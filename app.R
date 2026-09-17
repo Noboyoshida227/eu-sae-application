@@ -1309,7 +1309,7 @@ ui <- fluidPage(
           h4("Missing Poverty Rates"),
           tableOutput("readiness_missing"),
           h4("Auxiliary Covariate Summary"),
-          p("Means, standard errors, domain counts, and correlations with the domain-level target indicator (poverty rate or mean welfare, matching the Indicator selector), shown for each year separately and pooled over all years."),
+          p("Means, standard errors, domain counts, and Pearson correlations with the domain-level target indicator (poverty rate or mean welfare, matching the Indicator selector), shown for each year separately and pooled over all years. The p-value tests whether the correlation differs from zero (two-sided); significance codes: *** p < 0.001, ** p < 0.01, * p < 0.05, . p < 0.1. Variables are listed from the most to the least significant pooled correlation."),
           tableOutput("readiness_aux")
         ),
 
@@ -2784,10 +2784,15 @@ server <- function(input, output, session) {
     df <- rr$aux_summary
     cor_label <- attr(df, "cor_target_label") %||% "Corr. w/ Poverty"
     if (!"year" %in% names(df)) df$year <- "All years"
-    df <- df[, c("variable", "year", "mean", "se", "n_obs", "cor_poverty")]
+    if (!"cor_pvalue" %in% names(df)) df$cor_pvalue <- NA_real_
+    if (!"cor_signif" %in% names(df)) df$cor_signif <- ""
+    df <- df[, c("variable", "year", "mean", "se", "n_obs", "cor_poverty", "cor_pvalue", "cor_signif")]
     # Show the variable name once per block so the per-year rows read as a group.
     df$variable <- ifelse(duplicated(df$variable), "", df$variable)
-    names(df) <- c("Variable", "Year", "Mean", "Std. Error", "N (domains)", cor_label)
+    df$cor_pvalue <- ifelse(is.na(df$cor_pvalue), "",
+                            formatC(df$cor_pvalue, format = "g", digits = 3))
+    names(df) <- c("Variable", "Year", "Mean", "Std. Error", "N (domains)", cor_label,
+                   "p-value", "Signif.")
     df
   }, striped = TRUE, digits = 4)
 

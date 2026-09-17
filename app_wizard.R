@@ -1127,7 +1127,7 @@ ui <- fluidPage(
             h4("Missing Poverty Rates"),
             tableOutput("readiness_missing"),
             h4("Auxiliary Covariate Summary"),
-            p("Means, standard errors, domain counts, and correlations with the domain-level target indicator (poverty rate or mean welfare, matching the Indicator selector), shown for each year separately and pooled over all years."),
+            p("Means, standard errors, domain counts, and Pearson correlations with the domain-level target indicator (poverty rate or mean welfare, matching the Indicator selector), shown for each year separately and pooled over all years. The p-value tests whether the correlation differs from zero (two-sided); significance codes: *** p < 0.001, ** p < 0.01, * p < 0.05, . p < 0.1. Variables are listed from the most to the least significant pooled correlation."),
             tableOutput("readiness_aux")
           ),
         

@@ -3,6 +3,7 @@
 ## 5.2.0-rc.6-wizard.5.8 - 2026-09-17
 
 - Maps of one kind now share one legend range (`sae_shared_limits()` in `R/map_style.R`): all poverty maps (Direct, UFH, MFH, benchmarked variants, both years) use one value range, all RMSE maps another, and all change maps a symmetric range around zero, so the same colour means the same value on every map and colours can be compared across methods and years. Previously each map stretched the colours over its own minimum and maximum (announced with w5g but not included in that build). The UFH figures in `outputs/figures/` (`ufh_map_y*.png`, `ufh_rmse_map_y*.png`, EUR maps) follow the same rule across both years. Report captions updated.
+- Data Readiness: the "Auxiliary Covariate Summary" table now reports, next to each correlation with the target indicator, the two-sided p-value of the Pearson correlation test and significance codes (*** p < 0.001, ** p < 0.01, * p < 0.05, . p < 0.1), for each year and pooled. Variables are listed from the most to the least significant pooled correlation (unavailable correlations last), with the year rows kept together under each variable. `outputs/tables/aux_covariate_summary.csv` gains `cor_pvalue` and `cor_signif` columns and is written in the same order.
 - The package now lives at github.com/Noboyoshida227/eu-sae-application (fresh public repository; the maintainer guide `HOW_TO_RELEASE.md` points there). Country data folders (`Data/Greece/`) are excluded from the repository by `.gitignore`.
 - No change to estimates, MSEs or model selection.
 

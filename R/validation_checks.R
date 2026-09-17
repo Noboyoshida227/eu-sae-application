@@ -260,6 +260,48 @@ readiness_key_value_issues <- function(data, needed, label) {
   sprintf("%s %s", label, paste(parts, collapse = "; "))
 }
 
+readiness_signif_stars <- function(p) {
+  p <- suppressWarnings(as.numeric(p))
+  out <- rep("", length(p))
+  out[!is.na(p) & p < 0.1]   <- "."
+  out[!is.na(p) & p < 0.05]  <- "*"
+  out[!is.na(p) & p < 0.01]  <- "**"
+  out[!is.na(p) & p < 0.001] <- "***"
+  out
+}
+
+# Sort the covariate summary so that variables appear in order of the
+# statistical significance of their correlation with the target: the pooled
+# ("All years") p-value first, the smallest p-value across years as a
+# fallback, then the absolute correlation as tie-breaker, unavailable
+# correlations last. Rows of one variable stay together, years in order.
+readiness_sort_by_significance <- function(aux_summary) {
+  if (is.null(aux_summary) || nrow(aux_summary) == 0L ||
+      !all(c("variable", "year", "cor_pvalue", "cor_poverty") %in% names(aux_summary))) {
+    return(aux_summary)
+  }
+  vars <- unique(aux_summary$variable)
+  key <- vapply(vars, function(v) {
+    rows <- aux_summary[aux_summary$variable == v, , drop = FALSE]
+    pooled <- rows$cor_pvalue[rows$year == "All years"]
+    p <- if (length(pooled) && is.finite(pooled[1])) pooled[1] else
+      suppressWarnings(min(rows$cor_pvalue, na.rm = TRUE))
+    if (!is.finite(p)) p <- 2  # no usable correlation: after every real p-value
+    r <- suppressWarnings(max(abs(rows$cor_poverty), na.rm = TRUE))
+    if (!is.finite(r)) r <- 0
+    c(p = p, r = r)
+  }, numeric(2))
+  ord <- order(key["p", ], -key["r", ], vars)
+  var_rank <- match(aux_summary$variable, vars[ord])
+  year_rank <- match(aux_summary$year, unique(aux_summary$year))
+  out <- aux_summary[order(var_rank, year_rank), , drop = FALSE]
+  rownames(out) <- NULL
+  for (a in setdiff(names(attributes(aux_summary)), c("names", "row.names", "class"))) {
+    attr(out, a) <- attr(aux_summary, a, exact = TRUE)
+  }
+  out
+}
+
 empty_readiness_result <- function(messages = character(),
                                    cor_target_label = "Corr. w/ Poverty") {
   aux_summary <- data.frame(
@@ -269,6 +311,8 @@ empty_readiness_result <- function(messages = character(),
     se          = numeric(),
     n_obs       = integer(),
     cor_poverty = numeric(),
+    cor_pvalue  = numeric(),
+    cor_signif  = character(),
     stringsAsFactors = FALSE
   )
   attr(aux_summary, "cor_target_label") <- cor_target_label
@@ -494,6 +538,8 @@ assess_data_readiness <- function(survey_data,
     se          = NA_real_,
     n_obs       = NA_integer_,
     cor_poverty = NA_real_,
+    cor_pvalue  = NA_real_,
+    cor_signif  = "",
     stringsAsFactors = FALSE
   )
   merged_year <- if (length(aux_years)) {
@@ -516,8 +562,17 @@ assess_data_readiness <- function(survey_data,
     both <- ok & !is.na(y)
     if (sum(both) > 2 && stats::sd(x[both]) > 0 && stats::sd(y[both]) > 0) {
       aux_summary$cor_poverty[i] <- round(stats::cor(x[both], y[both]), 4)
+      # Two-sided test of H0: rho = 0 (Pearson, t distribution with n - 2 df).
+      pv <- tryCatch(stats::cor.test(x[both], y[both])$p.value, error = function(e) NA_real_)
+      aux_summary$cor_pvalue[i] <- if (is.finite(pv)) signif(pv, 3) else NA_real_
+      aux_summary$cor_signif[i] <- readiness_signif_stars(pv)
     }
   }
+
+  # Order the variables by the significance of their pooled ("All years")
+  # correlation, most significant first, so that the strongest candidates
+  # are at the top of the table; years stay grouped under each variable.
+  aux_summary <- readiness_sort_by_significance(aux_summary)
 
   # Carry the indicator-aware label alongside the table so callers can
   # render a meaningful column header (the column itself stays named
@@ -526,7 +581,7 @@ assess_data_readiness <- function(survey_data,
   attr(aux_summary, "cor_target_label") <- cor_target_label
 
   msgs <- c(msgs, sprintf(
-    "Test 1: Auxiliary covariate summary computed for %d variables, separately for %d year(s) and pooled across %d domain-year observations (correlation against %s).",
+    "Test 1: Auxiliary covariate summary computed for %d variables, separately for %d year(s) and pooled across %d domain-year observations (Pearson correlation against %s with two-sided p-values; variables listed from most to least significant pooled correlation).",
     length(aux_vars), length(aux_years), nrow(aux_data), fgt_noun
   ))
 
