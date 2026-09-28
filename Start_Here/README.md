@@ -1,6 +1,8 @@
 # Start the application
 
-Extract the whole ZIP first, then open this `Start_Here` folder and run the
+Download the application zip from
+<https://github.com/Noboyoshida227/eu-sae-application/releases> (under **Assets**; not the
+"Source code" archives). Extract the whole ZIP first, then open this `Start_Here` folder and run the
 launcher for your computer. Keep `Start_Here` directly inside the package
 folder — the launchers use the folder above as their working directory.
 
@@ -25,16 +27,18 @@ internet connection. Later runs start much faster.
    computer, do not replace your organization's R installation unless IT asks
    you to. On a Mac, choose the `.pkg` installer matching your chip (Apple
    silicon or Intel).
-2. For HTML and Word reports, install **one** of these free options. You do not
-   need all three:
+2. HTML and Word reports need Pandoc. Usually there is nothing to install: the
+   launcher reuses a Pandoc that is already on the computer and otherwise
+   downloads a checksum-verified copy the first time (see "Pandoc" below). To
+   work without internet access, install **one** of these free options first:
    - **RStudio Desktop:** <https://posit.co/download/rstudio-desktop/>
    - **Quarto:** <https://quarto.org/docs/get-started/>
    - **Standalone Pandoc:** <https://pandoc.org/installing.html>
 
-The application may open without Pandoc, but report creation will fail. If your
-organization limits software or R-package installation, ask IT for an approved
-R 4.2+ installation, one option above, and access to the approved R package
-repository.
+Without Pandoc the analysis still runs; the run then ends as *Analysis
+completed - report unavailable*. If your organization limits software or
+R-package installation, ask IT for an approved R 4.2+ installation, Pandoc (or
+one option above), and access to the approved R package repository.
 
 ---
 
@@ -97,9 +101,13 @@ On Windows the equivalent is `setx EU_SAE_RSCRIPT "C:\Program Files\R\R-4.5.2\bi
 
 ---
 
-## After a run
+## During and after a run
 
-Open `../outputs/final_report.html` in a browser, or
+While an analysis runs, the page stays usable and the log updates live.
+**Stop**, next to **Run Analysis**, ends the run; it then finishes as *Stopped
+by user*. Press **Stop** before closing the terminal window.
+
+After a run, open `../outputs/final_report.html` in a browser, or
 `../outputs/final_report.docx` in Word (paths relative to this folder). The Word
 text and tables are editable and the figures are embedded — save a separate copy
 before editing. If only the HTML appears, check the run log for a

@@ -1,7 +1,7 @@
 @echo off
 setlocal DisableDelayedExpansion
 REM ============================================================
-REM  EU SAE Dashboard 5.2.0-rc.6-wizard.5.8 - One-click launcher (Windows)
+REM  EU SAE Dashboard 5.2.0-rc.6-wizard.5.9 - One-click launcher (Windows)
 REM
 REM  Double-click this file to start the dashboard.
 REM  Your default web browser will open with the dashboard.
@@ -135,7 +135,7 @@ REM  - Then sources app.R directly. app.R contains its own non-interactive
 REM    launcher, which prefers port 7777 and automatically falls back to the
 REM    next free local port if 7777 is already in use. Calling source('app.R') instead
 REM    of shiny::runApp(appDir=...) avoids a double-runApp nesting that
-REM    breaks static asset serving (www/eu_poverty_map.png and friends).
+REM    breaks static asset serving (www/cover_map_spain.png and friends).
 "%RSCRIPT%" -e "if (file.exists('install_packages.R')) source('install_packages.R'); source('app.R')"
 set "APP_EXIT=%ERRORLEVEL%"
 

@@ -26,10 +26,9 @@ others' private information, and sustained disruption of discussions.
 
 ## Reporting
 
-Report concerns to the maintainers through a private channel rather than a
-public issue, or to github@worldbank.org. Reports will be reviewed and handled
-discreetly. The World Bank organization's own code of conduct also applies to
-activity in this repository.
+Report concerns privately to the maintainer, Nobuo Yoshida (see the contact
+options on the GitHub profile github.com/Noboyoshida227), rather than in a
+public issue. Reports will be reviewed and handled discreetly.
 
 ## Scope
 

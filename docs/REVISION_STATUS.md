@@ -14,7 +14,7 @@ closure is claimed.
 | B3 | Partial | Removed the absolute 0.001 cutoff. Positive lower-tail replacement is disabled by default; any multiplier still needs method-owner approval and simulation. |
 | B4 | Implemented | AI prompts are evidence-conditional and no longer assert fixed conclusions or eight combinations. |
 | B5 | Partial | Added explicit external-transfer consent, prompt minimization, a prompt-injection guard and configurable gateway URLs. Lawful basis, provider/retention terms and institutional approval remain open. |
-| B6 | Partial—release blocker | Non-inventory literature files are excluded. The candidate includes only listed Spain RDS and simulated examples; the replacement Spain map has documented IGN/CNIG CC BY 4.0 provenance; the survey derivation remains missing. Public Git history/release assets remain unremediated and non-code rights remain unapproved. |
+| B6 | Partial—blocks production/official release | Non-inventory literature files are excluded. The candidate includes only listed Spain RDS and simulated examples; the replacement Spain map has documented IGN/CNIG CC BY 4.0 provenance; the survey derivation remains missing. The canonical repository was restarted with a fresh history on 17 Sep 2026 and the previous one deleted on 27 Sep 2026 (`docs/HISTORY_REMEDIATION.md`); older repositories still need review, and non-code rights remain unapproved. |
 | B7 | Implemented | Added targeted tests and CI; this is code QA, not statistical validation. |
 | B8 | Implemented | Removed hard-coded Greece labels and added a country/territory input. |
 | H1 | Implemented | Input-load failure is blocking. |
@@ -28,7 +28,7 @@ closure is claimed.
 | H9 | Implemented | Run metadata and input hashes are captured before one final report render. MFH inversion, robust-refit, condition-number-method, and g3/MSE availability diagnostics are added after the MFH step and explicitly printed in the report. |
 | H10 | Implemented | UFH complete-case filtering uses required estimation fields and logs excluded domain IDs. |
 | H11 | Partial | Diagnostics are more visible, but no institutionally approved warning/action policy or thresholds exist. |
-| H12 | Implemented | Delimited inputs default to UTF-8 with a documented override. |
+| H12 | Implemented | Delimited inputs are read as UTF-8 when valid and as Latin-1 otherwise, without re-encoding, so no rows are lost; `SAE_INPUT_ENCODING` overrides. |
 | H13 | Partial | Quality indicators are exported, but publication thresholds and actions remain unapproved. |
 | H14 | Implemented | Duplicate rendering was removed; the final report follows completed run metadata. |
 | H15 | Implemented | Missing normality p-values are reported as unavailable rather than failed. |
@@ -38,7 +38,7 @@ closure is claimed.
 | H19 | Open | Remote branches/tags and publication workflow require repository-owner action. |
 | H20 | Implemented | Added VERSION/changelog and replaced country-specific labels. |
 | H21 | Implemented | README plus DOCX/PDF/PPTX were refreshed for 5.2.0-rc.6, clean-build contents, reproducibility controls, pointwise inference and embedded AI interpretation; superseded binaries are excluded by the explicit release inventory. |
-| H22 | Open—release blocker | Existing Git history remains large and retains prohibited/superseded binaries. Follow `docs/HISTORY_REMEDIATION.md`; no history rewrite is claimed. |
+| H22 | Partial | The canonical repository (eu-sae-application) was started with a fresh history that contains none of the prohibited binaries; the previous repository was deleted on 27 Sep 2026. Older repositories that predate the fresh start still need review (`docs/HISTORY_REMEDIATION.md`). |
 | M1 | Open | Robustness and estimator behavior still need representative numerical/statistical validation. |
 | M2 | Open | No approved change to the issue's method/default policy is claimed. |
 | M3 | Implemented | Clean exports omit run histories and input-file copies. |
@@ -55,7 +55,7 @@ closure is claimed.
 | M14 | Open | No substantive closure is claimed; requires method-owner validation. |
 | M15 | Open | No substantive closure is claimed; requires method-owner validation. |
 | M16 | Open | No substantive closure is claimed; requires method-owner validation. |
-| M17 | Partial—release blocker | Added scoped LICENSE, NOTICE, third-party inventory and governance file. Institutional copyright/release authority, asset ownership and disclaimer approval remain unresolved. |
+| M17 | Partial—blocks production/official release | Added scoped LICENSE, NOTICE, third-party inventory and governance file. Institutional copyright/release authority, asset ownership and disclaimer approval remain unresolved. |
 | M18 | Implemented | Robust MFH2 refit now applies one shared complete-case mask. |
 | L1 | Implemented | Bootstrap time-loop construction now handles `nT = 1`; convergence checks use `isTRUE`. |
 | L2 | Open | Canonical remote tag/case cleanup remains repository-owner work. |
@@ -66,9 +66,11 @@ closure is claimed.
 | L7 | Open | Full accessibility remediation remains incomplete. |
 | L8 | Open | Remaining statistical/documentation convention requires owner decision. |
 
-## Public-sharing gate
+## Public sharing
 
-The history-free clean folder may be used for controlled review. Public sharing
-remains blocked by B6/H22 (public history and release assets) and M17 (document,
-asset and institutional release authority). Passing tests and checksums does not
-approve estimators, privacy basis, data rights or official statistical use.
+The maintainer publishes the package as an unofficial release candidate on the
+GitHub Releases page, https://github.com/Noboyoshida227/eu-sae-application/releases, for
+review and testing. M17 (document, asset and institutional release authority)
+remains open: the package is not an official World Bank Group product. Passing
+tests and checksums does not approve estimators, privacy basis, data rights or
+official statistical use.

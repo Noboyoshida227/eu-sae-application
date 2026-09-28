@@ -24,6 +24,11 @@ What it changes
      guidelines note (.docx) - these are ZIP files of XML underneath.
   5. Regenerates the download-instructions PDF via tools/build_instruction_pdf.py
      (skip with --skip-pdf if reportlab is unavailable here; regenerate later).
+  6. With --release-name, writes RELEASE_NAME and replaces the old release
+     name (e.g. EU_SAE_520_w5h) with the new one in the same text files and
+     inside the slide deck and guidelines note.
+  Folders in SKIP_DIRS (dist, tmp, outputs, app_runs, "Claude outputs", ...)
+  are never touched.
 
 What it does NOT do
   - It does not write the CHANGELOG entry. Add one under "## <new version>"
@@ -39,7 +44,7 @@ os.chdir(ROOT)
 TEXT_EXT = {".R", ".Rmd", ".md", ".txt", ".csv", ".bat", ".command", ".sh",
             ".yml", ".yaml", ".json", ".ps1", ".py", ".lua", ".gitattributes"}
 SKIP_DIRS = {".git", "dist", "tmp", "outputs", "app_runs", "r_local_library",
-             "node_modules", ".Rproj.user", ".claude"}
+             "node_modules", ".Rproj.user", ".claude", "Claude outputs"}
 SKIP_FILES = {"docs/CHANGELOG.md",           # history - never rewritten
               "tools/bump_version.py"}       # this file quotes versions as examples
 OFFICE_TARGETS = [                            # (path pattern, XML parts to patch)
@@ -102,6 +107,9 @@ def main():
     if (ROOT / "dist" / short_name).exists():
         die(f"Release folder already exists: dist/{short_name}")
     old_tok, new_tok = token(old), token(new)
+    rn_file = ROOT / "RELEASE_NAME"
+    old_short = rn_file.read_text(encoding="utf-8").strip() if rn_file.exists() else ""
+    swap_short = bool(a.release_name) and bool(old_short) and old_short != short_name
     dry = a.dry_run
     say(f"{'DRY RUN - ' if dry else ''}{old}  ->  {new}")
     say(f"{'          ' if dry else ''}{old_tok}  ->  {new_tok}\n")
@@ -130,11 +138,13 @@ def main():
     for p in sorted(tracked_text_files()):
         b = p.read_bytes()
         n1, n2 = b.count(old.encode()), b.count(old_tok.encode())
-        if not (n1 or n2): continue
+        n3 = b.count(old_short.encode()) if swap_short and p.name != "RELEASE_NAME" else 0
+        if not (n1 or n2 or n3): continue
         nb = b.replace(old.encode(), new.encode()).replace(old_tok.encode(), new_tok.encode())
+        if n3: nb = nb.replace(old_short.encode(), short_name.encode())
         if not dry: p.write_bytes(nb)
-        say(f"  {p.as_posix():<62} {n1 + n2:>3} replacement(s)")
-        n_files += 1
+        say(f"  {p.as_posix():<62} {n1 + n2 + n3:>3} replacement(s)")
+        if n1 or n2: n_files += 1
     if n_files == 0: die("no text file contained the old version - is WIZARD_VERSION out of step with the tree?")
 
     # ---- 4. office documents ----------------------------------------------
@@ -142,6 +152,8 @@ def main():
     for pat, part in OFFICE_TARGETS:
         p = pat.format(tok=old_tok)
         n = patch_office_zip(p, part, old, new, dry)
+        if swap_short:
+            n += patch_office_zip(p, part, old_short, short_name, dry)
         say(f"  {p:<62} {n:>3} replacement(s)")
 
     # ---- 3. renames ---------------------------------------------------------

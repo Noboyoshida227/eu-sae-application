@@ -354,6 +354,103 @@ display: none;
 
 <section id="changelog" class="level1">
 <h1>Changelog</h1>
+<section id="rc.6-wizard.5.9---2026-09-28" class="level2">
+<h2>5.2.0-rc.6-wizard.5.9 - 2026-09-28</h2>
+<ul>
+<li>Data Readiness tables are kept with the run. <strong>Run
+Analysis</strong> repeats the readiness check and then clears
+<code>outputs/</code> for the new run; that clean-up no longer deletes
+the readiness tables (<code>aux_covariate_summary.csv</code> with
+<code>cor_pvalue</code> and <code>cor_signif</code>,
+<code>national_poverty.csv</code>,
+<code>domain_poverty_rates.csv</code>,
+<code>domain_consistency.csv</code>, <code>readiness_messages.txt</code>
+and, when cells are missing, <code>missing_poverty.csv</code>). They
+stay in <code>outputs/tables/</code> and are archived with the run. A
+readiness check that finds no missing cells now also removes a
+<code>missing_poverty.csv</code> left by an earlier check. Runs started
+outside the app (scripts, tests) clear everything as before. New
+dev-only test <code>tests/test_readiness_tables.R</code> (10
+checks).</li>
+<li>The package is published on GitHub Releases:
+https://github.com/Noboyoshida227/eu-sae-application/releases. The
+download instructions, READMEs, release notices, user guide and
+guidelines note now point there and no longer say that public sharing is
+blocked. The package remains a release candidate: it is not an official
+World Bank Group product and is not approved for official
+statistics.</li>
+<li>Documentation brought up to date with w5g and w5h: the background
+run and <strong>Stop</strong> button, the shared map colour scheme and
+legend ranges, and the p-values in the Data Readiness covariate summary
+are now described in the README, the wizard reference, the launcher
+README, the download instructions, the user guide (slides 26 and 28) and
+the guidelines note (Sections 5.7, 10.4, 11.1 and 11.8 and Annexes C and
+E). Figures 8a, 8b and 9 of the guidelines note were redrawn with the
+current maps and carry the IGN boundary credit. Stale folder names and
+examples were corrected.</li>
+<li>New landing-page and slide-guide illustration
+<code>www/cover_map_spain.png</code>, drawn by the package from the
+Spain example (<code>tools/make_cover_map.R</code>). It replaces the
+former EU map picture, whose source and licence were not recorded, on
+the landing page, in the slide guide, on the guidelines-note cover and
+in its Figure 10 (a new landing-page screenshot).</li>
+<li><code>tools/bump_version.py</code> also replaces the old release
+name in the documents that mention it, and never touches the ignored
+<code>Claude outputs/</code> folder.</li>
+<li>The package is an independent project and will not become a World
+Bank Group repository. Removed: the World Bank contact addresses in
+<code>CODE_OF_CONDUCT.md</code> and <code>CONTRIBUTING.md</code>
+(concerns and questions now go to the maintainer through GitHub), the
+“Official Use Only” label on the user-guide slides, the “World Bank
+Group” affiliation on the user-guide title slide, the World Bank e-mail
+contact on its last slide (now the GitHub issues page) and the “World
+Bank Group” footer on the landing page (now “Independent release
+candidate for review and testing”). <code>README.md</code>,
+<code>NOTICE</code>, <code>CONTRIBUTING.md</code> and
+<code>docs/GOVERNANCE.md</code> say so.</li>
+<li>Text inputs (CSV, TXT, TSV, DAT) are no longer cut short when they
+are not UTF-8. Since 5.2.0-rc.1 they were re-encoded with
+<code>fileEncoding = "UTF-8"</code>, which stops at the first byte that
+is not valid UTF-8 and keeps only the rows before it, with nothing more
+than a warning: a Windows-1252 or Windows-1250 CSV (Excel’s default
+“CSV” on Windows) with one accented name lost every later row. Files are
+now read without re-encoding, as UTF-8 when they are valid UTF-8 (a
+byte-order mark is removed from the first column name) and otherwise as
+Latin-1 with a warning, so every row is kept.
+<code>SAE_INPUT_ENCODING</code> still forces an encoding. RDS, Stata,
+SPSS, SAS, Parquet, Feather and Excel inputs are not affected. New
+dev-only test <code>tests/test_input_encoding.R</code>.</li>
+<li>The <em>Analysis seed</em> tooltip now says what the seed controls:
+the LASSO folds and the MFH bootstrap draws. The UFH and benchmarking
+bootstraps use a fixed seed.</li>
+<li>Notes for users upgrading from v5.1.0 (no code change in 5.9):
+<ul>
+<li>UFH: a domain whose direct estimate is exactly 0 (or exactly 1 for
+the headcount ratio) stays in the UFH fit, with a variance based on its
+sample size (5.2.0-rc.1 and rc.4). v5.1.0 dropped such domains from the
+fit and gave them a synthetic estimate, so UFH estimates and MSEs change
+for every domain in a year that has such a domain. MFH kept them in both
+versions.</li>
+<li>MFH change tests: the MCPE bootstrap uses 200 replicates by default
+(v5.1.0: 50, fixed), and its seed follows the analysis seed. Domains
+with a p-value close to 0.05 can change significance.</li>
+<li>MFH3: v5.1.0 could not fit MFH3 (its msae patch made
+<code>eblupMFH3</code> fail, and the failure was reported as
+non-convergence), so MFH2 was always used. Since rc.5 MFH3 is fitted and
+chosen by the Molina-Romero rule.</li>
+<li>MFH <code>sm_out</code>: direct variances larger than 5 times the
+smoothed variance are no longer replaced (post-rc.6 revision). This
+supersedes the rc.1 note on a “configurable relative rule”: the only
+replacement rule is the absolute 0.001 cutoff, and the configuration key
+<code>mfh.variance_lower_multiplier</code> has no effect.</li>
+<li>On the Spain example with the default settings, the direct
+estimates, the MFH2 estimates and MSEs and all selected covariates are
+identical to v5.1.0.</li>
+</ul></li>
+<li>No change to estimates, MSEs or model selection for inputs that were
+already read completely.</li>
+</ul>
+</section>
 <section id="rc.6-wizard.5.8---2026-09-17" class="level2">
 <h2>5.2.0-rc.6-wizard.5.8 - 2026-09-17</h2>
 <ul>

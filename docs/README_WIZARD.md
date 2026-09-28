@@ -1,6 +1,6 @@
 # EU SAE Dashboard — Wizard edition
 
-Wizard version: **5.2.0-rc.6-wizard.5.8**
+Wizard version: **5.2.0-rc.6-wizard.5.9**
 Underlying EU SAE package: **5.2.0-rc.6**
 
 This is the clean 5.2.0-rc.6 application package with an additional guided
@@ -22,6 +22,10 @@ reuses the same server logic.
 Both dashboards may run at the same time because they use different ports.
 
 ## Run the wizard
+
+Download the application zip from the Releases page,
+<https://github.com/Noboyoshida227/eu-sae-application/releases> (under **Assets**; not the automatic "Source code"
+archives), and extract the whole zip into a new folder.
 
 R 4.2.0 or later is required. Use the newest version that your organization has
 approved and made available; the absolute latest R release is not required. On
@@ -117,18 +121,54 @@ incomplete, and the wizard lists the outstanding items. The final run control
 is disabled until the fatal data prerequisites are present. The shared rc.6
 server performs its own configuration and readiness checks before analysis.
 
+### Data Readiness
+
+**1. Check Data Readiness** (and every **Run Analysis**, which repeats the
+check first) writes the readiness tables to `outputs/tables/`:
+`aux_covariate_summary.csv`, `national_poverty.csv`, `domain_poverty_rates.csv`,
+`domain_consistency.csv`, `readiness_messages.txt` and, when cells are missing,
+`missing_poverty.csv`. They are kept through the run and archived with it.
+
+The *Auxiliary Covariate Summary* reports, for each covariate and each analysis
+year plus "All years", the mean, standard error, number of domains and the
+correlation with the target indicator, together with the two-sided p-value of
+the Pearson correlation test (`cor_pvalue`) and significance codes
+(`cor_signif`: `***` p < 0.001, `**` p < 0.01, `*` p < 0.05, `.` p < 0.1).
+Covariates are listed from the most to the least significant pooled
+correlation, with each covariate's year rows kept together. These bivariate
+tests are a screening aid; they do not replace the model-based covariate
+selection in UFH and MFH.
+
 ### Running and stopping
 
 **2. Run Analysis** starts the UFH / MFH / Comparison steps, the optional AI
 interpretation, the report and the archive copy in a separate R process
 (`scripts/run_pipeline_bg.R`). The page stays responsive while it works: the
 log pane follows `app_runs/<run>/run.log` live and the progress bar follows
-the step in progress. Only one analysis runs at a time; a second click on
-**Run Analysis** is refused until the current run has ended. **Stop** ends
+the step in progress. A second click on **Run Analysis** is refused until the
+current run has ended. Do not start analyses from two browser pages, or from
+the wizard and the classic dashboard, at the same time: they share `outputs/`,
+and the second run clears the first run's files. **Stop** ends
 the run: the R process of the current step is terminated and the run
 finishes with the status *Stopped by user*. Files written before the stop
 remain in `outputs/` until the next run; nothing is archived and no report is
-produced. Closing the black launcher window also ends a running analysis.
+produced. Press **Stop** before closing the black launcher window.
+
+### Maps
+
+All maps use one colour scheme (`R/map_style.R`). Level maps (poverty rates,
+RMSE, mean welfare) use the reversed magma scale, lighter = lower and darker =
+higher; change maps (poverty change, growth rates) use a blue–white–red scale
+with white at zero. In the final report (Comparison step), all poverty maps
+(every method, both years) share one legend range, all RMSE maps share
+another, and the poverty-change maps share one range that is symmetric around
+zero, so the same colour means the same value on every map of that kind. The
+UFH and MFH step figures in `outputs/figures/` use one range across both years
+within their own step; the growth-rate maps have their own scale. Domains
+without an estimate are grey. Maps drawn on the bundled Spain boundary carry
+the IGN credit required by its CC BY 4.0 licence.
+
+### AI assistance
 
 AI assistance is optional. When enabled, it requires both an API key and a
 separate acknowledgement that aggregate estimates, uncertainty measures,
@@ -173,10 +213,9 @@ The first command covers the rc.6 package tests plus wizard parsing, version,
 and required-control checks. The second renders both interfaces and verifies
 that every classic-dashboard element ID appears exactly once in the wizard.
 
-See `docs/WIZARD_RELEASE_NOTICE.txt`, `docs/RELEASE_CHECKLIST.md`, and
-`docs/HISTORY_REMEDIATION.md` before public distribution. This is an internal-review candidate,
-not evidence that institutional rights or repository-history remediation have
-been completed.
+See `docs/WIZARD_RELEASE_NOTICE.txt` and `docs/RELEASE_CHECKLIST.md`. This is a
+release candidate published for review and testing; it is not an official World
+Bank Group product and is not approved for official statistics.
 
 ## Input folder migration
 

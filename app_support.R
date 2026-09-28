@@ -850,13 +850,29 @@ enrich_diagnostics_from_output <- function(output_df, yr, model_type = "UFH") {
   sprintf("[SAE_STEP_COMPLETE] %s", step)
 }
 
-.pipeline_clean_outputs <- function(logger = message) {
+# Tables written by "Check Data Readiness" (assess_data_readiness() in
+# R/validation_checks.R, saved to outputs/tables).
+.SAE_READINESS_TABLES <- c(
+  "aux_covariate_summary.csv", "national_poverty.csv", "domain_poverty_rates.csv",
+  "missing_poverty.csv", "domain_consistency.csv", "readiness_messages.txt"
+)
+
+# Empties outputs/ before a run. When the pipeline runs under the app's
+# background driver (SAE_RUN_DIR is set), the dashboard's Run Analysis handler
+# has just rewritten the Data Readiness tables from this run's own inputs, so
+# they are kept: they stay in outputs/tables and are archived with the run.
+# Runs started any other way (scripts, tests) clear them as before.
+.pipeline_clean_outputs <- function(logger = message,
+                                    keep_readiness = nzchar(Sys.getenv("SAE_RUN_DIR", ""))) {
   roots <- c("outputs/data", "outputs/tables", "outputs/figures", "outputs/logs")
   for (root in roots) {
     dir.create(root, recursive = TRUE, showWarnings = FALSE)
     generated <- list.files(root, full.names = TRUE, recursive = FALSE,
                             all.files = TRUE, no.. = TRUE)
     generated <- generated[basename(generated) != ".gitkeep"]
+    if (isTRUE(keep_readiness) && identical(root, "outputs/tables")) {
+      generated <- generated[!basename(generated) %in% .SAE_READINESS_TABLES]
+    }
     if (length(generated) > 0) {
       unlink(generated, recursive = TRUE, force = TRUE)
     }
@@ -865,7 +881,11 @@ enrich_diagnostics_from_output <- function(output_df, yr, model_type = "UFH") {
     c("outputs/final_report.html", "outputs/final_report.docx", "outputs/comparison_ai_note.html"),
     force = TRUE
   )
-  logger("Cleared previous generated outputs for this run.")
+  logger(if (isTRUE(keep_readiness)) {
+    "Cleared previous generated outputs for this run (Data Readiness tables kept)."
+  } else {
+    "Cleared previous generated outputs for this run."
+  })
 }
 
 # Result helper for render_final_report(): a plain list the dashboard can show.

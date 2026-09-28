@@ -1,9 +1,10 @@
 # Governance and release authority
 
-This repository does not currently establish an institutional product owner,
-method owner, release approver, security owner, support service level, or
-World Bank Group publication authorization. Existing author names and
-affiliations in documents are not substitutes for those approvals.
+This is an independent project maintained by Nobuo Yoshida. It is not, and is
+not intended to become, an official World Bank Group repository or product.
+It has no institutional product owner, method owner, release approver, security
+owner or support service level. Author names and affiliations that appear in
+documents do not imply institutional endorsement.
 
 ## Interim change control
 
@@ -11,7 +12,7 @@ affiliations in documents are not substitutes for those approvals.
 2. Statistical-method changes require a named method owner, validation evidence
    and recorded approval before production use.
 3. Data, documentation, image and third-party rights require an approved asset
-   inventory before publication.
+   inventory before an official or production release.
 4. Security/privacy changes require review of data flows, providers, retention,
    residency, incident response and user notices.
 5. A release manager records test, checksum, platform and document-QA evidence

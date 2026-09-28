@@ -2,6 +2,14 @@
 
 ## Start here
 
+Download the package from the [Releases page](https://github.com/Noboyoshida227/eu-sae-application/releases): under **Assets**, take
+the application zip (`EU_SAE_520_….zip`), not the automatic "Source code"
+archives. Compare its SHA-256 with the value on the release page, then extract
+the whole zip. This is an independent project maintained by Nobuo Yoshida, not a
+World Bank Group repository. The package is a release candidate for review and
+testing; it is not an official World Bank Group product and is not approved for
+official statistics.
+
 Install **R 4.2 or later** and run `install_packages.R` once to install the
 required packages. Use the newest R version that your organization has approved
 and made available; installing the absolute latest release is not required.
@@ -33,8 +41,8 @@ Ports advance if occupied. There is no supplied wizard shell launcher; manual
 launch through R remains possible from the package root using
 `source("app_wizard.R")` after installing dependencies.
 
-- [Download and verification instructions](docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_8.pdf)
-- [Wizard reference](docs/README_WIZARD.md) and [slide guide](docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_8.pptx)
+- [Download and verification instructions](docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_9.pdf)
+- [Wizard reference](docs/README_WIZARD.md) and [slide guide](docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_9.pptx)
 - [Methodological guidance](docs/guidance/guidelines_v5_2_0_rc6_wizard.docx)
 - [Examples and your own input folders](Data/README.md)
 
@@ -75,8 +83,10 @@ Browse to three approved local inputs in the dashboard:
 3. domain geometry.
 
 Tabular formats: RDS/RData, CSV/TSV/TXT/DAT, Stata, SPSS, SAS, Parquet,
-Feather, and Excel. Text defaults to UTF-8; set `SAE_INPUT_ENCODING` before
-launch only when a documented source encoding differs. Geometry formats: sf
+Feather, and Excel. Text files are read as UTF-8 when they are valid UTF-8 (a
+byte-order mark is removed) and otherwise as Latin-1 with a warning, so no rows
+are lost; set `SAE_INPUT_ENCODING` before launch to force a specific source
+encoding. Geometry formats: sf
 RDS/RData, zipped ESRI shapefile, GeoPackage, GeoJSON, KML, and GML.
 
 The review candidate includes the documented Spain example and fully synthetic
@@ -84,6 +94,33 @@ examples under `Data/Spain/` and `Data/simulated/`. Neither provides real
 estimates. This candidate uses documented IGN/CNIG CartoBase ANE boundaries
 under CC BY 4.0; survey derivation and other release approvals remain open.
 See [data limitations and map attribution](Data/Spain/README.md) and `THIRD_PARTY_NOTICES.md`.
+
+## Readiness check, runs and maps
+
+- **1. Check Data Readiness** loads the inputs and checks columns, years, domain
+  keys, missing direct estimates and national totals. Its *Auxiliary Covariate
+  Summary* shows, for each covariate, the mean, its standard error and the
+  correlation with the target indicator, with the two-sided p-value of that
+  correlation and significance codes (`***` p < 0.001, `**` p < 0.01, `*`
+  p < 0.05, `.` p < 0.1), by year and pooled; covariates are listed from the
+  most to the least significant. Treat these as a screening aid only: model
+  selection happens in UFH/MFH. The readiness tables are written to
+  `outputs/tables/` (`aux_covariate_summary.csv` and others), refreshed when a
+  run starts, and archived with the run.
+- **2. Run Analysis** runs UFH, MFH, Comparison and the report in a separate R
+  process, so the page stays responsive and the log follows the run live. A
+  second click on **Run Analysis** is refused while a run is active. Do not
+  start analyses from two browser pages, or from the wizard and the dashboard,
+  at the same time: they share `outputs/`. **Stop** ends a run, which then
+  finishes as *Stopped by user*.
+- **Maps** use one colour scheme. Level maps (poverty rates, RMSE, mean
+  welfare) run from light (lower) to dark (higher); change maps use
+  blue–white–red with white at zero. In the final report, all poverty maps
+  (every method, both years) share one legend range, all RMSE maps share
+  another, and the poverty-change maps share one range centred on zero, so the
+  same colour means the same value on every map of that kind. The UFH and MFH
+  step figures in `outputs/figures/` use one range across both years within
+  their own step. Domains without an estimate are grey.
 
 ## Reproducibility controls
 
@@ -154,8 +191,8 @@ It creates fresh staging, a manifest, a ZIP and `SHA256SUMS.txt` under
 `dist/reorganized_candidate/` when called directly; an existing destination is never overwritten.
 The ZIP contains one package folder with unchanged version identifiers.
 Run `Rscript scripts/verify_release.R` from an extracted clean package to
-verify both its full file set and hashes. Passing verification is not public
-release approval. See `docs/RELEASE_CHECKLIST.md` before distribution.
+verify both its full file set and hashes. Passing verification does not approve
+the methods or official statistical use; see `docs/RELEASE_CHECKLIST.md`.
 
 ## Main contents
 
@@ -163,7 +200,7 @@ release approval. See `docs/RELEASE_CHECKLIST.md` before distribution.
 - `R/` application helpers
 - `scripts/` analysis and release tools
 - `tests/` targeted regression/static tests
-- `outputs/{data,tables,figures}/.gitkeep`
+- `outputs/{data,tables}/.gitkeep`
 - `docs/guidance/Technical notes/` and user instructions
 - release, privacy, support, data-rights, and issue-status documentation
 
@@ -186,6 +223,6 @@ uncertainty. See Section 11.9 of the guidance note.
 ### Short release packages
 
 Run `Release.ps1` from a clean, committed source folder to create
-`dist/EU_SAE_520_w5c/EU_SAE_520_w5c.zip` and its matching application folder.
+`dist/<RELEASE_NAME>/<RELEASE_NAME>.zip` and its matching application folder.
 `RELEASE_NAME` controls these short names; `WIZARD_VERSION` retains the full version.
 Use `tools/bump_version.py <new-version> --release-name <new-short-name>` for later releases.

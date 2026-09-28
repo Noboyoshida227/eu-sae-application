@@ -17,7 +17,7 @@ Every change you ever make is made here. Think of it as the manuscript.
 
 **The `dist` folder — where finished releases are kept.**
 `C:\Users\noboy\Repos\eu-sae-personal\dist\`
-Each release gets its own sub-folder, named after its version, containing a
+Each release gets its own sub-folder, named after its release name, containing a
 complete copy of the package and the zip file you send out. These are printed
 copies of the manuscript, frozen on the day they were made. **You never edit
 anything in here.** If you want to change something, edit the manuscript and
@@ -71,12 +71,14 @@ This program changes all of them in one go and regenerates the
 download-instructions PDF.
 
 ```powershell
-python tools\bump_version.py 5.2.0-rc.6-wizard.5.8-greece --release-name EU_SAE_520_w6
+python tools\bump_version.py <new-version> --release-name <new-release-name>
 ```
 
-The last part is the new version. Keep the pattern `5.2.0-rc.6-wizard.N-label`:
-increase `N` by one each release, and choose any short label (no spaces) that
-reminds you what the round was about — `greece`, `bugfix`, `october`.
+Replace `<new-version>` with the new version and `<new-release-name>` with the
+short name of the zip. The current ones are in the files `WIZARD_VERSION` and
+`RELEASE_NAME`: increase the last number of the version by one, and move the
+last letter of the release name on by one (w5h → w5i → w5j …). The program also
+writes the new release name into the slides and notes that mention it.
 
 It prints every file it touched. Add `--dry-run` at the end to see what it
 *would* change without changing anything.
@@ -110,19 +112,24 @@ Then run the checks from PowerShell and make sure they all pass:
 Rscript tests\run_tests.R
 Rscript tests\test_startup.R
 Rscript tests\test_pandoc_bootstrap.R
+Rscript tests\test_step_runner.R
+Rscript tests\test_mfh_coef_table.R
+Rscript tests\test_background_run.R
+Rscript tests\test_readiness_tables.R
+Rscript tests\test_input_encoding.R
 Rscript scripts\check_dependency_lock.R
 ```
 
 **2. Stamp the new version.**
 ```powershell
-python tools\bump_version.py 5.2.0-rc.6-wizard.5.8-greece --release-name EU_SAE_520_w6
+python tools\bump_version.py <new-version> --release-name <new-release-name>
 ```
 
 **3. Write down what changed.** Open `docs\CHANGELOG.md` in any text editor
 and add a short section at the very top, under a heading that matches the
 version you just stamped:
 ```
-## 5.2.0-rc.6-wizard.5.8-greece - 2026-09-10
+## <new-version> - <today's date>
 
 - What you changed, and why, in a few lines. Write it for your colleagues;
   you will paste it into the GitHub release page.
@@ -135,23 +142,24 @@ Write a one-line summary, click **Commit to main**, then **Push origin**.
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Release.ps1
 ```
-When it finishes, the zip is in `dist\EU_SAE_520_w6\`.
+When it finishes, the zip is in `dist\<new-release-name>\`.
 
 **Then publish.** `Release.ps1` ends by printing two `git tag` / `git push`
 lines with the commit filled in; run them (GitHub Desktop → Repository → Open in
 PowerShell, if `git` is not on your PATH). Then on GitHub:
 `github.com/Noboyoshida227/eu-sae-application/releases` → **Draft a new release**.
-In *Choose a tag* pick `v5.2.0-rc.6-wizard.5.8-greece` (or type it and click
-*Create new tag on publish* if you skipped the tag step). Paste your CHANGELOG
-section as the description, add the one line from `SHA256SUMS.txt`, attach the
-zip, tick *pre-release*, publish. Send colleagues the release link, e.g.
-`github.com/Noboyoshida227/eu-sae-application/releases/tag/v5.2.0-rc.6-wizard.5.8-greece`.
+In *Choose a tag* pick `v<new-version>` (or type it and click
+*Create new tag on publish* if you skipped the tag step). Title the release
+`EU SAE <new-version> (<new-release-name>)`. Paste your CHANGELOG section as
+the description, add the one line from `SHA256SUMS.txt`, attach the zip (not
+anything else), tick *pre-release*, publish. Send colleagues the release link:
+`github.com/Noboyoshida227/eu-sae-application/releases/tag/v<new-version>`.
 
 ---
 
 ## 5. Things that come up
 
-**"dist\release_… already exists."**
+**"dist\EU_SAE_520_… already exists."**
 You already built this version. If nobody has received it yet, delete that one
 folder and run `Release.ps1` again. If anyone has it, stamp a new version
 instead — two different zips must never share a name.
@@ -175,6 +183,14 @@ After downloading the package from GitHub, copy `Data\Spain\survey.rds` and
 `auxiliary.rds` in from any previous release zip. They are kept out of GitHub
 on purpose (licensing) and `Release.ps1` will tell you if they are missing.
 
+**Country data must stay on this computer.**
+Country data folders are excluded by `.gitignore` and never go into a release.
+Local safeguards in `.git\hooks` also refuse to commit or push files that look
+like country data (for example Stata `.dta` files, `app_runs\` or
+`Claude outputs\`) and refuse to upload local archive branches. If GitHub
+Desktop says a hook blocked a commit, untick the files it names. The
+safeguards exist only on the maintainer's computer.
+
 **PowerShell says scripts are disabled.**
 The `-ExecutionPolicy Bypass` part of the `Release.ps1` command handles this.
 If a plain `python …` line is refused, run
@@ -192,6 +208,6 @@ window.
 ## Short release names
 
 `RELEASE_NAME` controls the local release folder, application folder, and ZIP basename.
-The current name is `EU_SAE_520_w5d`; the full version remains in `WIZARD_VERSION`.
+The current name is in `RELEASE_NAME`; the full version remains in `WIZARD_VERSION`.
 For the next build use `python tools/bump_version.py <new-version> --release-name <new-short-name>`.
 The builder refuses to overwrite an existing destination. Existing release archives are unchanged.

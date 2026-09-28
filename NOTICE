@@ -1,18 +1,19 @@
 EU SAE application package — release-candidate notice
 
-This package is an unofficial release candidate. Existing documents identify
-World Bank Group authorship or affiliation, but no institutional release
-authority, endorsement, warranty, or support commitment is established by this
-repository. The software must not be represented as an official World Bank
-Group product without written authorization from the appropriate institution.
+This package is an independent, unofficial release candidate maintained by
+Nobuo Yoshida; it is not a World Bank Group repository or product. Some
+documents give the author's World Bank Group affiliation in a byline or cite
+World Bank publications, but no institutional release authority, endorsement,
+warranty, or support commitment is established by this repository. The
+software must not be represented as an official World Bank Group product.
 
 The MIT grant in LICENSE is deliberately limited to software source code.
 Documentation, data, images, and third-party material are outside that grant.
-Their status is recorded in THIRD_PARTY_NOTICES.md and data/README.md.
+Their status is recorded in THIRD_PARTY_NOTICES.md and Data/README.md.
 
-The clean distribution omits the example RDS data and third-party literature.
-It does not cure copies still retrievable from earlier Git objects, tags, release
-assets, forks, caches, or downloaded archives. See HISTORY_REMEDIATION.md.
+The clean distribution includes only the example data listed in
+THIRD_PARTY_NOTICES.md and omits third-party literature. Copies in earlier
+repositories and archives are covered in docs/HISTORY_REMEDIATION.md.
 
 This notice is not legal advice. Rights and release authority require review by
 the relevant institutional intellectual-property and publication functions.

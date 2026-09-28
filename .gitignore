@@ -100,3 +100,6 @@ startup_setup.log
 
 # ---- Country data are never part of the repository (confidential inputs) ----
 Data/Greece/
+
+# Python bytecode
+__pycache__/

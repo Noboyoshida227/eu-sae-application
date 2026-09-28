@@ -1,8 +1,25 @@
 # Required Git-history and release-asset remediation
 
+## Status (27 Sep 2026)
+
+- The package now lives in a new repository,
+  <https://github.com/Noboyoshida227/eu-sae-application>, started on
+  17 Sep 2026 with a fresh history. That history contains none of the
+  literature PDFs and no country data (checked on 27 Sep 2026).
+- The previous repository was made private and then deleted on 27 Sep 2026.
+  Its history is kept offline by the maintainer.
+- Older repositories or archives of the package that predate the fresh start
+  may still hold copies of the literature PDFs or superseded example files.
+  They must be made private or deleted, and their forks and mirrors reviewed.
+
+The procedure below remains the reference if a repository's history ever has
+to be rewritten.
+
 Removing files from the working tree does not remove them from Git history.
-The eight literature PDFs remain retrievable from existing objects/tags and the
-published v5.1.0 source archive. This is a public-release blocker.
+Before the fresh start, the eight literature PDFs were retrievable from the old
+repository's objects and tags and from the v5.1.0 source archive; that
+repository was deleted on 27 Sep 2026. Copies elsewhere still need review (see
+Status above).
 
 The repository owner should coordinate the following with institutional IP,
 records-management and repository administrators. These steps rewrite public
@@ -27,6 +44,5 @@ builder.
 8. Establish one canonical tag convention and Git LFS or an approved document
    repository for future large binaries, with rights review before addition.
 
-The folder built by `scripts/build_clean_release.R` contains no `.git` history
-and is suitable for controlled review, but it is not evidence that the public
-GitHub repository has been remediated.
+The folder built by `scripts/build_clean_release.R` contains no `.git` history;
+its zip is the package published on GitHub Releases.

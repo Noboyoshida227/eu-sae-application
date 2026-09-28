@@ -1,7 +1,7 @@
 @echo off
 setlocal DisableDelayedExpansion
 REM ============================================================
-REM  EU SAE Dashboard 5.2.0-rc.6-wizard.5.8 - One-click launcher (Windows)
+REM  EU SAE Dashboard 5.2.0-rc.6-wizard.5.9 - One-click launcher (Windows)
 REM
 REM  Double-click this file to start the step-by-step (wizard) dashboard.
 REM  Your default web browser will open with the dashboard.
@@ -135,7 +135,7 @@ REM  - Then sources app_wizard.R directly. app_wizard.R contains its own
 REM    non-interactive launcher, which prefers port 7788 and automatically
 REM    falls back to the next free local port. Calling source('app_wizard.R') instead
 REM    of shiny::runApp(appDir=...) avoids a double-runApp nesting that
-REM    breaks static asset serving (www/eu_poverty_map.png and friends).
+REM    breaks static asset serving (www/cover_map_spain.png and friends).
 echo Checking R packages and Pandoc. First-time downloads may take several minutes.
 echo Setup details are saved in startup_setup.log in the package folder.
 "%RSCRIPT%" -e "local({con <- file('startup_setup.log', open='wt'); sink(con, split=TRUE); sink(con, type='message'); on.exit({sink(type='message'); sink(); close(con)}); source('install_packages.R')}); source('app_wizard.R')"

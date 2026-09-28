@@ -81,8 +81,8 @@ docs/guidance/Technical notes/Note on eblupMFH2_robust.R.docx
 docs/guidance/Technical notes/run_fh_covariance_monte_carlo.R
 docs/guidance/guidelines_v5_2_0_rc6_wizard.docx
 docs/guidance/literature/README.md
-docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_8.pdf
-docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_8.pptx
+docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_9.pdf
+docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_9.pptx
 docs/report_reference.docx
 install_packages.R
 outputs/.gitkeep
@@ -112,4 +112,5 @@ tools/build_instruction_pdf.py
 tools/build_wizard_manifest.R
 tools/bump_version.py
 tools/check_ui_parity.R
-www/eu_poverty_map.png
+tools/make_cover_map.R
+www/cover_map_spain.png

@@ -860,7 +860,8 @@ ui <- fluidPage(
   div(id = "cover_page",
     div(class = "cover-content",
       div(class = "cover-illustration",
-        tags$img(src = "eu_poverty_map.png",
+        tags$img(src = "cover_map_spain.png",
+                 alt = "Example map: poverty rate by Spanish province, 2013",
                  style = "width: 90%; max-width: 680px;")
       ),
       div(class = "cover-label", "Small Area Estimation Platform"),
@@ -874,7 +875,7 @@ ui <- fluidPage(
       ),
       actionButton("enter_app_btn", "Get Started", class = "btn"),
       div(class = "cover-footer",
-        "World Bank Group"
+        "Independent release candidate for review and testing"
       )
     )
   ),
@@ -892,7 +893,7 @@ ui <- fluidPage(
         tip_label("Country or territory", "Used only in report and brief titles; it does not affect estimation."),
         value = ""),
       numericInput("analysis_seed",
-        tip_label("Analysis seed", "Controls LASSO folds and bootstrap draws so identical inputs and settings reproduce the same stochastic analysis."),
+        tip_label("Analysis seed", "Controls the LASSO folds and the MFH bootstrap draws. The UFH and benchmarking bootstraps use a fixed seed, so identical inputs and settings always reproduce the same results."),
         value = 123, min = 0, step = 1),
       textInput("run_label",
         tip_label("Run label", "Optional short label appended to the saved app_runs folder so outputs from different runs are easier to distinguish."),
@@ -929,8 +930,8 @@ ui <- fluidPage(
       tags$ul(
         style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
         tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_8.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_8.pptx")),
+        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_9.pdf")),
+        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_9.pptx")),
         tags$li(tags$code("outputs/final_report.html"), " after a completed run")
       ),
       tags$hr(),
@@ -4135,7 +4136,7 @@ server <- function(input, output, session) {
 # IMPORTANT: we pass appDir (a directory) to shiny::runApp rather than the
 # .app object. Passing the shinyApp object directly skips Shiny's automatic
 # serving of the www/ folder, which 404s the landing-page choropleth
-# (www/eu_poverty_map.png) and any other static assets. Passing appDir
+# (www/cover_map_spain.png) and any other static assets. Passing appDir
 # causes Shiny to re-source this file as part of normal app loading; the
 # Sys.getenv guard below prevents that from re-entering this branch and
 # causing infinite recursion.

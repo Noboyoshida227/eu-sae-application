@@ -58,5 +58,5 @@ licensed under the MIT licence.
 
 ## Contact
 
-Open an issue for anything about the package. For questions about this
-organization's repositories, write to github@worldbank.org.
+Open an issue for anything about the package. This is an independent project
+maintained by Nobuo Yoshida; it is not a World Bank Group repository.

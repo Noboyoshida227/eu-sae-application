@@ -178,7 +178,7 @@ fi
 #    non-interactive launcher, which prefers port 7777 and falls back to
 #    the next free local port. Sourcing it rather than calling
 #    shiny::runApp(appDir=) avoids a double-runApp nesting that breaks
-#    static asset serving (www/eu_poverty_map.png and friends).
+#    static asset serving (www/cover_map_spain.png and friends).
 echo "Checking R packages and Pandoc. First-time downloads may take several minutes."
 echo "Setup details are saved in startup_setup.log in the package folder."
 echo ""

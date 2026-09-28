@@ -39,5 +39,5 @@ not authorize redistribution of a previously downloaded publisher PDF.
    redistribution licence was established during review; obtain it from the
    authors or an authorized institutional source.
 
-Historical Git objects and the v5.1.0 release remain a separate blocker; see
+Historical Git objects and the v5.1.0 release are covered in
 `docs/HISTORY_REMEDIATION.md`.

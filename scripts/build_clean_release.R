@@ -35,7 +35,7 @@ for (path in paths) {
 }
 writeLines(c(
   paste("EU SAE candidate", wizard_version, "- reorganized layout"),
-  "Prepared for review only; not authorized for public distribution or official statistics.",
+  "Published on GitHub Releases for review and testing; not an official product and not approved for official statistics.",
   "Includes only the explicit scripts/release_inventory.csv file list.",
   "Windows: open Start_Here and run Start_Wizard.bat or Start_Dashboard.bat. Keep Start_Here inside the package.",
   "macOS/Linux: open Start_Here and run Start_Wizard.command or Start_Dashboard.command (double-click on macOS). Keep Start_Here inside the package.",
@@ -43,9 +43,9 @@ writeLines(c(
   "Reports: final_report.html and editable final_report.docx; comparison outputs include signed estimated-change figures alongside CI-width figures.",
   "Excluded: internal notes, non-inventory literature, user Data folders, local libraries, credentials, run histories, generated outputs and local diagnostics.",
   "Spain boundaries now use documented IGN/CNIG CartoBase ANE (CC BY 4.0); the survey derivation script remains missing.",
-  "MCPE independent validation, platform smoke tests, rights and institutional approval remain release gates.",
+  "MCPE independent validation, platform smoke tests, rights and institutional approval remain open before any production release.",
   "Review docs/RELEASE_CHECKLIST.md, docs/MCPE_VALIDATION_STATUS.md, docs/HISTORY_REMEDIATION.md and THIRD_PARTY_NOTICES.md.",
-  "No Git history is included; this build does not remediate earlier repository objects or releases."
+  "No Git history is included."
 ), file.path(stage, "docs", "CLEAN_RELEASE_NOTICE.txt"), useBytes = TRUE)
 sae_write_release_manifest(stage)
 sae_verify_release(stage)

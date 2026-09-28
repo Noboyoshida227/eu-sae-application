@@ -41,26 +41,89 @@ sae_accepted_table_formats_text <- function() {
   paste(sae_accepted_table_formats(), collapse = ", ")
 }
 
+# ---- Text encodings -----------------------------------------------------
+# Re-encoding a text file with fileEncoding = "UTF-8" stops at the first byte
+# that is not valid UTF-8 and returns the rows read so far with only a warning,
+# so a Windows (Latin-1/Windows-1252/1250) CSV with one accented character
+# would silently lose every later row. Text inputs are therefore read without
+# re-encoding: strings are only marked as UTF-8 when the file is valid UTF-8,
+# and as Latin-1 otherwise (every byte is valid Latin-1, so nothing is lost).
+# SAE_INPUT_ENCODING, when set, still forces a specific source encoding.
+sae_text_encoding_args <- function(path, header_only = FALSE) {
+  override <- Sys.getenv("SAE_INPUT_ENCODING", "")
+  if (nzchar(override)) return(list(fileEncoding = override))
+
+  size <- suppressWarnings(file.size(path))
+  n <- if (is.na(size)) 0 else if (header_only) min(size, 1048576) else size
+  bytes <- if (n > 0) readBin(path, what = "raw", n = n) else raw()
+  if (length(bytes) >= 2L &&
+      (identical(bytes[1:2], as.raw(c(0xFF, 0xFE))) ||
+       identical(bytes[1:2], as.raw(c(0xFE, 0xFF))))) {
+    return(list(fileEncoding = "UTF-16"))
+  }
+  if (length(bytes) >= 3L && identical(bytes[1:3], as.raw(c(0xEF, 0xBB, 0xBF)))) {
+    bytes <- bytes[-(1:3)]
+  }
+  if (header_only) {
+    newline <- which(bytes == as.raw(0x0A))
+    if (length(newline)) bytes <- bytes[seq_len(newline[1])]
+  }
+  bytes <- bytes[bytes != as.raw(0L)]
+  if (!length(bytes) || isTRUE(validUTF8(rawToChar(bytes)))) {
+    return(list(encoding = "UTF-8"))
+  }
+  if (!header_only) {
+    warning(
+      basename(path), " is not UTF-8 encoded. It is read as Latin-1 so that no ",
+      "rows are lost; accented characters in text columns may display ",
+      "incorrectly. Save the file as 'CSV UTF-8', or set SAE_INPUT_ENCODING to ",
+      "its encoding before launch.",
+      call. = FALSE
+    )
+  }
+  list(encoding = "latin1")
+}
+
+sae_strip_bom_names <- function(x) {
+  nm <- names(x)
+  if (length(nm) && !is.na(nm[1])) {
+    # Work on bytes so this behaves the same in every locale.
+    first <- charToRaw(nm[1])
+    if (length(first) >= 3L && identical(first[1:3], as.raw(c(0xEF, 0xBB, 0xBF)))) {
+      cleaned <- rawToChar(first[-(1:3)])
+      Encoding(cleaned) <- "UTF-8"
+      names(x)[1] <- cleaned
+    }
+  }
+  x
+}
+
+sae_read_text_table <- function(reader, path, ..., encoding_args = NULL) {
+  encoding_args <- encoding_args %||% sae_text_encoding_args(path)
+  out <- do.call(reader, c(list(path, ...), encoding_args))
+  sae_strip_bom_names(out)
+}
+
 sae_read_dat_input <- function(path) {
-  input_encoding <- Sys.getenv("SAE_INPUT_ENCODING", "UTF-8")
+  encoding_args <- sae_text_encoding_args(path)
   readers <- list(
-    tab = function() utils::read.delim(
-      path, check.names = FALSE, stringsAsFactors = FALSE,
-      fileEncoding = input_encoding
+    tab = function() sae_read_text_table(
+      utils::read.delim, path, check.names = FALSE, stringsAsFactors = FALSE,
+      encoding_args = encoding_args
     ),
-    comma = function() utils::read.csv(
-      path, check.names = FALSE, stringsAsFactors = FALSE,
-      fileEncoding = input_encoding
+    comma = function() sae_read_text_table(
+      utils::read.csv, path, check.names = FALSE, stringsAsFactors = FALSE,
+      encoding_args = encoding_args
     ),
-    semicolon = function() utils::read.table(
-      path, header = TRUE, sep = ";", check.names = FALSE,
+    semicolon = function() sae_read_text_table(
+      utils::read.table, path, header = TRUE, sep = ";", check.names = FALSE,
       stringsAsFactors = FALSE, quote = "\"", comment.char = "",
-      fileEncoding = input_encoding
+      encoding_args = encoding_args
     ),
-    whitespace = function() utils::read.table(
-      path, header = TRUE, sep = "", check.names = FALSE,
+    whitespace = function() sae_read_text_table(
+      utils::read.table, path, header = TRUE, sep = "", check.names = FALSE,
       stringsAsFactors = FALSE, quote = "\"", comment.char = "",
-      fileEncoding = input_encoding
+      encoding_args = encoding_args
     )
   )
   candidates <- lapply(readers, function(reader) {
@@ -82,18 +145,17 @@ sae_read_table_input <- function(path, label = "input file") {
     stop(label, " does not exist: ", path %||% "(blank)", call. = FALSE)
   }
   ext <- sae_file_ext(path)
-  input_encoding <- Sys.getenv("SAE_INPUT_ENCODING", "UTF-8")
   out <- switch(
     ext,
     rds = readRDS(path),
     rda = sae_single_object_from_rdata(path, label),
     rdata = sae_single_object_from_rdata(path, label),
-    csv = utils::read.csv(path, check.names = FALSE, stringsAsFactors = FALSE,
-                          fileEncoding = input_encoding),
-    txt = utils::read.csv(path, check.names = FALSE, stringsAsFactors = FALSE,
-                          fileEncoding = input_encoding),
-    tsv = utils::read.delim(path, check.names = FALSE, stringsAsFactors = FALSE,
-                            fileEncoding = input_encoding),
+    csv = sae_read_text_table(utils::read.csv, path, check.names = FALSE,
+                              stringsAsFactors = FALSE),
+    txt = sae_read_text_table(utils::read.csv, path, check.names = FALSE,
+                              stringsAsFactors = FALSE),
+    tsv = sae_read_text_table(utils::read.delim, path, check.names = FALSE,
+                              stringsAsFactors = FALSE),
     dat = sae_read_dat_input(path),
     dta = {
       if (!requireNamespace("haven", quietly = TRUE)) {
@@ -258,10 +320,16 @@ sae_read_input_names <- function(path, kind = c("table", "geometry")) {
     } else {
       ext <- sae_file_ext(path)
       if (ext == "csv") {
-        return(names(utils::read.csv(path, nrows = 0, check.names = FALSE)))
+        return(names(sae_read_text_table(
+          utils::read.csv, path, nrows = 0, check.names = FALSE,
+          encoding_args = sae_text_encoding_args(path, header_only = TRUE)
+        )))
       }
       if (ext == "tsv") {
-        return(names(utils::read.delim(path, nrows = 0, check.names = FALSE)))
+        return(names(sae_read_text_table(
+          utils::read.delim, path, nrows = 0, check.names = FALSE,
+          encoding_args = sae_text_encoding_args(path, header_only = TRUE)
+        )))
       }
       if (ext == "dat") {
         return(names(sae_read_table_input(path)))

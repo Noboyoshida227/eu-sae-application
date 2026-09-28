@@ -31,9 +31,9 @@ Edit files at the repository root. Never edit anything under `dist\`.
 cd C:\Users\noboy\Repos\eu-sae-personal
 
 # 1. bump the version everywhere (use --dry-run first to see what it will touch)
-python tools\bump_version.py 5.2.0-rc.6-wizard.6 --release-name EU_SAE_520_w6
+python tools\bump_version.py <new-version> --release-name <new-release-name>
 
-# 2. write the CHANGELOG entry under  ## 5.2.0-rc.6-wizard.6 - <date>
+# 2. write the CHANGELOG entry under  ## <new-version> - <date>
 #    (docs\CHANGELOG.md - describe what changed and why)
 
 # 3. commit everything in GitHub Desktop, then push
@@ -45,13 +45,14 @@ powershell -ExecutionPolicy Bypass -File .\Release.ps1
 git tag -a v<version> -m "EU SAE <version>" <commit>
 git push origin v<version>
 
-# 6. on GitHub: Releases -> Draft a new release -> choose the tag,
+# 6. on GitHub (https://github.com/Noboyoshida227/eu-sae-application/releases):
+#    Draft a new release -> choose the tag, title "EU SAE <version> (<RELEASE_NAME>)",
 #    paste the CHANGELOG entry, attach the .zip, quote the SHA-256,
 #    tick "pre-release" while the package is a release candidate.
 ```
 
-Send recipients the `.zip` from `dist\<RELEASE_NAME>\` together with its
-SHA-256 from `SHA256SUMS.txt`.
+Send recipients the link to the release page; it carries the zip and its
+SHA-256.
 
 ## What the build enforces
 
@@ -86,12 +87,18 @@ authoritative one; keep the others short and pointing to it.
 `auxiliary.rds` by design. Copy them in from a previous release archive before
 building; `Release.ps1` will tell you if they are missing.
 
+**Country data.** Real survey or auxiliary data (for example `Data/Greece/`)
+never go into the repository or a release: `.gitignore` excludes them and the
+release inventory does not list them. Keep them in an ignored folder or outside
+the repository folder.
+
 **Scratch folders.** `tmp\` and `dist\` are ignored by git and are yours to
 delete. Nothing in them is needed to rebuild a release.
 
 ## Short release names
 
 `RELEASE_NAME` controls the local release folder, application folder, and ZIP basename.
-The current name is `EU_SAE_520_w5d`; the full version remains in `WIZARD_VERSION`.
+The current name is in `RELEASE_NAME`; the full version remains in `WIZARD_VERSION`.
+`bump_version.py` also replaces the old release name in the documents that mention it.
 For the next build use `python tools/bump_version.py <new-version> --release-name <new-short-name>`.
 The builder refuses to overwrite an existing destination. Existing release archives are unchanged.

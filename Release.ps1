@@ -94,7 +94,7 @@ $target = Join-Path 'dist' $packageName
 if (Test-Path -LiteralPath $target) {
     Write-Bad "$target already exists."
     Write-Bad "A version is built once. Either change the version:"
-    Write-Bad "     python tools\bump_version.py <new-version>"
+    Write-Bad "     python tools\bump_version.py <new-version> --release-name <new-release-name>"
     Write-Bad "or, if that build was never sent to anyone, delete the folder and run again."
     exit 1
 }
@@ -118,8 +118,8 @@ if ($missing) {
     if ($missing -match 'Data/Spain/(survey|auxiliary)\.rds') {
         Write-Bad ""
         Write-Bad "Data\Spain\survey.rds and auxiliary.rds are kept OUT of the repository on"
-        Write-Bad "purpose (GPL-2). Copy them in from the previous release archive or from"
-        Write-Bad "the release manager; see Data\Spain\README.md."
+        Write-Bad "purpose (GPL-2). Copy them in from a previous release zip (GitHub"
+        Write-Bad "Releases); see Data\Spain\README.md."
     }
     exit 1
 }

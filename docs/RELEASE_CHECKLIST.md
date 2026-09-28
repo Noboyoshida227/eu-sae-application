@@ -27,8 +27,9 @@ candidate label to a production version.
 - [ ] At least one managed-environment test uses an organization-approved R
       4.2+ version that is not the newest available R release.
 - [ ] `Rscript tests/run_tests.R` passes in the release environment.
-- [ ] `Rscript tests/test_startup.R`, `Rscript tests/test_pandoc_bootstrap.R`, `Rscript tests/test_step_runner.R`, `Rscript tests/test_mfh_coef_table.R` and `Rscript tests/test_background_run.R` pass.
+- [ ] `Rscript tests/test_startup.R`, `Rscript tests/test_pandoc_bootstrap.R`, `Rscript tests/test_step_runner.R`, `Rscript tests/test_mfh_coef_table.R`, `Rscript tests/test_background_run.R`, `Rscript tests/test_readiness_tables.R` and `Rscript tests/test_input_encoding.R` pass.
 - [ ] Manual: start a run with the Spain example, confirm the page stays responsive and the log updates while UFH runs, press **Stop** and confirm the status *Stopped by user* within about 20 seconds; then run again to completion.
+- [ ] Manual: after a completed Spain run, `outputs/tables/aux_covariate_summary.csv` (with `cor_pvalue` and `cor_signif`) is present and also in `app_runs/<run>/outputs/tables/`; the poverty maps of all methods and both years show the same legend range.
 - [ ] One Windows and one macOS machine without RStudio, Quarto or Pandoc start the wizard and finish a run with the report rendered (first-run Pandoc download), and one offline run finishes as "Analysis completed - report unavailable".
 - [ ] `Rscript scripts/check_dependency_lock.R` passes.
 - [ ] `docs/CHANGELOG.md` has an entry for this `WIZARD_VERSION`.

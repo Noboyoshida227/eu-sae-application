@@ -766,6 +766,10 @@ assess_data_readiness <- function(survey_data,
     if (nrow(missing_pov) > 0) {
       utils::write.csv(missing_pov, file.path(save_to, "missing_poverty.csv"),
                        row.names = FALSE)
+    } else {
+      # No missing cells this time: remove a file left by an earlier check so
+      # it cannot be mistaken for (or archived with) this run's results.
+      unlink(file.path(save_to, "missing_poverty.csv"))
     }
     # Domain consistency report
     consistency_df <- data.frame(
