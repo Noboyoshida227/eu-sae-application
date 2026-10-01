@@ -601,7 +601,7 @@ ui <- fluidPage(
       ),
       actionButton("enter_app_btn", "Get Started", class = "btn"),
       div(class = "cover-footer",
-        "Independent release candidate for review and testing"
+        "Release candidate for review and testing"
       )
     )
   ),
@@ -888,9 +888,8 @@ ui <- fluidPage(
               tip_label("Variance option (UFH)", "Sampling variance input for UFH when no transformation is used. 'sm_out' replaces a direct variance with its smoothed (GVF-based) variance only when the direct variance is missing/non-finite or below 0.001; 'sm_all' replaces all variances; 'direct' retains raw survey variances except safety backfills. When arcsin or log is selected, this choice is ignored because the transformation already stabilizes variances."),
                 choices = c("sm_out", "sm_all", "direct"), selected = "sm_out")
             ),
-            selectInput("ufh_ic_criterion",
-              tip_label("Model selection criterion", "Information criterion used for stepwise covariate selection. BIC penalizes complexity more heavily and tends to select simpler models. AIC favours predictive accuracy."),
-              choices = c("AIC", "BIC"), selected = "BIC"),
+            ic_criterion_input("ufh", selected = "BIC",
+              tip_text = "Information criterion used for stepwise covariate selection. BIC penalizes complexity more heavily and tends to select simpler models. AIC favours predictive accuracy. Not used when covariates are entered for both years with LASSO off."),
             checkboxInput("ufh_lasso_enabled",
               tip_label("Use LASSO screening",
                         "Optionally screens numeric covariates with LASSO before the AIC/BIC stepwise stage. The final model is still chosen by stepwise selection."),
@@ -941,9 +940,8 @@ ui <- fluidPage(
                   choices = c("bc_sm", "none"), selected = "bc_sm")
               )
             ),
-            selectInput("mfh_ic_criterion",
-              tip_label("Model selection criterion", "Information criterion used for stepwise covariate selection. AIC favours predictive accuracy; BIC penalizes complexity more and selects sparser models."),
-              choices = c("AIC", "BIC"), selected = "AIC"),
+            ic_criterion_input("mfh", selected = "AIC",
+              tip_text = "Information criterion used for stepwise covariate selection. AIC favours predictive accuracy; BIC penalizes complexity more and selects sparser models. Not used when covariates are entered for both years with LASSO off."),
             checkboxInput("mfh_lasso_enabled",
               tip_label("Use LASSO screening",
                         "Optionally screens numeric covariates with LASSO before the AIC/BIC stepwise stage. The final model is still chosen by stepwise selection."),
@@ -1010,6 +1008,13 @@ ui <- fluidPage(
               "Grouped by a survey variable" = "custom"
             ),
             selected = "national"
+          ),
+          conditionalPanel(
+            condition = "input.benchmark_level == 'national' && (input.var_benchmark_level || '').trim() !== ''",
+            tags$p(class = "help-block",
+                   "A grouped benchmark variable is still selected but is not used: National ",
+                   "benchmarking applies one national constraint. Choose \"Grouped by a survey ",
+                   "variable\" to use it, or clear the variable.")
           ),
           fileInput("regional_benchmark_file",
             tip_label("Benchmark Target Database (optional)",
@@ -1159,8 +1164,8 @@ ui <- fluidPage(
         style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
         tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
         tags$li(tags$code("docs/MCPE_VALIDATION_STATUS.md")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_9.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_9.pptx")),
+        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_10.pdf")),
+        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_10.pptx")),
         tags$li(tags$code("outputs/final_report.html"), " after a completed run")
       )
     )
@@ -1504,10 +1509,18 @@ wizard_server <- function(input, output, session) {
       sec("4. Models"),
       row("Pipeline steps", wiz_fmt(input$steps, "(none selected)")),
       row("UFH transformation / criterion",
-          paste(wiz_fmt(input$ufh_transformation), "/", wiz_fmt(input$ufh_ic_criterion))),
+          paste(wiz_fmt(input$ufh_transformation), "/",
+                sae_ic_criterion_label(input$ufh_ic_criterion,
+                                       isTRUE(input$ufh_lasso_enabled),
+                                       split_csv(input$ufh_candidates_y1),
+                                       split_csv(input$ufh_candidates_y2)))),
       row("UFH LASSO screening", if (isTRUE(input$ufh_lasso_enabled)) wiz_fmt(input$ufh_lasso_lambda) else "off"),
       row("MFH model / criterion",
-          paste(wiz_fmt(input$mfh_diag_model), "/", wiz_fmt(input$mfh_ic_criterion))),
+          paste(wiz_fmt(input$mfh_diag_model), "/",
+                sae_ic_criterion_label(input$mfh_ic_criterion,
+                                       isTRUE(input$mfh_lasso_enabled),
+                                       split_csv(input$mfh_candidates_y1),
+                                       split_csv(input$mfh_candidates_y2)))),
       row("MFH variance / covariance",
           paste(wiz_fmt(input$mfh_var_choice), "/", wiz_fmt(input$mfh_cov_choice))),
       row("MFH LASSO screening", if (isTRUE(input$mfh_lasso_enabled)) wiz_fmt(input$mfh_lasso_lambda) else "off"),

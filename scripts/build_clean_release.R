@@ -35,7 +35,7 @@ for (path in paths) {
 }
 writeLines(c(
   paste("EU SAE candidate", wizard_version, "- reorganized layout"),
-  "Published on GitHub Releases for review and testing; not an official product and not approved for official statistics.",
+  "Published on GitHub Releases for review and testing. Whether to publish estimates as official statistics is for each national statistical office to decide.",
   "Includes only the explicit scripts/release_inventory.csv file list.",
   "Windows: open Start_Here and run Start_Wizard.bat or Start_Dashboard.bat. Keep Start_Here inside the package.",
   "macOS/Linux: open Start_Here and run Start_Wizard.command or Start_Dashboard.command (double-click on macOS). Keep Start_Here inside the package.",

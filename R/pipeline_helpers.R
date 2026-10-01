@@ -755,3 +755,58 @@ sae_mfh_coef_table <- function(estcoef, formulas, years, method = "MFH") {
   rownames(out) <- NULL
   out
 }
+
+# ------------------------------------------------------------
+# Model-selection criterion (AIC/BIC) and fixed covariates
+# ------------------------------------------------------------
+# AIC/BIC is used only by stepwise covariate selection. With LASSO off, a
+# covariate list entered for a year fixes that year's formula, so the
+# criterion is not used for that year. When both years are fixed it is not
+# used at all: the app then records `ic_criterion: none`, and the UFH and
+# MFH scripts accept "none" only in that case. The app's criterion box
+# (ic_criterion_input() in app.R) follows the same rule.
+sae_covariates_fixed <- function(lasso_enabled, vars) {
+  vars <- as.character(unlist(vars))
+  !isTRUE(lasso_enabled) && length(vars[nzchar(trimws(vars))]) > 0L
+}
+
+sae_effective_ic_criterion <- function(criterion, lasso_enabled, vars_y1, vars_y2) {
+  if (sae_covariates_fixed(lasso_enabled, vars_y1) &&
+      sae_covariates_fixed(lasso_enabled, vars_y2)) {
+    return("none")
+  }
+  criterion
+}
+
+# Plain-language description for logs, the wizard review and diagnostics.
+sae_ic_criterion_label <- function(criterion, lasso_enabled, vars_y1, vars_y2,
+                                   years = c("Year 1", "Year 2")) {
+  fixed1 <- sae_covariates_fixed(lasso_enabled, vars_y1)
+  fixed2 <- sae_covariates_fixed(lasso_enabled, vars_y2)
+  if ((fixed1 && fixed2) || identical(criterion, "none")) {
+    return("not used (covariates fixed for both years)")
+  }
+  crit <- if (is.null(criterion) || !nzchar(criterion %||% "")) "(unset)" else as.character(criterion)
+  if (fixed1) return(sprintf("%s (%s only; %s covariates fixed)", crit, years[2], years[1]))
+  if (fixed2) return(sprintf("%s (%s only; %s covariates fixed)", crit, years[1], years[2]))
+  crit
+}
+
+# Error text when "none" is requested but a year still needs stepwise
+# selection; NULL when "none" is consistent with the covariate settings.
+sae_ic_none_problem <- function(model, lasso_enabled, vars_y1, vars_y2,
+                                years = c("Year 1", "Year 2")) {
+  if (isTRUE(lasso_enabled)) {
+    reason <- "LASSO screening is on, so the covariates are only a candidate pool for stepwise selection"
+  } else {
+    missing <- years[c(!sae_covariates_fixed(FALSE, vars_y1),
+                       !sae_covariates_fixed(FALSE, vars_y2))]
+    if (length(missing) == 0L) return(NULL)
+    reason <- sprintf("%s %s no usable covariates (none entered, or none found in the auxiliary data), so stepwise selection is needed",
+                      paste(missing, collapse = " and "),
+                      if (length(missing) == 1L) "has" else "have")
+  }
+  sprintf(paste("%s: the model-selection criterion is 'none' (not used), which requires LASSO off",
+                "and covariates fixed for both years, but %s. Choose AIC or BIC, or enter valid",
+                "covariates for both years with LASSO off."), model, reason)
+}

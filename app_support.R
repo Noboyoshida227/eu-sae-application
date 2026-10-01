@@ -47,10 +47,9 @@ validate_app_config <- function(cfg) {
   if (!is.finite(mcpe_nB) || mcpe_nB < 50L) {
     errs <- c(errs, "`mfh.mcpe_nB` must be an integer of at least 50; 500 or more is recommended for production inference.")
   }
-  lower_mult <- suppressWarnings(as.numeric(cfg$mfh$variance_lower_multiplier %||% 0))
-  if (!is.finite(lower_mult) || lower_mult < 0 || lower_mult >= 1) {
-    errs <- c(errs, "`mfh.variance_lower_multiplier` must be in [0, 1). Use 0 to replace only zero/missing lower-tail variances.")
-  }
+  # `mfh.variance_lower_multiplier` is no longer read by any step (the only
+  # sm_out rule is the absolute 0.001 cutoff); it is not validated, and the
+  # MFH step notes in its log that it is ignored.
 
   steps <- cfg$run$steps %||% c("UFH", "MFH", "Comparison")
   bad_steps <- setdiff(steps, c("UFH", "MFH", "Comparison"))
@@ -85,6 +84,26 @@ validate_app_config <- function(cfg) {
   refvar_alpha <- suppressWarnings(as.numeric(cfg$mfh$refvar_alpha %||% 0.05))
   if (!is.finite(refvar_alpha) || refvar_alpha <= 0 || refvar_alpha >= 1) {
     errs <- c(errs, "`mfh.refvar_alpha` must be strictly between 0 and 1.")
+  }
+  # ic_criterion "none" (not used) is valid only when no stepwise selection
+  # runs: LASSO off and covariates listed for both years.
+  for (m in c("ufh", "mfh")) {
+    mc <- cfg[[m]]
+    if (is.list(mc) && identical(mc$ic_criterion, "none")) {
+      listed <- function(v) {
+        v <- as.character(unlist(v))
+        length(v[nzchar(trimws(v))]) > 0L
+      }
+      v1 <- mc$candidate_vars_y1
+      v2 <- mc$candidate_vars_y2
+      if (!listed(v1) && !listed(v2)) v1 <- v2 <- mc$candidate_vars
+      if (isTRUE(mc$lasso_enabled) || !listed(v1) || !listed(v2)) {
+        errs <- c(errs, sprintf(paste0(
+          "`%s.ic_criterion` is 'none' (not used), which requires `%s.lasso_enabled: false` ",
+          "and covariates in both `%s.candidate_vars_y1` and `%s.candidate_vars_y2`. ",
+          "Use AIC or BIC otherwise."), m, m, m, m))
+      }
+    }
   }
   optional_paths <- c(
     benchmark_target_path = cfg$benchmarking$target_path,
@@ -949,6 +968,17 @@ render_final_report <- function(include_ai = FALSE, logger = message,
     if (isTRUE(include_ai)) "included where available" else "not included"
   ))
 
+  if (isTRUE(include_word) && identical(pandoc$word_ok, FALSE)) {
+    # Only an older Pandoc was available (no newer copy could be found or
+    # downloaded): the HTML report is complete, the Word copy is skipped.
+    unlink("outputs/final_report.docx", force = TRUE)
+    logger(paste0(
+      "WARNING: Word report skipped - ", pandoc$reason, " ",
+      "Connect to the internet and render the report again (the app downloads ",
+      "its own Pandoc), or install Pandoc 2.17 or later from https://pandoc.org/installing.html."
+    ))
+    include_word <- FALSE
+  }
   if (isTRUE(include_word)) {
     # Never mistake a prior run's Word report for the newly rendered HTML.
     unlink("outputs/final_report.docx", force = TRUE)

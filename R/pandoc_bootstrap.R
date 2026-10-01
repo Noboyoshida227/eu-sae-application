@@ -7,10 +7,16 @@
 # copy. Rather than asking every user to install it (admin rights,
 # Gatekeeper, PATH problems), this file:
 #
-#   1. looks for a usable Pandoc (>= 2.8) in the places it is commonly
-#      found, including a copy this package downloaded earlier; and
+#   1. looks for a Pandoc that can also make the Word report (>= 2.17) in
+#      the places it is commonly found, including a copy this package
+#      downloaded earlier;
 #   2. if none is found, downloads one pinned, checksum-verified release
-#      straight from GitHub into a per-user cache folder and uses that.
+#      straight from GitHub into a per-user cache folder and uses that; and
+#   3. if that is not possible, falls back to an older Pandoc (>= 2.8),
+#      which renders the HTML report only (result field word_ok = FALSE).
+# Before w5j an old copy (e.g. an older RStudio's bundled Pandoc) was
+# accepted at step 1, so the pinned copy was never downloaded and the Word
+# report failed with "pandoc document conversion failed with error 83".
 #
 # It uses only base R (utils::download.file / unzip / untar). It does NOT
 # use the CRAN `pandoc`, `gh`, `httr2` or `rlang` packages, whose version
@@ -28,8 +34,9 @@
 #
 # Public entry points:
 #   sae_find_pandoc(root, min_version)   -> list(dir, version) or NULL
-#   sae_ensure_pandoc(root, min_version, allow_download, quiet)
-#        -> list(ok, dir, version, source, reason); ok = FALSE carries `reason`.
+#   sae_ensure_pandoc(root, min_version, allow_download, quiet, word_min_version)
+#        -> list(ok, dir, version, source, reason, word_ok); ok = FALSE carries
+#           `reason`; word_ok = FALSE (HTML only) also carries `reason`.
 # On success both point rmarkdown at the selected folder explicitly
 # (rmarkdown::find_pandoc(dir = )) and verify it took, so the version rmarkdown
 # renders with is the one reported here.
@@ -308,21 +315,44 @@ sae_download_pandoc <- function(quiet = FALSE) {
 
 # ---- Main entry point ---------------------------------------------------
 
-.sae_pandoc_result <- function(ok, dir = NULL, version = NULL, source = NA_character_, reason = NA_character_) {
-  list(ok = isTRUE(ok), dir = dir, version = version, source = source, reason = reason)
+.sae_pandoc_result <- function(ok, dir = NULL, version = NULL, source = NA_character_,
+                               reason = NA_character_, word_ok = isTRUE(ok)) {
+  list(ok = isTRUE(ok), dir = dir, version = version, source = source, reason = reason,
+       word_ok = isTRUE(ok) && isTRUE(word_ok))
 }
 
 # Find Pandoc, downloading it if allowed, necessary, and not already attempted
-# in this R session. Always returns list(ok, dir, version, source, reason).
+# in this R session. Always returns list(ok, dir, version, source, reason,
+# word_ok): a Pandoc >= word_min_version is preferred (found or downloaded);
+# an older one (>= min_version) is used for the HTML report only.
 sae_ensure_pandoc <- function(root = getwd(), min_version = "2.8",
                               allow_download = !identical(Sys.getenv("EU_SAE_PANDOC_OFFLINE"), "1"),
-                              quiet = FALSE) {
+                              quiet = FALSE, word_min_version = "2.17") {
   say <- function(...) if (!quiet) message(...)
-  found <- sae_find_pandoc(root, min_version)
+  want <- max(numeric_version(min_version), numeric_version(word_min_version))
+  found <- sae_find_pandoc(root, as.character(want))
   if (!is.null(found)) {
     say("  OK: Pandoc ", found$version, " at ", found$dir)
     return(.sae_pandoc_result(TRUE, found$dir, found$version, "existing"))
   }
+  res <- .sae_ensure_pandoc_download(root, as.character(want), allow_download, say, quiet)
+  if (isTRUE(res$ok)) return(res)
+  # No Pandoc for the Word report and none could be downloaded: an older
+  # copy still renders the HTML report.
+  if (numeric_version(min_version) < want) {
+    old <- sae_find_pandoc(root, min_version)
+    if (!is.null(old)) {
+      reason <- paste0("Pandoc ", old$version, " at ", old$dir, " renders the HTML report, but the ",
+                       "Word report needs Pandoc ", word_min_version, " or later (", res$reason, ").")
+      say("  ", reason)
+      return(.sae_pandoc_result(TRUE, old$dir, old$version, "existing", reason = reason,
+                                word_ok = FALSE))
+    }
+  }
+  res
+}
+
+.sae_ensure_pandoc_download <- function(root, min_version, allow_download, say, quiet) {
   if (!allow_download) {
     reason <- "Pandoc not found and downloads are disabled (EU_SAE_PANDOC_OFFLINE=1)."
     say("  ", reason)
@@ -334,7 +364,7 @@ sae_ensure_pandoc <- function(root = getwd(), min_version = "2.8",
     say("  ", reason)
     return(.sae_pandoc_result(FALSE, reason = reason))
   }
-  say("  Pandoc not found on this computer; fetching a private copy for this user (one-time, no admin rights needed).")
+  say("  No Pandoc ", min_version, " or later found on this computer; fetching a private copy for this user (one-time, no admin rights needed).")
   dl <- tryCatch(list(dir = sae_download_pandoc(quiet = quiet)),
                  error = function(e) list(error = conditionMessage(e)))
   if (!is.null(dl$error)) {

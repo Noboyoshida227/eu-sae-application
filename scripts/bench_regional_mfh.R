@@ -54,6 +54,16 @@
 #'   \item{lambda}{D x nT matrix of ratio adjustment factors applied.}
 #'   \item{fails}{Number of failed bootstrap iterations (0 if MSE = FALSE).}
 
+if (!exists("sae_simulate_mfh_random_effects", mode = "function")) {
+  .mfh_helper <- if (requireNamespace("here", quietly = TRUE)) {
+    here::here("R", "mfh_bootstrap_helpers.R")
+  } else {
+    file.path("R", "mfh_bootstrap_helpers.R")
+  }
+  source(.mfh_helper)
+  rm(.mfh_helper)
+}
+
 bench_regional_mfh <- function(eblup_mat,
                                 mse_mat    = NULL,
                                 mcpe_mat   = NULL,
@@ -309,39 +319,16 @@ bench_regional_mfh <- function(eblup_mat,
       edt_b    <- rep(0, M)
       meandt_b <- rep(0, M)
 
-      # For MFH2 (scalar varu2, scalar rho) we keep the original AR(1)
-      # generator. For MFH3 the AR(1) structure still holds but with
-      # time-varying innovation variance varu2_vec[t]. For MFH1 there is
-      # no AR(1): we just draw u[d,t] ~ N(0, varu2_vec[t]) independently.
-      if (model_type == "MFH1") {
-        # Independent random effects across time (and across domains)
-        udt_mat_gen <- matrix(
-          rnorm(M, mean = 0, sd = rep(sqrt(varu2_vec), times = nD)),
-          nrow = nD, ncol = nT, byrow = TRUE
-        )
-        # Store in row-major domain-then-time order for backward-compat
-        for (d in seq_len(nD)) {
-          idx_d <- (d - 1) * nT + seq_len(nT)
-          udt_b[idx_d] <- udt_mat_gen[d, ]
-        }
-      } else {
-        # MFH2 / MFH3: AR(1) on random effects with scalar rho.
-        # For MFH3 innovation variance varies by time (varu2_vec[t]).
-        adt_b <- rnorm(M, mean = 0,
-                       sd = rep(sqrt(varu2_vec), times = nD))
-        i <- 1
-        for (d in seq_len(nD)) {
-          # MFH2 is homoskedastic, so the stationary AR(1) initialization is
-          # appropriate. MFH3 is heteroskedastic over time; use the period-1
-          # random-effect variance directly rather than imposing stationarity.
-          udt_b[i] <- if (model_type == "MFH2") Unomenrho2_05 * adt_b[i] else adt_b[i]
-          for (tt in seq_len(nT)[-1L]) {
-            i <- i + 1
-            udt_b[i] <- rho_scalar * udt_b[i - 1] + adt_b[i]
-          }
-          i <- i + 1
-        }
-      }
+      # Random effects from the fitted model, with the same generator as the
+      # MCPE bootstrap (sae_simulate_mfh_random_effects(), R/mfh_bootstrap_
+      # helpers.R): MFH1 independent over time; MFH2 stationary AR(1); MFH3
+      # u_0 ~ N(0, 1), u_t = rho u_{t-1} + a_t with Var(a_t) = refvar[t], as in
+      # msae. Before w5j the MFH3 branch here started at u_1 = a_1 and left
+      # out rho * u_0, which understated the first-period variance and the
+      # cross-time covariance. The MFH1 and MFH2 draws are unchanged.
+      udt_b <- as.numeric(t(sae_simulate_mfh_random_effects(
+        model_type, nD = nD, nT = nT, refvar = varu2_vec, rho = rho_scalar
+      )))
 
       # Sampling errors + mean structure (same across variants)
       i <- 1

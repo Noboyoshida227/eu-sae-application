@@ -17,7 +17,7 @@ parse_ok <- vapply(r_files, function(path) {
 check(all(parse_ok), "all R sources parse")
 check(identical(trimws(readLines("VERSION", warn = FALSE)[1]), "5.2.0-rc.6"), "VERSION is the candidate version")
 check(identical(trimws(readLines("WIZARD_VERSION", warn = FALSE)[1]),
-                "5.2.0-rc.6-wizard.5.9"),
+                "5.2.0-rc.6-wizard.5.10"),
       "WIZARD_VERSION identifies the rc.6 wizard overlay")
 wizard_version <- trimws(readLines("WIZARD_VERSION", warn = FALSE)[1])
 changelog_text <- read_all("docs/CHANGELOG.md")
@@ -119,8 +119,8 @@ check(grepl("sae_write_release_manifest", wizard_manifest_text, fixed = TRUE),
 wizard_resources <- c(
   "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx",
   "docs/MCPE_VALIDATION_STATUS.md",
-  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_9.pdf",
-  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_9.pptx"
+  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_10.pdf",
+  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_10.pptx"
 )
 check(all(vapply(wizard_resources, file.exists, logical(1))) &&
         all(vapply(wizard_resources, grepl, logical(1), x = wizard_text,
@@ -451,6 +451,16 @@ check(grepl("print(kable(mfh_numerical_diag", report_text, fixed = TRUE),
       "MFH numerical diagnostics table is explicitly printed")
 check(grepl('here::i_am("report.Rmd")', report_text, fixed = TRUE),
       "final report anchors here paths to the running package copy")
+check(grepl('mfh_rule_applied <- isTRUE(mfh_requested_model %in% c("AUTO", "MFH3"))',
+            report_text, fixed = TRUE) &&
+        grepl('cat("## MFH Variance Structure\\n\\n")', report_text, fixed = TRUE) &&
+        grepl('cat("## MFH Variance-Structure Selection\\n\\n")', report_text, fixed = TRUE) &&
+        grepl('setup_tbl$Item != "MFH3 reference-variance test adjustment"',
+              report_text, fixed = TRUE) &&
+        grepl('`r if (mfh_rule_applied) "They are separate from the MFH3',
+              report_text, fixed = TRUE) &&
+        !grepl("The default procedure fits MFH3 first", report_text, fixed = TRUE),
+      "final report discusses the MFH3/MFH2 rule only when MFH3 was requested")
 ai_report_keys <- c("overview", "normality", "rates", "precision",
                     "change_significance", "poverty_maps", "change_maps")
 check(grepl("params:", report_text, fixed = TRUE) &&
@@ -727,9 +737,161 @@ if (rmarkdown::pandoc_available() && requireNamespace("xml2", quietly=TRUE) && r
   check(inherits(try(sae_render_word_report(word_html,word_docx,root=word_fixture),silent=TRUE),"try-error") &&
         identical(word_before,readBin(word_html,"raw",n=file.info(word_html)$size)),
         "missing Word resources fail clearly without modifying the HTML")
+  # Tall figures (the map grids) must fit the printable height with any
+  # supported Pandoc, including those without pandoc.image (< 3.1.13).
+  tall_png <- file.path(word_fixture,"tall.png")
+  grDevices::png(tall_png,width=300,height=600); graphics::plot.new(); grDevices::dev.off()
+  tall_html <- file.path(word_fixture,"tall.html"); tall_docx <- file.path(word_fixture,"tall.docx")
+  writeLines(paste0('<html><head><title>Tall</title></head><body><p><img src="data:image/png;base64,',
+    jsonlite::base64_enc(readBin(tall_png,"raw",file.info(tall_png)$size)),'" alt="grid"></p></body></html>'),tall_html)
+  sae_render_word_report(tall_html,tall_docx,root=getwd())
+  zip::unzip(tall_docx,files="word/document.xml",exdir=file.path(word_fixture,"tall"))
+  tall_xml <- xml2::read_xml(file.path(word_fixture,"tall","word/document.xml"))
+  tall_ext <- xml2::xml_find_first(tall_xml,"//*[local-name()='extent']")
+  tall_h <- as.numeric(xml2::xml_attr(tall_ext,"cy"))/914400
+  tall_w <- as.numeric(xml2::xml_attr(tall_ext,"cx"))/914400
+  check(isTRUE(tall_h <= 7.01 && abs(tall_w/tall_h-0.5) < 0.01),
+        "Word export scales tall figures to the printable page height")
+  # The HTML-only map picker is dropped from Word; its static grid is kept.
+  only_html <- file.path(word_fixture,"only.html"); only_docx <- file.path(word_fixture,"only.docx")
+  writeLines(paste0('<html><head><title>Only</title></head><body>',
+    '<div class="sae-html-only"><p>PICKER_HTML_ONLY</p><table><tr><td>x</td></tr></table></div>',
+    '<div class="sae-html-only"><!--sae-html-only-start--><p>MARKED_HTML_ONLY \u00e9</p><!--sae-html-only-end--></div>',
+    '<div class="sae-word-only"><p>STATIC_GRID_FOR_WORD \u00e9</p></div></body></html>'),only_html,useBytes=TRUE)
+  only_before <- readBin(only_html,"raw",n=file.info(only_html)$size)
+  sae_render_word_report(only_html,only_docx,root=getwd())
+  zip::unzip(only_docx,files="word/document.xml",exdir=file.path(word_fixture,"only"))
+  only_text <- paste(xml2::xml_text(xml2::xml_find_all(
+    xml2::read_xml(file.path(word_fixture,"only","word/document.xml")),"//w:t",word_ns)),collapse=" ")
+  check(grepl("STATIC_GRID_FOR_WORD",only_text,fixed=TRUE) && !grepl("PICKER_HTML_ONLY",only_text,fixed=TRUE) &&
+        !grepl("MARKED_HTML_ONLY",only_text,fixed=TRUE) &&
+        identical(only_before,readBin(only_html,"raw",n=file.info(only_html)$size)) &&
+        length(list.files(word_fixture,pattern="^word-(source|assets)-"))==0L,
+        "Word export drops HTML-only blocks and keeps their Word-only replacement")
   stopifnot(startsWith(normalizePath(word_fixture,winslash="/"),paste0(normalizePath(tempdir(),winslash="/"),"/")))
   unlink(word_fixture,recursive=TRUE)
 } else message("SKIP: Word integration fixture needs Pandoc, xml2 and zip.")
+
+# Map method picker for the HTML report: one check box and one table row per
+# method, images embedded, static grid kept for Word, NULL without panels.
+source("R/report_map_picker.R")
+picker_dir <- tempfile("sae-picker-test-"); dir.create(picker_dir)
+picker_methods <- c("Direct","UFH","UFH benchmarked","MFH2","MFH2 benchmarked")
+picker_tags <- c("direct","ufh","ufh_benchmarked","mfh2","mfh2_benchmarked")
+picker_man <- expand.grid(year=c(2012L,2013L), row=seq_along(picker_methods))
+picker_man$method <- picker_methods[picker_man$row]; picker_man$tag <- picker_tags[picker_man$row]
+picker_man$file <- sprintf("panel_%s_%s.png", picker_man$tag, picker_man$year)
+picker_man$saved <- TRUE; picker_man$legend <- "legend.png"; picker_man$caption <- "Boundary credit <test>"
+for (f in c(picker_man$file,"legend.png")) { grDevices::png(file.path(picker_dir,f),width=40,height=40); grid::grid.newpage(); grDevices::dev.off() }
+utils::write.csv(picker_man, file.path(picker_dir,"manifest.csv"), row.names=FALSE)
+picker_html <- sae_map_picker_html(picker_dir, id="sae-picker-test")
+count_matches <- function(pattern, x) lengths(regmatches(x, gregexpr(pattern, x)))
+check(is.character(picker_html) &&
+      count_matches('type="checkbox"', picker_html) == 5L &&
+      count_matches('<tr data-method="', picker_html) == 5L &&
+      count_matches('<td><img src="data:image/png;base64,', picker_html) == 10L &&
+      grepl('data-method="ufh_benchmarked"', picker_html, fixed=TRUE) &&
+      grepl("Boundary credit &lt;test&gt;", picker_html, fixed=TRUE) &&
+      grepl("getElementById('sae-picker-test')", picker_html, fixed=TRUE),
+      "HTML map picker lists every method with embedded panels and the boundary credit")
+picker_md <- sae_map_grid_markdown("grid.png", picker_dir, "sae-picker-test", "Grid")
+check(grepl("::: {.sae-html-only}", picker_md, fixed=TRUE) &&
+      grepl("::: {.sae-word-only}\n\n![Grid](grid.png)", picker_md, fixed=TRUE) &&
+      identical(sae_map_grid_markdown("grid.png", file.path(picker_dir,"missing"), "x", "Grid"), "![Grid](grid.png)\n\n") &&
+      is.null(sae_map_picker_html(file.path(picker_dir,"missing"), "x")),
+      "map grid markdown pairs the HTML picker with the static grid and falls back without panels")
+unlink(picker_dir, recursive=TRUE)
+
+# Model-selection criterion with fixed covariates: "none" only when LASSO is
+# off and both years have covariates; the config check and the UI follow it.
+source("R/pipeline_helpers.R")
+check(identical(sae_effective_ic_criterion("BIC", FALSE, c("a","b"), "c"), "none") &&
+      identical(sae_effective_ic_criterion("BIC", TRUE, "a", "c"), "BIC") &&
+      identical(sae_effective_ic_criterion("AIC", FALSE, "a", character()), "AIC") &&
+      identical(sae_effective_ic_criterion("AIC", FALSE, " ", "c"), "AIC"),
+      "criterion is 'none' only for LASSO off and covariates fixed in both years")
+check(identical(sae_ic_criterion_label("BIC", FALSE, "a", NULL), "BIC (Year 2 only; Year 1 covariates fixed)") &&
+      identical(sae_ic_criterion_label("AIC", FALSE, NULL, "x"), "AIC (Year 1 only; Year 2 covariates fixed)") &&
+      identical(sae_ic_criterion_label("AIC", FALSE, "a", "b"), "not used (covariates fixed for both years)") &&
+      identical(sae_ic_criterion_label("AIC", TRUE, "a", "b"), "AIC") &&
+      is.null(sae_ic_none_problem("UFH", FALSE, "a", "b")) &&
+      grepl("LASSO screening is on", sae_ic_none_problem("UFH", TRUE, "a", "b"), fixed = TRUE) &&
+      grepl("Year 2 has no usable covariates", sae_ic_none_problem("MFH", FALSE, "a", NULL), fixed = TRUE),
+      "criterion labels and the 'none' consistency message")
+source("app_support.R")
+ic_cfg <- function(ufh) list(years_keep = c(2012L, 2013L), analysis_seed = 123L,
+                             run = list(steps = c("UFH", "MFH")), ufh = ufh,
+                             mfh = list(ic_criterion = "AIC"))
+check(isTRUE(validate_app_config(ic_cfg(list(ic_criterion = "none", lasso_enabled = FALSE,
+                                             candidate_vars_y1 = "a", candidate_vars_y2 = "b")))$valid) &&
+      !isTRUE(validate_app_config(ic_cfg(list(ic_criterion = "none", lasso_enabled = TRUE,
+                                              candidate_vars_y1 = "a", candidate_vars_y2 = "b")))$valid) &&
+      !isTRUE(validate_app_config(ic_cfg(list(ic_criterion = "none", lasso_enabled = FALSE,
+                                              candidate_vars_y1 = "a")))$valid) &&
+      isTRUE(validate_app_config(ic_cfg(list(ic_criterion = "BIC", lasso_enabled = TRUE)))$valid),
+      "config check accepts ic_criterion 'none' only with fixed covariates for both years")
+app_text_ic <- paste(readLines("app.R", warn = FALSE), collapse = "\n")
+wiz_text_ic <- paste(readLines("app_wizard.R", warn = FALSE), collapse = "\n")
+check(all(vapply(c("ufh", "mfh"), function(m) {
+        grepl(sprintf('ic_criterion_input("%s"', m), app_text_ic, fixed = TRUE) &&
+        grepl(sprintf('ic_criterion_input("%s"', m), wiz_text_ic, fixed = TRUE) &&
+        grepl(sprintf("sae_effective_ic_criterion(input$%s_ic_criterion,isTRUE(input$%s_lasso_enabled)", m, m),
+              gsub("\\s+", "", app_text_ic), fixed = TRUE)
+      }, logical(1))) &&
+      grepl("sae_ic_criterion_label(input$ufh_ic_criterion", wiz_text_ic, fixed = TRUE),
+      "dashboard and wizard use the criterion box, and the run records the effective criterion")
+
+# REML check at msae's end point: msae's own example passes; a fit moved
+# away from its end point, or flagged as not converged, is reported.
+if (requireNamespace("msae", quietly = TRUE)) {
+  source("R/msae_compat.R")
+  sae_install_msae_compat_functions(envir = globalenv())
+  source("R/mfh_convergence_check.R")
+  data("datasae1", package = "msae", envir = environment())
+  ck_fl <- list(f1 = Y1 ~ X1 + X2, f2 = Y2 ~ X2)
+  ck_vd <- c("v1", "v2", "v12")
+  ck_fit <- msae::eblupMFH2(ck_fl, vardir = ck_vd, data = datasae1)
+  ck_ok <- sae_mfh_reml_endpoint(ck_fit, "MFH2", ck_fl, ck_vd, datasae1)
+  ck_moved <- ck_fit
+  ck_moved$fit$refvar <- ck_fit$fit$refvar * 0.5
+  ck_bad <- sae_mfh_reml_endpoint(ck_moved, "MFH2", ck_fl, ck_vd, datasae1)
+  ck_m1 <- msae::eblupMFH1(ck_fl, vardir = ck_vd, data = datasae1)
+  ck_m1$fit$convergence <- FALSE
+  ck_nc <- sae_mfh_reml_endpoint(ck_m1, "MFH1", ck_fl, ck_vd, datasae1)
+  ck_row <- sae_mfh_check_row(ck_bad, selected_model = "MFH2")
+  check(identical(ck_ok$status, "ok") && ck_ok$newton_decrement < 1e-4 &&
+        identical(ck_bad$status, "not_at_maximum") && ck_bad$newton_decrement > 0.01 &&
+        identical(ck_nc$status, "not_converged") &&
+        isTRUE(ck_row$selected) && identical(ck_row$status, "not_at_maximum"),
+        "REML end-point check passes msae's example and flags a moved or non-converged fit")
+  ck_th <- c(sigma2_1 = 0.002, sigma2_2 = 0.003, rho = 0.5)
+  check(isTRUE(all.equal(sae_mfh_G("MFH3", ck_th),
+                         matrix(c(0.002 + 0.25, 0.5 * 0.002 + 0.125,
+                                  0.5 * 0.002 + 0.125, 0.003 + 0.25 * 0.002 + 0.0625), 2))),
+        "MFH3 covariance follows msae (Var(u0) = 1)")
+} else message("SKIP: msae not installed; REML end-point check not tested.")
+
+mfh_text <- paste(readLines("scripts/02_mfh.R", warn = FALSE), collapse = "\n")
+check(grepl('ufh_msae_code  <- if (isTRUE(log_transform)) "UFH_log" else "UFH_untransformed"', mfh_text, fixed = TRUE) &&
+      !grepl('"rate_UFH"', mfh_text, fixed = TRUE) &&
+      grepl("mfh_convergence_check.csv", mfh_text, fixed = TRUE) &&
+      grepl("are not used because they are", mfh_text, fixed = TRUE),
+      "MFH step names its UFH by scale, writes the convergence check and reports unusable covariates")
+bench_text <- paste(readLines("scripts/bench_regional_mfh.R", warn = FALSE), collapse = "\n")
+check(grepl("sae_simulate_mfh_random_effects(", bench_text, fixed = TRUE),
+      "benchmarking bootstrap uses the shared MFH random-effect generator (MFH3 includes rho * u0)")
+cmp_text <- paste(readLines("scripts/03_comparison.R", warn = FALSE), collapse = "\n")
+check(grepl("lapply(file.path(figures_root, .figure_subdirs), list.files", cmp_text, fixed = TRUE),
+      "Comparison clean-up is limited to its own figure subfolders")
+check(isTRUE(validate_app_config(list(years_keep = c(2012L, 2013L), analysis_seed = 123L,
+                                      run = list(steps = "MFH"),
+                                      mfh = list(variance_lower_multiplier = 5)))$valid),
+      "the unused variance_lower_multiplier setting no longer blocks a run")
+for (ui_file in c("app.R", "app_wizard.R")) {
+  check(grepl("A grouped benchmark variable is still selected but is not used",
+              paste(readLines(ui_file, warn = FALSE), collapse = "\n"), fixed = TRUE),
+        paste(ui_file, "notes an unused grouped benchmark variable under National benchmarking"))
+}
 
 if (length(failures) > 0L) {
   stop("Tests failed: ", paste(failures, collapse = "; "), call. = FALSE)

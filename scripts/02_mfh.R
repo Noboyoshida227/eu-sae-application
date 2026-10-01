@@ -56,6 +56,7 @@ source(here::here("R", "input_paths.R"))
 source(here::here("R", "pipeline_helpers.R"))
 source(here::here("R", "variance_policy.R"))
 source(here::here("R", "mfh_model_selection.R"))
+source(here::here("R", "mfh_convergence_check.R"))
 source(here::here("R", "map_style.R"))
 
 # ---- Invalidate stale MFH output artifacts ----
@@ -73,7 +74,8 @@ dir.create(here::here("outputs", "data"), showWarnings = FALSE, recursive = TRUE
   here::here("outputs", "tables", "mfh_selection_diagnostics.csv"),
   here::here("outputs", "tables", "mfh_model_diagnostics.csv"),
   here::here("outputs", "tables", "mfh_variance_structure_selection.csv"),
-  here::here("outputs", "tables", "mfh_mcpe_validation.csv")
+  here::here("outputs", "tables", "mfh_mcpe_validation.csv"),
+  here::here("outputs", "tables", "mfh_convergence_check.csv")
 )
 for (.f in .mfh_outputs_to_clean) {
   if (file.exists(.f)) {
@@ -214,6 +216,15 @@ indicator_type   <- cfg_or_default(cfg$indicator_type,  "poverty")
 }
 log_transform    <- isTRUE(.mfh_log_transform_raw) &&
                     identical(indicator_type, "mean_welfare")
+
+# The UFH fitted in this step (msae::eblupUFH) uses the MFH covariates and
+# the MFH scale: untransformed poverty rates, or log welfare when MFH runs
+# on the log scale. It is not the UFH of the UFH step (emdi, arcsine or log
+# transformation, its own covariates), so its columns and labels name the
+# scale, e.g. rate_UFH_untransformed (before w5j: rate_UFH).
+ufh_msae_code  <- if (isTRUE(log_transform)) "UFH_log" else "UFH_untransformed"
+ufh_msae_label <- if (isTRUE(log_transform)) "UFH, log scale" else "UFH, untransformed"
+.ufh_col <- function(stat, suffix = "") paste0(stat, "_", ufh_msae_code, suffix)
 .safe_log_positive <- function(x) {
   out <- rep(NA_real_, length(x))
   ok <- is.finite(x) & x > 0
@@ -549,13 +560,29 @@ do_benchmark <- isTRUE(mfh_cfg$do_benchmark)
 population_path <- cfg_or_default(mfh_cfg$population_path, "")
 bench_nB <- as.integer(cfg_or_default(mfh_cfg$bench_nB, 200))
 
-# Model selection criterion: "AIC" (default) or "BIC"
+# Model selection criterion: "AIC" (default) or "BIC"; "none" when the
+# covariates are fixed for both years with LASSO off (no stepwise selection).
 mfh_ic_criterion <- cfg_or_default(mfh_cfg$ic_criterion, "AIC")
-if (!mfh_ic_criterion %in% c("AIC", "BIC")) {
+if (!mfh_ic_criterion %in% c("AIC", "BIC", "none")) {
   warning(sprintf("Invalid ic_criterion '%s' for MFH; defaulting to AIC.", mfh_ic_criterion))
   mfh_ic_criterion <- "AIC"
 }
 mfh_lasso_enabled <- isTRUE(mfh_cfg$lasso_enabled)
+if (!is.null(mfh_cfg$variance_lower_multiplier)) {
+  cat("Note: mfh.variance_lower_multiplier is set in the configuration but is not used:",
+      "sm_out replaces a direct variance only when it is missing/non-finite or below 0.001.\n")
+}
+.mfh_ic_years <- paste("Year", 1:2, paste0("(", sort(as.integer(years_keep))[1:2], ")"))
+if (identical(mfh_ic_criterion, "none")) {
+  .mfh_ic_problem <- sae_ic_none_problem("MFH", mfh_lasso_enabled,
+                                         mfh_candidate_vars_y1, mfh_candidate_vars_y2,
+                                         years = .mfh_ic_years)
+  if (!is.null(.mfh_ic_problem)) stop(.mfh_ic_problem, call. = FALSE)
+}
+cat("Model-selection criterion:",
+    sae_ic_criterion_label(mfh_ic_criterion, mfh_lasso_enabled,
+                           mfh_candidate_vars_y1, mfh_candidate_vars_y2,
+                           years = .mfh_ic_years), "\n")
 mfh_lasso_lambda <- cfg_or_default(mfh_cfg$lasso_lambda, "lambda.1se")
 analysis_seed <- suppressWarnings(as.integer(cfg_or_default(cfg$analysis_seed, 123L)))
 if (!is.finite(analysis_seed) || analysis_seed < 0L) analysis_seed <- 123L
@@ -1127,6 +1154,19 @@ base_static_candidates <- intersect(
     v_year <- paste0(v, "_", yr)
     if (v_year %in% candidate_vars_all) v_year else v
   }), use.names = FALSE)
+  # A listed covariate that is not numeric cannot enter msae's design
+  # matrix. Before w5j it was dropped silently from a fixed formula; now
+  # the run says so (the step log and the app's warning summary).
+  dropped <- setdiff(unique(resolved), candidate_vars_all)
+  if (length(dropped) > 0L) {
+    warning(sprintf(paste(
+      "MFH %s: covariate(s) entered for this year are not used because they are",
+      "not numeric: %s. Recode them as numeric indicators (0/1) to use them.%s"),
+      yr, paste(dropped, collapse = ", "),
+      if (length(dropped) == length(unique(resolved)) && !isTRUE(mfh_lasso_enabled))
+        " No entered covariate is usable, so this year's MFH model has an intercept only." else ""),
+      call. = FALSE)
+  }
   intersect(candidate_vars_all, unique(resolved))
 }
 
@@ -1584,6 +1624,35 @@ if (!diag_model %in% names(model_lookup)) {
 }
 selected_model <- model_lookup[[diag_model]]
 
+# ---- REML check at msae's end point (R/mfh_convergence_check.R) ----
+# msae's estimates are kept; this records whether each fitted MFH model
+# stopped at a REML maximum and warns when the selected model did not.
+.mfh_conv_models <- list(MFH1 = model_mfh1, MFH2 = model_mfh2,
+                         MFH3 = .model_mfh3_attempt)
+.mfh_conv_models <- .mfh_conv_models[!vapply(.mfh_conv_models, is.null, logical(1))]
+.mfh_conv_checks <- lapply(names(.mfh_conv_models), function(m) {
+  sae_mfh_reml_endpoint(.mfh_conv_models[[m]], m, mfh_formula, vardir_cols, domain_dt)
+})
+.mfh_conv_tbl <- do.call(rbind, lapply(.mfh_conv_checks, sae_mfh_check_row,
+                                       selected_model = diag_model))
+dir.create(here::here("outputs", "tables"), showWarnings = FALSE, recursive = TRUE)
+write.csv(.mfh_conv_tbl, here::here("outputs", "tables", "mfh_convergence_check.csv"),
+          row.names = FALSE)
+cat("\nREML check at msae's end point (outputs/tables/mfh_convergence_check.csv):\n")
+for (.chk in .mfh_conv_checks) {
+  .is_sel <- identical(.chk$model, diag_model)
+  cat(sprintf("  %s%s: %s. %s\n", .chk$model, if (.is_sel) " (selected)" else "",
+              .chk$status, .chk$message))
+  if (.is_sel && !identical(.chk$status, "ok")) {
+    warning(sprintf(paste(
+      "%s (selected MFH model): %s Estimates, MSEs and change tests rest on these",
+      "variance parameters; see outputs/tables/mfh_convergence_check.csv and the",
+      "'MFH Convergence Check' section of the report."), .chk$model, .chk$message),
+      call. = FALSE)
+  }
+}
+rm(.chk)
+
 # Detect a wholesale fit failure (selected_model is NULL or its fit object
 # is empty). This happens when something further upstream made eblupMFH*()
 # error out before producing any object -- most often a NA in vardir that
@@ -1624,6 +1693,7 @@ saveRDS(
   list(
     years_keep       = years_keep,
     selected_model   = selected_model,
+    convergence_check = .mfh_conv_tbl,
     formula          = mfh_formula,
     diag_model_requested = diag_model_requested,
     diag_model       = diag_model,
@@ -1713,7 +1783,7 @@ if (isTRUE(.model_fit_failed)) {
     ) %>%
     arrange(year, domain)
 
-  for (.model_name in c("UFH", "MFH1", "MFH2", "MFH3")) {
+  for (.model_name in c(ufh_msae_code, "MFH1", "MFH2", "MFH3")) {
     db_wide_all[[paste0("rate_", .model_name)]] <- NA_real_
     db_wide_all[[paste0("mse_", .model_name)]]  <- NA_real_
     db_wide_all[[paste0("cv_", .model_name)]]   <- NA_real_
@@ -1869,7 +1939,7 @@ make_long_model <- function(model_obj, model_name, domain_vec) {
 
 # ---- 2) Stack model results and reshape wide ----
 db_long_list <- list(
-  make_long_model(model_ufh,  "UFH",  domain_vec),
+  make_long_model(model_ufh,  ufh_msae_code,  domain_vec),
   make_long_model(model_mfh1, "MFH1", domain_vec),
   make_long_model(model_mfh2, "MFH2", domain_vec)
 )
@@ -1914,7 +1984,7 @@ db_wide_all <- direct_long %>%
 db_wide_all <- db_wide_all %>%
   mutate(
     direct_rmse = sqrt(direct_mse),
-    rmse_UFH    = sqrt(mse_UFH),
+    !!.ufh_col("rmse") := sqrt(.data[[.ufh_col("mse")]]),
     rmse_MFH1   = sqrt(mse_MFH1),
     rmse_MFH2   = sqrt(mse_MFH2)
   )
@@ -2410,18 +2480,18 @@ if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform)) {
   smear_full  <- smear_vec
   smear_model <- if (isTRUE(mfh_bias_correction)) smear_vec else rep(1, length(smear_vec))
 
-  rate_cols  <- intersect(c("direct_rate", "rate_UFH", "rate_UFH_Bench",
+  rate_cols  <- intersect(c("direct_rate", .ufh_col("rate"), .ufh_col("rate", "_Bench"),
                             "rate_MFH1", "rate_MFH2", "rate_MFH3", "rate_Bench"),
                           names(db_wide_all))
-  mse_cols   <- intersect(c("direct_mse", "mse_UFH", "mse_UFH_Bench",
+  mse_cols   <- intersect(c("direct_mse", .ufh_col("mse"), .ufh_col("mse", "_Bench"),
                             "mse_MFH1", "mse_MFH2", "mse_MFH3", "mse_Bench"),
                           names(db_wide_all))
-  cv_cols    <- intersect(c("direct_cv", "cv_UFH", "cv_UFH_Bench",
+  cv_cols    <- intersect(c("direct_cv", .ufh_col("cv"), .ufh_col("cv", "_Bench"),
                             "cv_MFH1", "cv_MFH2", "cv_MFH3", "cv_Bench"),
                           names(db_wide_all))
   # Note `direct_rmse` IS included here so it gets recomputed once
   # `direct_mse` is overridden with the arithmetic-scale variance below.
-  rmse_cols  <- intersect(c("direct_rmse", "rmse_UFH", "rmse_UFH_Bench",
+  rmse_cols  <- intersect(c("direct_rmse", .ufh_col("rmse"), .ufh_col("rmse", "_Bench"),
                             "rmse_MFH1", "rmse_MFH2", "rmse_MFH3", "rmse_Bench"),
                           names(db_wide_all))
 
@@ -2839,20 +2909,19 @@ year_plot <- y1   # switch to y2 if desired
 method_colors <- c(
   "direct_mse"  = "black",
   "direct_rate" = "black",
-  "mse_UFH"     = "#1f77b4",
-  "rate_UFH"    = "#1f77b4",
   "mse_MFH1"    = "#ff7f0e",
   "rate_MFH1"   = "#ff7f0e",
   "mse_MFH2"    = "#d62728",
   "rate_MFH2"   = "#d62728"
 )
+method_colors[c(.ufh_col("mse"), .ufh_col("rate"))] <- "#1f77b4"
 if (fit_mfh3) {
   method_colors <- c(method_colors, "mse_MFH3" = "#2ca02c", "rate_MFH3" = "#2ca02c")
 }
 
 # Column vectors: use any_of() so missing columns are silently skipped
-mse_model_cols  <- c("mse_UFH", "mse_MFH1", "mse_MFH2", if (fit_mfh3) "mse_MFH3")
-rate_model_cols <- c("rate_UFH", "rate_MFH1", "rate_MFH2", if (fit_mfh3) "rate_MFH3")
+mse_model_cols  <- c(.ufh_col("mse"), "mse_MFH1", "mse_MFH2", if (fit_mfh3) "mse_MFH3")
+rate_model_cols <- c(.ufh_col("rate"), "rate_MFH1", "rate_MFH2", if (fit_mfh3) "rate_MFH3")
 
 ## ---------- 1) MSE incl direct ----------
 plot_mse_all <- db_wide_all %>%
@@ -2879,7 +2948,7 @@ p1 <- ggplot(plot_mse_all, aes(x = domain_order, y = MSE, color = Method)) +
 ## ---------- 2) MSE models only ----------
 plot_mse_models <- db_wide_all %>%
   filter(year == year_plot) %>%
-  arrange(mse_UFH) %>%
+  arrange(.data[[.ufh_col("mse")]]) %>%
   mutate(domain_order = row_number()) %>%
   select(domain, domain_order, any_of(mse_model_cols)) %>%
   pivot_longer(
@@ -2893,7 +2962,7 @@ p2 <- ggplot(plot_mse_models, aes(x = domain_order, y = MSE, color = Method)) +
   scale_color_manual(values = method_colors) +
   labs(
     title = paste0("MSE comparison (models only) - ", year_plot),
-    x = "Domain (ordered by increasing UFH MSE)",
+    x = paste0("Domain (ordered by increasing ", ufh_msae_label, " MSE)"),
     y = "MSE"
   ) +
   theme_minimal()
@@ -2923,7 +2992,7 @@ p3 <- ggplot(plot_rate_all, aes(x = domain_order, y = Rate, color = Method)) +
 ## ---------- 4) Estimate models only ----------
 plot_rate_models <- db_wide_all %>%
   filter(year == year_plot) %>%
-  arrange(rate_UFH) %>%
+  arrange(.data[[.ufh_col("rate")]]) %>%
   mutate(domain_order = row_number()) %>%
   select(domain, domain_order, any_of(rate_model_cols)) %>%
   pivot_longer(
@@ -2937,7 +3006,7 @@ p4 <- ggplot(plot_rate_models, aes(x = domain_order, y = Rate, color = Method)) 
   scale_color_manual(values = method_colors) +
   labs(
     title = paste0(pov_lab$short, " comparison (models only) - ", year_plot),
-    x = "Domain (ordered by increasing UFH value)",
+    x = paste0("Domain (ordered by increasing ", ufh_msae_label, " value)"),
     y = pov_lab$short
   ) +
   theme_minimal()
@@ -2950,10 +3019,10 @@ ggsave(here::here("outputs", "figures", paste0("mfh_rate_models_", year_plot, ".
 # ---- RMSE color mapping (same hues as MSE columns) ----
 rmse_colors <- c(
   "direct_rmse" = "black",
-  "rmse_UFH"    = "#1f77b4",
   "rmse_MFH1"   = "#ff7f0e",
   "rmse_MFH2"   = "#d62728"
 )
+rmse_colors[.ufh_col("rmse")] <- "#1f77b4"
 if (fit_mfh3) rmse_colors <- c(rmse_colors, "rmse_MFH3" = "#2ca02c")
 
 rmse_model_cols <- sub("^mse_", "rmse_", mse_model_cols)
@@ -2983,7 +3052,7 @@ p5 <- ggplot(plot_rmse_all, aes(x = domain_order, y = RMSE, color = Method)) +
 ## ---------- 6) RMSE models only ----------
 plot_rmse_models <- db_wide_all %>%
   filter(year == year_plot) %>%
-  arrange(rmse_UFH) %>%
+  arrange(.data[[.ufh_col("rmse")]]) %>%
   mutate(domain_order = row_number()) %>%
   select(domain, domain_order, any_of(rmse_model_cols)) %>%
   pivot_longer(
@@ -2997,7 +3066,7 @@ p6 <- ggplot(plot_rmse_models, aes(x = domain_order, y = RMSE, color = Method)) 
   scale_color_manual(values = rmse_colors) +
   labs(
     title = paste0("RMSE comparison (models only) \u2013 ", year_plot),
-    x     = "Domain (ordered by increasing UFH RMSE)",
+    x     = paste0("Domain (ordered by increasing ", ufh_msae_label, " RMSE)"),
     y     = "RMSE"
   ) +
   theme_minimal()
@@ -3032,13 +3101,13 @@ n_long <- all_var_hat_domain_dt %>%
 
 # 2) Build plotting dataset: UFH vs selected model rates + sample size
 plot_dt <- db_wide_all %>%
-  select(domain, year, rate_UFH, all_of(rate_col)) %>%
+  select(domain, year, all_of(c(.ufh_col("rate"), rate_col))) %>%
   left_join(n_long, by = c("domain", "year")) %>%
   filter(year %in% years_keep)
 
 # 3) Smoothing diagnostic: absolute difference vs sample size
 plot_dt <- plot_dt %>%
-  mutate(abs_diff = abs(.data[[rate_col]] - rate_UFH)) %>%
+  mutate(abs_diff = abs(.data[[rate_col]] - .data[[.ufh_col("rate")]])) %>%
   filter(is.finite(abs_diff), is.finite(N), !is.na(N), N > 0)
 
 ggplot(plot_dt, aes(x = N, y = abs_diff)) +
@@ -3046,10 +3115,10 @@ ggplot(plot_dt, aes(x = N, y = abs_diff)) +
   geom_smooth(method = "loess", se = TRUE) +
   scale_x_log10() +
   labs(
-    title = paste0(diag_model, " smoothing diagnostic: |", diag_model, " - UFH| vs sample size"),
+    title = paste0(diag_model, " smoothing diagnostic: |", diag_model, " - ", ufh_msae_label, "| vs sample size"),
     subtitle = "Larger differences at small N indicate stronger smoothing where direct information is weak",
     x = "Sample size (N, log scale)",
-    y = paste0("|", diag_model, " - UFH|")
+    y = paste0("|", diag_model, " - ", ufh_msae_label, "|")
   ) +
   theme_minimal()
 

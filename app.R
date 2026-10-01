@@ -614,6 +614,49 @@ tip_label <- function(label_text, tip_text) {
   )
 }
 
+# Model-selection criterion box for UFH or MFH (prefix "ufh" or "mfh"), used
+# by the dashboard and the wizard. AIC/BIC is used only by stepwise covariate
+# selection. With LASSO off, covariates entered for a year fix that year's
+# formula: when both years are fixed the box is replaced by a greyed "Not
+# used" field, and when one year is fixed a note says which year the
+# criterion still applies to. The run records the same rule through
+# sae_effective_ic_criterion() (R/pipeline_helpers.R).
+ic_criterion_input <- function(prefix, selected, tip_text) {
+  filled    <- function(y) sprintf("/[^\\s,]/.test(input.%s_candidates_%s || '')", prefix, y)
+  lasso_off <- sprintf("!input.%s_lasso_enabled", prefix)
+  both  <- sprintf("(%s && %s && %s)", lasso_off, filled("y1"), filled("y2"))
+  only1 <- sprintf("(%s && %s && !%s)", lasso_off, filled("y1"), filled("y2"))
+  only2 <- sprintf("(%s && !%s && %s)", lasso_off, filled("y1"), filled("y2"))
+  tagList(
+    conditionalPanel(
+      condition = sprintf("!%s", both),
+      selectInput(paste0(prefix, "_ic_criterion"),
+        tip_label("Model selection criterion", tip_text),
+        choices = c("AIC", "BIC"), selected = selected),
+      conditionalPanel(condition = only1,
+        tags$p(class = "help-block",
+               "Applies to Year 2 only: the Year 1 covariates are fixed.")),
+      conditionalPanel(condition = only2,
+        tags$p(class = "help-block",
+               "Applies to Year 1 only: the Year 2 covariates are fixed."))
+    ),
+    conditionalPanel(
+      condition = both,
+      tags$div(class = "form-group shiny-input-container",
+        tags$label(class = "control-label",
+          tip_label("Model selection criterion",
+                    paste("AIC/BIC is used only by stepwise covariate selection.",
+                          "With LASSO off and covariates entered for both years, the model",
+                          "uses exactly those covariates, so no criterion is needed and the",
+                          "run records it as 'not used'. Clear a covariate box or turn LASSO",
+                          "on to choose AIC or BIC again."))),
+        tags$div(class = "form-control",
+                 style = "background-color:#eee;color:#555;cursor:not-allowed;height:auto;",
+                 "Not used: covariates fixed for both years"))
+    )
+  )
+}
+
 mapping_selectize <- function(input_id, label, selected = "",
                               placeholder = "Search or type column name") {
   selected <- selected %||% ""
@@ -875,7 +918,7 @@ ui <- fluidPage(
       ),
       actionButton("enter_app_btn", "Get Started", class = "btn"),
       div(class = "cover-footer",
-        "Independent release candidate for review and testing"
+        "Release candidate for review and testing"
       )
     )
   ),
@@ -930,8 +973,8 @@ ui <- fluidPage(
       tags$ul(
         style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
         tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_9.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_9.pptx")),
+        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_10.pdf")),
+        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_10.pptx")),
         tags$li(tags$code("outputs/final_report.html"), " after a completed run")
       ),
       tags$hr(),
@@ -974,6 +1017,13 @@ ui <- fluidPage(
             "Grouped by a survey variable" = "custom"
           ),
           selected = "national"
+        ),
+        conditionalPanel(
+          condition = "input.benchmark_level == 'national' && (input.var_benchmark_level || '').trim() !== ''",
+          tags$p(class = "help-block",
+                 "A grouped benchmark variable is still selected but is not used: National ",
+                 "benchmarking applies one national constraint. Choose \"Grouped by a survey ",
+                 "variable\" to use it, or clear the variable.")
         ),
         fileInput("regional_benchmark_file",
           tip_label("Benchmark Target Database (optional)",
@@ -1141,9 +1191,8 @@ ui <- fluidPage(
           tip_label("Variance option (UFH)", "Sampling variance input for UFH when no transformation is used. 'sm_out' replaces a direct variance with its smoothed (GVF-based) variance only when the direct variance is missing/non-finite or below 0.001; 'sm_all' replaces all variances; 'direct' retains raw survey variances except safety backfills. When arcsin or log is selected, this choice is ignored because the transformation already stabilizes variances."),
           choices = c("sm_out", "sm_all", "direct"), selected = "sm_out")
       ),
-      selectInput("ufh_ic_criterion",
-        tip_label("Model selection criterion", "Information criterion used for stepwise covariate selection. BIC penalizes complexity more heavily and tends to select simpler models. AIC favours predictive accuracy."),
-        choices = c("AIC", "BIC"), selected = "BIC"),
+      ic_criterion_input("ufh", selected = "BIC",
+        tip_text = "Information criterion used for stepwise covariate selection. BIC penalizes complexity more heavily and tends to select simpler models. AIC favours predictive accuracy. Not used when covariates are entered for both years with LASSO off."),
       checkboxInput("ufh_lasso_enabled",
         tip_label("Use LASSO screening",
                   "Optionally screens numeric covariates with LASSO before the AIC/BIC stepwise stage. If custom Year 1 or Year 2 covariates are entered below, they define the LASSO candidate pool for that year. The final model is still chosen by stepwise selection."),
@@ -1195,9 +1244,8 @@ ui <- fluidPage(
             choices = c("bc_sm", "none"), selected = "bc_sm")
         )
       ),
-      selectInput("mfh_ic_criterion",
-        tip_label("Model selection criterion", "Information criterion used for stepwise covariate selection. AIC favours predictive accuracy; BIC penalizes complexity more and selects sparser models."),
-        choices = c("AIC", "BIC"), selected = "AIC"),
+      ic_criterion_input("mfh", selected = "AIC",
+        tip_text = "Information criterion used for stepwise covariate selection. AIC favours predictive accuracy; BIC penalizes complexity more and selects sparser models. Not used when covariates are entered for both years with LASSO off."),
       checkboxInput("mfh_lasso_enabled",
         tip_label("Use LASSO screening",
                   "Optionally screens numeric covariates with LASSO before the AIC/BIC stepwise stage. If custom Year 1 or Year 2 covariates are entered below, they define the LASSO candidate pool for that year. The final model is still chosen by stepwise selection."),
@@ -3277,6 +3325,14 @@ server <- function(input, output, session) {
     if (identical(input$povline_type %||% "column", "numeric")) {
       append_log(sae_poverty_line_log_message("numeric", povline_numeric_map, years))
     }
+    if (isTRUE(input$do_benchmark) &&
+        identical(input$benchmark_level %||% "national", "national") &&
+        nzchar(trimws(input$var_benchmark_level %||% ""))) {
+      append_log(sprintf(paste(
+        "Note: the grouped benchmark variable '%s' is selected but not used, because the",
+        "benchmarking level is National (one national constraint). Choose 'Grouped by a",
+        "survey variable' to benchmark within its groups."), trimws(input$var_benchmark_level)))
+    }
     ufh_candidates_y1 <- split_csv(input$ufh_candidates_y1)
     ufh_candidates_y2 <- split_csv(input$ufh_candidates_y2)
     mfh_candidates_y1 <- split_csv(input$mfh_candidates_y1)
@@ -3657,7 +3713,12 @@ server <- function(input, output, session) {
       bias_correction         = ufh_bc_logical,
       bias_correction_method  = ufh_bc_method,
       backtransformation      = ufh_bt_string,
-      ic_criterion            = input$ufh_ic_criterion,
+      # "none" when the covariates are fixed for both years (LASSO off):
+      # no stepwise selection runs, so no criterion is used.
+      ic_criterion            = sae_effective_ic_criterion(
+                                  input$ufh_ic_criterion,
+                                  isTRUE(input$ufh_lasso_enabled),
+                                  ufh_candidates_y1, ufh_candidates_y2),
       var_choice              = ufh_var_val,
       lasso_enabled           = isTRUE(input$ufh_lasso_enabled),
       lasso_lambda            = input$ufh_lasso_lambda %||% "lambda.1se",
@@ -3704,7 +3765,10 @@ server <- function(input, output, session) {
       benchmark_level_variable = benchmark_level_var,
       benchmark_source        = benchmark_source_label,
       var_map                 = var_map,
-      ic_criterion            = input$mfh_ic_criterion,
+      ic_criterion            = sae_effective_ic_criterion(
+                                  input$mfh_ic_criterion,
+                                  isTRUE(input$mfh_lasso_enabled),
+                                  mfh_candidates_y1, mfh_candidates_y2),
       rhs_domain              = input$rhs_domain,
       shp_domain              = input$shp_domain,
       years_keep              = years,

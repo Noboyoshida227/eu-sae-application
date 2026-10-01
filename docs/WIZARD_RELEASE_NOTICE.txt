@@ -1,6 +1,6 @@
 EU SAE APPLICATION PACKAGE - WIZARD RELEASE NOTICE
 
-Wizard overlay version: 5.2.0-rc.6-wizard.5.9
+Wizard overlay version: 5.2.0-rc.6-wizard.5.10
 Underlying package version: 5.2.0-rc.6
 
 This candidate was assembled from the verified 5.2.0-rc.5 wizard distribution
@@ -66,8 +66,8 @@ docs/MCPE_VALIDATION_STATUS.md.
 
 This remains a release candidate. It is published at
 https://github.com/Noboyoshida227/eu-sae-application/releases
-for review and testing; it is not an official World Bank Group product and is
-not approved for official statistics. The conditions in
+for review and testing. Whether to publish estimates as official statistics
+is for each national statistical office to decide. The conditions in
 docs/RELEASE_CHECKLIST.md apply before any production release.
 
 Both report formats include signed estimated-change and CI-width comparisons.

@@ -33,6 +33,7 @@ R/input_readers.R
 R/llm_assistant.R
 R/map_style.R
 R/mfh_bootstrap_helpers.R
+R/mfh_convergence_check.R
 R/mfh_model_selection.R
 R/msae_compat.R
 R/multilingual.R
@@ -42,6 +43,7 @@ R/pipeline_helpers.R
 R/release_controls.R
 R/release_packaging.R
 R/report_export.R
+R/report_map_picker.R
 R/report_word.lua
 R/validation_checks.R
 R/variance_policy.R
@@ -81,8 +83,8 @@ docs/guidance/Technical notes/Note on eblupMFH2_robust.R.docx
 docs/guidance/Technical notes/run_fh_covariance_monte_carlo.R
 docs/guidance/guidelines_v5_2_0_rc6_wizard.docx
 docs/guidance/literature/README.md
-docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_9.pdf
-docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_9.pptx
+docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_10.pdf
+docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_10.pptx
 docs/report_reference.docx
 install_packages.R
 outputs/.gitkeep

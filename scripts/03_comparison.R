@@ -134,7 +134,9 @@ if (!is.null(.cmp_cfg$ufh)) {
   .diag_push(sprintf("  var_choice: %s",
                      .cmp_cfg$ufh$var_choice %||% "(unset)"))
   .diag_push(sprintf("  ic_criterion: %s",
-                     .cmp_cfg$ufh$ic_criterion %||% "(unset)"))
+                     if (identical(.cmp_cfg$ufh$ic_criterion, "none"))
+                       "none (not used; covariates fixed for both years)"
+                     else .cmp_cfg$ufh$ic_criterion %||% "(unset)"))
 }
 
 mfh_artifacts <- readRDS(here::here("outputs", "data", "mfh_artifacts.rds"))
@@ -1354,6 +1356,114 @@ plot_rmse_map <- function(col_name, method_label, year_val) {
 }
 
 
+# ---- Map grids: rows = methods, columns = years ----
+# One figure per map family (estimates, RMSE), so that differences between
+# methods (down a column) and over time (along a row) can be read at a
+# glance. Every panel uses the family's shared legend range
+# (.map_level_limits / .map_rmse_limits), so a colour means the same value in
+# every panel and on the single-map files.
+.map_panel_aspect <- function(sf_obj) {
+  b  <- sf::st_bbox(sf_obj)
+  dx <- as.numeric(b[["xmax"]] - b[["xmin"]])
+  dy <- as.numeric(b[["ymax"]] - b[["ymin"]])
+  if (isTRUE(sf::st_is_longlat(sf_obj))) {
+    dx <- dx * cos(mean(c(b[["ymin"]], b[["ymax"]])) * pi / 180)
+  }
+  if (!is.finite(dx) || !is.finite(dy) || dx <= 0 || dy <= 0) return(1)
+  min(max(dx / dy, 0.5), 2.5)
+}
+
+# Figure size (inches) for a grid with `n_rows` methods and one column per
+# year: 9 inches wide, so that it fits a report page.
+.map_grid_size <- function(n_rows, n_cols = length(years_keep)) {
+  width   <- 9
+  panel_w <- (width - 1.2) / max(n_cols, 1)
+  panel_h <- panel_w / .map_panel_aspect(shp_dt)
+  list(width = width, height = min(n_rows * panel_h + 2.2, 30))
+}
+
+# specs: list of list(col, label) in row order; kind: "rate" or "rmse".
+plot_map_grid <- function(specs, kind = c("rate", "rmse"), title = NULL) {
+  kind <- match.arg(kind)
+  pieces <- list()
+  for (sp in specs) {
+    col <- if (kind == "rmse") paste0(sp$col, "_RMSE") else sp$col
+    if (!col %in% names(comparison_dt)) next
+    for (yr in years_keep) {
+      pieces[[length(pieces) + 1L]] <- shp_dt %>%
+        left_join(
+          comparison_dt %>% filter(year == yr) %>%
+            transmute(domain, value = as.numeric(.data[[col]])),
+          by = "domain"
+        ) %>%
+        mutate(method = sp$label, year = as.character(yr))
+    }
+  }
+  if (length(pieces) == 0L) stop("No estimates available for the map grid.")
+  map_sf <- do.call(rbind, pieces)
+  row_levels <- unique(vapply(specs, function(sp) sp$label, character(1)))
+  map_sf$method <- droplevels(factor(map_sf$method, levels = row_levels))
+  map_sf$year   <- factor(map_sf$year, levels = as.character(years_keep))
+  limits <- if (kind == "rmse") {
+    if (exists(".map_rmse_limits")) .map_rmse_limits else NULL
+  } else {
+    if (exists(".map_level_limits")) .map_level_limits else NULL
+  }
+  ggplot(map_sf) +
+    geom_sf(aes(fill = value), color = NA) +
+    sae_fill_level(
+      name   = if (kind == "rmse") "RMSE" else pov_lab$short,
+      labels = label_number(accuracy = if (kind == "rmse") 0.001 else 0.01),
+      limits = limits,
+      oob    = scales::squish,
+      guide  = guide_colourbar(barwidth = grid::unit(16, "lines"),
+                               barheight = grid::unit(0.9, "lines"),
+                               title.vjust = 0.85)
+    ) +
+    facet_grid(method ~ year, switch = "y") +
+    labs(
+      title    = title,
+      subtitle = paste("Rows: estimation method. Columns: year.",
+                       "One colour scale for all panels;\nlighter = lower,",
+                       "darker = higher, grey = no estimate."),
+      caption  = sae_map_caption(.map_attribution)
+    ) +
+    theme_minimal(base_size = 15) +
+    theme(
+      plot.title      = element_text(size = 19, face = "bold"),
+      plot.subtitle   = element_text(size = 12),
+      strip.text      = element_text(size = 15, face = "bold"),
+      strip.placement = "outside",
+      axis.text       = element_blank(),
+      axis.ticks      = element_blank(),
+      panel.grid      = element_blank(),
+      panel.spacing   = grid::unit(0.8, "lines"),
+      legend.position = "bottom",
+      legend.title    = element_text(size = 14),
+      legend.text     = element_text(size = 12)
+    )
+}
+
+# Row specs for the grids: Direct, UFH and the selected MFH model. When
+# benchmarking is on, each model is followed by its benchmarked estimates:
+# Direct, UFH, UFH benchmarked, MFH, MFH benchmarked (5 rows). Rows whose
+# column is missing are skipped by plot_map_grid().
+.map_grid_specs <- function(benchmarked = .benchmark_enabled) {
+  specs <- list(list(col = "Direct", label = "Direct"),
+                list(col = "FH",     label = "UFH"))
+  if (isTRUE(benchmarked)) {
+    specs <- c(specs, list(list(col = "FH_Bench", label = "UFH benchmarked")))
+  }
+  if (!.mfh_not_executed) {
+    specs <- c(specs, list(list(col = "MFH", label = diag_model)))
+    if (isTRUE(benchmarked)) {
+      specs <- c(specs, list(list(col = "MFH_Bench",
+                                  label = paste(diag_model, "benchmarked"))))
+    }
+  }
+  specs
+}
+
 .display_map_specs <- list(
   list(col = "Direct",    label = "Direct Map"),
   list(col = "FH",        label = "FH Map")
@@ -1781,9 +1891,17 @@ for (.sd in .figure_subdirs) {
 # affected, which is why README/HTML/CSV/XLSX update correctly but PNGs stay
 # stale on the second run. Deleting any pre-existing exports first forces
 # every subsequent ggsave() to create a *new* file, which OneDrive accepts.
-.existing_outputs <- list.files(figures_root, recursive = TRUE,
-                                full.names = TRUE, all.files = TRUE,
-                                include.dirs = FALSE)
+# Only this step's own exports are removed: its subfolders and README.md.
+# The UFH and MFH steps write their figures (ufh_*.png, mfh_*.png) to the
+# root of outputs/figures/; before w5j this clean-up deleted them too, so
+# they were in neither outputs/ nor the run archive after a full run.
+.existing_outputs <- c(
+  unlist(lapply(file.path(figures_root, .figure_subdirs), list.files,
+                recursive = TRUE, full.names = TRUE, all.files = TRUE,
+                include.dirs = FALSE), use.names = FALSE),
+  file.path(figures_root, "README.md")
+)
+.existing_outputs <- .existing_outputs[file.exists(.existing_outputs)]
 if (length(.existing_outputs) > 0) {
   unlink(.existing_outputs, force = TRUE)
 }
@@ -1962,6 +2080,117 @@ for (.spec in .map_specs) {
   }
 }
 
+# ---- Map grids (rows = methods, columns = years) ----
+# Written next to the single maps; the report shows the grids.
+.export_map_grid <- function(kind, folder, fname, what) {
+  specs <- Filter(function(sp) {
+    (if (kind == "rmse") paste0(sp$col, "_RMSE") else sp$col) %in% names(comparison_dt)
+  }, .map_grid_specs())
+  if (length(specs) == 0L) {
+    .export_log_push(sprintf("  skipped %s :: no estimates", fname))
+    return(FALSE)
+  }
+  size  <- .map_grid_size(length(specs))
+  # One title line when it fits the 9-inch figure, otherwise the indicator
+  # name on the first line (long indicator names).
+  title <- paste0(pov_lab$short, ": ", what)
+  if (nchar(title) > 48) title <- paste0(pov_lab$short, ":\n", what)
+  .safe_ggsave(
+    plot_map_grid(specs, kind = kind, title = title),
+    file.path(figures_root, folder, fname),
+    width = size$width, height = size$height + if (grepl("\n", title)) 0.4 else 0,
+    dpi = 200
+  )
+}
+message("Exporting map grids ...")
+.export_map_grid("rate", "poverty_maps", "grid_estimates.png",
+                 "estimates by method and year")
+.export_map_grid("rmse", "rmse_maps", "grid_rmse.png",
+                 "RMSE by method and year")
+
+# ---- Map panels for the HTML method picker ----
+# The HTML report lets the reader choose which methods (rows of the grid) to
+# show. It needs one image per method and year, without title or legend,
+# plus one colour bar, all on the family's shared legend range. They are
+# written to grid_panels/ with a manifest; the Word report keeps grid_*.png.
+.map_tag <- function(label) {
+  gsub("^_+|_+$", "", gsub("[^a-z0-9]+", "_", tolower(label)))
+}
+.export_map_panels <- function(kind, folder) {
+  specs <- Filter(function(sp) {
+    (if (kind == "rmse") paste0(sp$col, "_RMSE") else sp$col) %in% names(comparison_dt)
+  }, .map_grid_specs())
+  if (length(specs) == 0L) return(invisible(FALSE))
+  out_dir <- file.path(figures_root, folder, "grid_panels")
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+  limits   <- if (kind == "rmse") .map_rmse_limits else .map_level_limits
+  accuracy <- if (kind == "rmse") 0.001 else 0.01
+  panel_w  <- 4
+  panel_h  <- panel_w / .map_panel_aspect(shp_dt)
+  rows <- list()
+  for (i in seq_along(specs)) {
+    sp  <- specs[[i]]
+    col <- if (kind == "rmse") paste0(sp$col, "_RMSE") else sp$col
+    tag <- .map_tag(sp$label)
+    for (yr in years_keep) {
+      fname  <- sprintf("panel_%s_%s.png", tag, yr)
+      map_sf <- shp_dt %>%
+        left_join(
+          comparison_dt %>% filter(year == yr) %>%
+            transmute(domain, value = as.numeric(.data[[col]])),
+          by = "domain"
+        )
+      p <- ggplot(map_sf) +
+        geom_sf(aes(fill = value), color = NA) +
+        sae_fill_level(limits = limits, oob = scales::squish, guide = "none") +
+        theme_void() +
+        theme(plot.margin = margin(0, 0, 0, 0))
+      ok <- .safe_ggsave(p, file.path(out_dir, fname), width = panel_w,
+                         height = panel_h, dpi = 150, bg = "white")
+      rows[[length(rows) + 1L]] <- data.frame(
+        row = i, method = sp$label, tag = tag, year = yr, file = fname,
+        saved = isTRUE(ok), stringsAsFactors = FALSE
+      )
+    }
+  }
+  legend_file <- ""
+  if (length(limits) == 2L && all(is.finite(limits))) {
+    bar <- data.frame(x = seq(limits[1], limits[2], length.out = 256))
+    lp <- ggplot(bar, aes(x = x, y = 0, fill = x)) +
+      geom_raster() +
+      sae_fill_level(limits = limits, guide = "none") +
+      scale_x_continuous(name = if (kind == "rmse") "RMSE" else pov_lab$short,
+                         labels = label_number(accuracy = accuracy),
+                         expand = c(0, 0)) +
+      scale_y_continuous(expand = c(0, 0)) +
+      theme_minimal(base_size = 13) +
+      theme(axis.text.y  = element_blank(),
+            axis.title.y = element_blank(),
+            axis.ticks.x = element_line(colour = "grey30"),
+            panel.grid   = element_blank(),
+            plot.margin  = margin(4, 14, 4, 14))
+    if (isTRUE(.safe_ggsave(lp, file.path(out_dir, "legend.png"), width = 6,
+                            height = 0.85, dpi = 150, bg = "white"))) {
+      legend_file <- "legend.png"
+    }
+  }
+  manifest <- do.call(rbind, rows)
+  manifest$legend  <- legend_file
+  manifest$caption <- paste(sae_map_caption(.map_attribution) %||% "", collapse = " ")
+  utils::write.csv(manifest, file.path(out_dir, "manifest.csv"), row.names = FALSE)
+  .export_log_push(sprintf("  saved %s (%d panels)", file.path(out_dir, "manifest.csv"),
+                           sum(manifest$saved)))
+  invisible(TRUE)
+}
+message("Exporting map panels for the HTML report ...")
+tryCatch({
+  .export_map_panels("rate", "poverty_maps")
+  .export_map_panels("rmse", "rmse_maps")
+}, error = function(e) {
+  .export_log_push(sprintf("  map panels FAILED :: %s", conditionMessage(e)))
+  message("Map panels for the HTML report were not written: ", conditionMessage(e))
+})
+
 # ---- RMSE maps ----
 message("Exporting RMSE maps ...")
 .rmse_map_specs <- list(
@@ -2137,6 +2366,14 @@ for (.spec in .change_map_specs) {
   "## poverty_maps/",
   "Domain-level poverty maps for each method and year. Filenames:",
   "",
+  "- `grid_estimates.png`: all maps in one figure, one row per method",
+  "  and one column per year. Rows: Direct, UFH, the selected MFH model;",
+  "  with benchmarking on, UFH benchmarked follows UFH and the benchmarked",
+  "  MFH row follows MFH (5 rows).",
+  "- `grid_panels/`: the same maps as single panels (one per method and",
+  "  year, no title or legend), a colour bar `legend.png` and",
+  "  `manifest.csv`. The HTML report uses them for its Methods list, which",
+  "  shows only the methods the reader selects.",
   "- `map_<method>_<year>.png` where method is one of",
   "  `direct`, `fh`, `fh_benchmarked`, `mfh`, `mfh_benchmarked`.",
   "",
@@ -2144,6 +2381,10 @@ for (.spec in .change_map_specs) {
   "Domain-level RMSE maps showing estimation precision for each method and year.",
   "Filenames:",
   "",
+  "- `grid_rmse.png`: all RMSE maps in one figure, with the same rows and",
+  "  columns as `grid_estimates.png`.",
+  "- `grid_panels/`: one RMSE map per method and year, a colour bar and",
+  "  `manifest.csv`, used by the Methods list in the HTML report.",
   "- `rmse_map_<method>_<year>.png` where method is one of",
   "  `direct`, `fh`, `fh_benchmarked`, `mfh`, `mfh_benchmarked`.",
   "",
@@ -2158,7 +2399,15 @@ for (.spec in .change_map_specs) {
   "years. Filenames:",
   "",
   "- `significance_<method>.png`",
-  "- `change_map_<method>.png`"
+  "- `change_map_<method>.png`",
+  "",
+  "## Step figures (this folder)",
+  "The UFH step writes its figures here as `ufh_*.png` and the MFH step as",
+  "`mfh_*.png` (maps, MSE/RMSE/CV comparisons, residual and Q-Q plots, change",
+  "plots). The Comparison step leaves them in place. In the MFH step figures,",
+  "the UFH series is msae's UFH with the MFH covariates on the MFH scale",
+  "(`UFH_untransformed`, or `UFH_log` for log welfare), not the UFH step's",
+  "model."
 )
 writeLines(.readme, file.path(figures_root, "README.md"))
 

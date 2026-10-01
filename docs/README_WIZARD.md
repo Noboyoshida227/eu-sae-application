@@ -1,6 +1,6 @@
 # EU SAE Dashboard — Wizard edition
 
-Wizard version: **5.2.0-rc.6-wizard.5.9**
+Wizard version: **5.2.0-rc.6-wizard.5.10**
 Underlying EU SAE package: **5.2.0-rc.6**
 
 This is the clean 5.2.0-rc.6 application package with an additional guided
@@ -82,6 +82,15 @@ population-weighted average of the domain estimates equal the direct national
 estimate, or choose **Grouped** and map a higher-level survey variable to apply
 the constraint separately within each group.
 
+In **Models**, the AIC/BIC *Model selection criterion* is used only for
+stepwise covariate selection. If LASSO is off and covariates are entered for
+both years of a model, that model uses exactly those covariates: its
+criterion box shows "Not used: covariates fixed for both years", and the run
+records the criterion as `none` (not used). If covariates are entered for one
+year only, the criterion applies to the other year, and a note under the box
+says so. With LASSO on, the entered covariates are a candidate pool and the
+criterion is always used.
+
 The breadcrumb is clickable. Green indicates a complete step, amber indicates
 an outstanding item, and blue indicates the current step.
 
@@ -97,6 +106,9 @@ model-selection adjustment. The raw, Bonferroni-adjusted, and BH-adjusted
 p-values are all saved in
 `outputs/tables/mfh_variance_structure_selection.csv`. With two years there is
 only one contrast, so the adjustments are identical.
+When MFH1 or MFH2 is chosen, the rule is not run: the report's "MFH Variance
+Structure" section then describes only the chosen model and does not discuss
+MFH3.
 
 This MFH3 control is shown only when MFH3 is selected or requested as a
 sensitivity fit. It does **not** adjust poverty-change tests across geographic
@@ -113,6 +125,20 @@ in `outputs/tables/mfh_mcpe_validation.csv`. These diagnostics support run-level
 review but do not replace independent validation of MCPE bias and interval
 coverage. See `docs/MCPE_VALIDATION_STATUS.md` for the completed checks, skipped
 dependency-dependent tests, and remaining validation work.
+
+### MFH convergence check
+
+The MFH variance parameters are msae's estimates. After fitting, the MFH step
+checks each fitted model (MFH1, MFH2 and, when fitted, MFH3) at msae's
+reported parameters: it computes the REML score and the Newton decrement,
+which are zero at a REML maximum. The result is in
+`outputs/tables/mfh_convergence_check.csv` and the report's "MFH Convergence
+Check" section, with status `ok`, `not_at_maximum` (msae reported convergence
+at a point that is not a maximum) or `not_converged` (msae stopped at its
+iteration limit). If the selected model is not `ok`, the run shows a warning
+and the report asks for review. The UFH that the MFH step fits with msae is
+labelled `UFH_untransformed` (or `UFH_log`) in `pov_mfh.xlsx` and the MFH
+figures, to distinguish it from the UFH step's model.
 
 ### Validation and consent
 
@@ -168,6 +194,22 @@ within their own step; the growth-rate maps have their own scale. Domains
 without an estimate are grey. Maps drawn on the bundled Spain boundary carry
 the IGN credit required by its CC BY 4.0 licence.
 
+The report (HTML and Word) shows the poverty maps and the RMSE maps as grids:
+one row per estimation method and one column per year, so differences between
+methods read down a column and changes over time along a row. The rows are
+Direct, UFH and the selected MFH model; with benchmarking on, UFH benchmarked
+follows UFH and the benchmarked MFH row follows MFH (5 rows). The grids are
+saved as `grid_estimates.png` in `outputs/figures/poverty_maps/` and
+`grid_rmse.png` in `outputs/figures/rmse_maps/`. The single maps are still
+saved in the same folders.
+
+In the HTML report, each grid has a **Methods** drop-down list with one tick
+box per method. Only the ticked methods are shown, so a reader can compare,
+for example, UFH with UFH benchmarked, or Direct, UFH and MFH2; **Select all**
+and **Clear** reset the list. The poverty and RMSE grids have separate lists.
+The panels for this view are in the `grid_panels/` subfolders. The Word report
+cannot run the list and shows the full grid.
+
 ### AI assistance
 
 AI assistance is optional. When enabled, it requires both an API key and a
@@ -214,8 +256,8 @@ and required-control checks. The second renders both interfaces and verifies
 that every classic-dashboard element ID appears exactly once in the wizard.
 
 See `docs/WIZARD_RELEASE_NOTICE.txt` and `docs/RELEASE_CHECKLIST.md`. This is a
-release candidate published for review and testing; it is not an official World
-Bank Group product and is not approved for official statistics.
+release candidate published for review and testing. Whether to publish estimates
+as official statistics is for each national statistical office to decide.
 
 ## Input folder migration
 
@@ -233,8 +275,10 @@ replace current outputs; archived copies are retained under
 for Excel links. The clean distribution contains no generated reports.
 
 Both formats require Pandoc, found or downloaded automatically as described
-above. Word formatting also requires `xml2` and
-`zip`, installed by `install_packages.R`. If Word is missing, inspect the run
+above; the Word report needs Pandoc 2.17 or later. If only an older Pandoc is
+available and a newer one cannot be downloaded, the HTML report is produced and
+the log explains why the Word report was skipped. Word formatting also requires
+`xml2` and `zip`, installed by `install_packages.R`. If Word is missing, inspect the run
 log, resolve the conversion warning, and regenerate; the completed HTML is
 retained.
 The new figures are in `outputs/figures/change_comparisons/`, with values in

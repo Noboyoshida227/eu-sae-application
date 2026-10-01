@@ -68,9 +68,9 @@ closure is claimed.
 
 ## Public sharing
 
-The maintainer publishes the package as an unofficial release candidate on the
-GitHub Releases page, https://github.com/Noboyoshida227/eu-sae-application/releases, for
+The maintainer publishes the package as a release candidate on the GitHub
+Releases page, https://github.com/Noboyoshida227/eu-sae-application/releases, for
 review and testing. M17 (document, asset and institutional release authority)
-remains open: the package is not an official World Bank Group product. Passing
-tests and checksums does not approve estimators, privacy basis, data rights or
-official statistical use.
+remains open. Passing tests and checksums does not by itself validate
+estimators, privacy basis or data rights. Whether to publish estimates as
+official statistics is for each national statistical office to decide.

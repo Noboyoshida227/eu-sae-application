@@ -162,6 +162,10 @@ cat("\n[2/3] Checking Pandoc (report rendering)...\n")
 pandoc_error <- tryCatch({
   source(file.path("R", "pandoc_bootstrap.R"), local = TRUE)
   res <- sae_ensure_pandoc(root = getwd(), min_version = "2.8")
+  if (isTRUE(res$ok) && identical(res$word_ok, FALSE)) {
+    cat("  Note:", res$reason, "\n")
+    cat("  The HTML report will be produced; the Word report needs a newer Pandoc.\n")
+  }
   if (isTRUE(res$ok)) NULL else if (is.character(res$reason)) res$reason else "Pandoc is not available."
 }, error = function(e) conditionMessage(e))
 if (!is.null(pandoc_error)) {

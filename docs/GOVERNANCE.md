@@ -1,8 +1,7 @@
 # Governance and release authority
 
-This is an independent project maintained by Nobuo Yoshida. It is not, and is
-not intended to become, an official World Bank Group repository or product.
-It has no institutional product owner, method owner, release approver, security
+This is an independent project maintained by Nobuo Yoshida, not a World Bank
+Group repository. It has no institutional product owner, method owner, release approver, security
 owner or support service level. Author names and affiliations that appear in
 documents do not imply institutional endorsement.
 
@@ -20,6 +19,7 @@ documents do not imply institutional endorsement.
 6. A production release must name the responsible organization, approvers,
    support channel, maintenance policy and vulnerability contact.
 
-Until these roles and approvals are recorded, the package remains an
-unsupported, unofficial release candidate and must not be described as an
-official statistical production system.
+Until these roles and approvals are recorded, the package remains a release
+candidate for review and testing, without a support commitment. Whether to
+publish estimates as official statistics is for each national statistical
+office to decide.

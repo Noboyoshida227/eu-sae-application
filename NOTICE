@@ -1,11 +1,12 @@
 EU SAE application package — release-candidate notice
 
-This package is an independent, unofficial release candidate maintained by
-Nobuo Yoshida; it is not a World Bank Group repository or product. Some
-documents give the author's World Bank Group affiliation in a byline or cite
-World Bank publications, but no institutional release authority, endorsement,
-warranty, or support commitment is established by this repository. The
-software must not be represented as an official World Bank Group product.
+This package is an independent release candidate maintained by Nobuo
+Yoshida; it is not a World Bank Group repository. Some documents give the
+author's World Bank Group affiliation in a byline or cite World Bank
+publications, but no institutional release authority, endorsement, warranty,
+or support commitment is established by this repository. Whether to publish
+estimates as official statistics is for each national statistical office to
+decide.
 
 The MIT grant in LICENSE is deliberately limited to software source code.
 Documentation, data, images, and third-party material are outside that grant.

@@ -98,6 +98,77 @@ sae_format_word_tables <- function(path) {
   invisible(path)
 }
 
+# Remove the parts between <!--sae-html-only-start--> and
+# <!--sae-html-only-end--> from `txt` (a byte string).
+sae_strip_html_only_text <- function(txt) {
+  start_tag <- "<!--sae-html-only-start-->"
+  end_tag   <- "<!--sae-html-only-end-->"
+  starts <- gregexpr(start_tag, txt, fixed = TRUE, useBytes = TRUE)[[1]]
+  if (starts[1] < 0) return(txt)
+  ends <- gregexpr(end_tag, txt, fixed = TRUE, useBytes = TRUE)[[1]]
+  keep <- character(0)
+  pos <- 1L
+  for (st in starts) {
+    if (st < pos) next
+    en <- ends[ends > st]
+    if (length(en) == 0L) break          # unterminated block: keep the rest
+    keep <- c(keep, substr(txt, pos, st - 1L))
+    pos <- en[1] + nchar(end_tag, type = "bytes")
+  }
+  keep <- c(keep, substr(txt, pos, nchar(txt, type = "bytes")))
+  out <- paste(keep, collapse = "")
+  Encoding(out) <- "bytes"
+  out
+}
+
+.sae_base64_decode <- function(x) {
+  if (requireNamespace("base64enc", quietly = TRUE)) return(base64enc::base64decode(x))
+  if (requireNamespace("jsonlite", quietly = TRUE)) return(jsonlite::base64_dec(x))
+  stop("The base64enc or jsonlite package is needed to prepare the Word report.")
+}
+
+# The source Pandoc reads for the Word report: a temporary copy of the
+# self-contained HTML report, written next to it, with
+#   * the HTML-only blocks removed (the map method picker), and
+#   * every embedded image (src="data:image/...;base64,...") written to a
+#     temporary folder and referenced by file name.
+# Pandoc's HTML reader needs several GB of memory for the base64 images of
+# a typical report (about 4 GB with Pandoc 3.11 and 6 GB with 2.17 on the
+# Spain example); with the images as files it needs about 0.5 GB, and the
+# Word file is the same. The original HTML is not modified. Returns
+# list(html, assets) for the caller to delete.
+sae_prepare_word_source <- function(html_path) {
+  bytes <- readBin(html_path, "raw", n = file.info(html_path)$size)
+  txt <- rawToChar(bytes)
+  Encoding(txt) <- "bytes"             # positions are byte offsets
+  txt <- sae_strip_html_only_text(txt)
+  assets <- tempfile("word-assets-", tmpdir = dirname(html_path))
+  pattern <- 'src="data:image/([A-Za-z0-9.+-]+);base64,([A-Za-z0-9+/=[:space:]]+)"'
+  m <- gregexpr(pattern, txt, perl = TRUE, useBytes = TRUE)
+  hits <- regmatches(txt, m)[[1]]
+  if (length(hits) > 0L) {
+    dir.create(assets, showWarnings = FALSE)
+    ext_of <- c("png" = "png", "jpeg" = "jpg", "jpg" = "jpg", "gif" = "gif",
+                "svg+xml" = "svg", "webp" = "webp")
+    repl <- vapply(seq_along(hits), function(i) {
+      parts <- regmatches(hits[i], regexec(pattern, hits[i], perl = TRUE, useBytes = TRUE))[[1]]
+      ext <- if (tolower(parts[2]) %in% names(ext_of)) ext_of[[tolower(parts[2])]] else "img"
+      name <- sprintf("img%04d.%s", i, ext)
+      writeBin(.sae_base64_decode(gsub("[[:space:]]", "", parts[3])), file.path(assets, name))
+      sprintf('src="%s/%s"', basename(assets), name)
+    }, character(1))
+    regmatches(txt, m) <- list(repl)
+  }
+  out <- tempfile("word-source-", tmpdir = dirname(html_path), fileext = ".html")
+  con <- file(out, open = "wb")
+  on.exit(close(con), add = TRUE)
+  writeBin(charToRaw(txt), con)
+  list(html = out, assets = assets)
+}
+
+# Minimum Pandoc for the Word report: its Lua filter uses pandoc.Inlines.
+sae_word_min_pandoc <- "2.17"
+
 # Word is derived from the completed HTML: no statistical or AI calls are rerun.
 sae_render_word_report <- function(html_path = "outputs/final_report.html",
                                     output_path = "outputs/final_report.docx",
@@ -107,7 +178,20 @@ sae_render_word_report <- function(html_path = "outputs/final_report.html",
   filter <- file.path(root, "R", "report_word.lua")
   if (!file.exists(reference) || !file.exists(filter)) stop("Word report template/filter is missing from the package.")
   if (!rmarkdown::pandoc_available()) stop("Pandoc is required for the Word report.")
+  pv <- rmarkdown::pandoc_version()
+  if (pv < numeric_version(sae_word_min_pandoc)) {
+    stop(sprintf(paste(
+      "Pandoc %s is too old for the Word report, which needs Pandoc %s or later",
+      "(the HTML report is not affected). Install a newer Pandoc, or let the app",
+      "download its own copy, and render the report again."), pv, sae_word_min_pandoc))
+  }
   html_path <- normalizePath(html_path, winslash = "/", mustWork = TRUE)
+  # Pandoc reads a prepared copy: HTML-only blocks removed, embedded images
+  # written to files (see sae_prepare_word_source()). The original HTML is
+  # not modified.
+  src <- sae_prepare_word_source(html_path)
+  html_source <- src$html
+  on.exit(unlink(c(src$html, src$assets), recursive = TRUE), add = TRUE)
   # pandoc_convert temporarily changes its working directory; resolve all
   # paths and options before entering it (R arguments are evaluated lazily).
   options <- c("--standalone",
@@ -121,7 +205,7 @@ sae_render_word_report <- function(html_path = "outputs/final_report.html",
   temporary <- tempfile("word-report-", tmpdir = dirname(output_path), fileext = ".docx")
   on.exit(unlink(temporary), add = TRUE)
   rmarkdown::pandoc_convert(
-    input = html_path,
+    input = html_source,
     from = "html", to = "docx", output = temporary,
     options = options,
     verbose = FALSE

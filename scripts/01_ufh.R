@@ -383,13 +383,14 @@ if (isTRUE(log_transform)) {
 }
 
 # ---- IC criterion (from config or default) ----
+# "none" means covariates are fixed for both years (LASSO off), so no
+# stepwise selection runs; it is checked below once the covariates are known.
 ufh_ic_criterion <- if (!is.null(ufh_cfg$ic_criterion) &&
-                        ufh_cfg$ic_criterion %in% c("AIC", "BIC")) {
+                        ufh_cfg$ic_criterion %in% c("AIC", "BIC", "none")) {
   ufh_cfg$ic_criterion
 } else {
   "BIC"
 }
-cat("Model-selection criterion:", ufh_ic_criterion, "\n")
 ufh_lasso_enabled <- isTRUE(ufh_cfg$lasso_enabled)
 ufh_lasso_lambda <- cfg_or_default(ufh_cfg$lasso_lambda, "lambda.1se")
 analysis_seed <- suppressWarnings(as.integer(cfg_or_default(.app_cfg$analysis_seed, 123L)))
@@ -487,6 +488,19 @@ if (!isTRUE(ufh_lasso_enabled) &&
   )
   cat("Year 2 fixed formula:", deparse(ufh_formula_override_y2), "\n")
 }
+
+# The criterion is used only for a year without a fixed formula.
+.ufh_ic_years <- paste("Year", seq_along(years_keep), paste0("(", years_keep, ")"))
+if (identical(ufh_ic_criterion, "none")) {
+  .ufh_ic_problem <- sae_ic_none_problem("UFH", ufh_lasso_enabled,
+                                         ufh_regressors_y1, ufh_regressors_y2,
+                                         years = .ufh_ic_years)
+  if (!is.null(.ufh_ic_problem)) stop(.ufh_ic_problem, call. = FALSE)
+}
+cat("Model-selection criterion:",
+    sae_ic_criterion_label(ufh_ic_criterion, ufh_lasso_enabled,
+                           ufh_regressors_y1, ufh_regressors_y2,
+                           years = .ufh_ic_years), "\n")
 
 # ---- Container for per-year results ----
 fh_results_list <- list()

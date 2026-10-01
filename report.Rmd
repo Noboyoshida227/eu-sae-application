@@ -50,6 +50,9 @@ table_dir <- here::here("outputs", "tables")
 }
 
 source(here::here("R", "comparison_report_ai.R"), local = knitr::knit_global())
+if (file.exists(here::here("R", "report_map_picker.R"))) {
+  source(here::here("R", "report_map_picker.R"), local = knitr::knit_global())
+}
 
 include_fig <- function(filename, ...) {
   path <- file.path(fig_dir, filename)
@@ -107,6 +110,20 @@ selection_diag <- if (length(selection_parts) > 0) bind_rows(selection_parts) el
 mfh_numerical_diag <- safe_read_csv("mfh_numerical_diagnostics.csv")
 mfh_variance_selection <- safe_read_csv("mfh_variance_structure_selection.csv")
 mfh_mcpe_validation <- safe_read_csv("mfh_mcpe_validation.csv")
+
+# MFH model requested in the setup. The MFH3/MFH2 variance-structure rule runs
+# only when MFH3 (or the legacy AUTO) was requested; when MFH1 or MFH2 was
+# chosen directly, the report does not discuss MFH3.
+mfh_requested_model <- toupper(as.character(
+  (mfh_artifacts$diag_model_requested %||% run_meta$mfh_requested_model %||%
+     mfh_variance_selection$requested_model %||% NA_character_)[1L]
+))
+mfh_selected_model <- toupper(as.character(
+  (mfh_artifacts$diag_model %||% run_meta$mfh_selected_model %||%
+     mfh_variance_selection$selected_model %||% NA_character_)[1L]
+))
+mfh_rule_applied <- isTRUE(mfh_requested_model %in% c("AUTO", "MFH3")) ||
+  isTRUE(as.logical((mfh_variance_selection$test_available %||% NA)[1L]))
 ```
 
 ```{r ai-report-styles, results='asis'}
@@ -181,7 +198,7 @@ if (!is.null(run_meta)) {
       "Benchmark level",
       "Benchmark source",
       "Benchmark target file",
-      "Requested MFH rule",
+      "Requested MFH model",
       "Selected MFH model",
       "MFH3 reference-variance test adjustment",
       "Analysis seed",
@@ -226,7 +243,11 @@ if (!is.null(run_meta)) {
     ),
     check.names = FALSE
   )
-  kable(setup_tbl, caption = "Run configuration and output locations")
+  if (!mfh_rule_applied) {
+    # MFH1 or MFH2 was chosen directly: the MFH3 test was not run.
+    setup_tbl <- setup_tbl[setup_tbl$Item != "MFH3 reference-variance test adjustment", , drop = FALSE]
+  }
+  kable(setup_tbl, caption = "Run configuration and output locations", row.names = FALSE)
 }
 ```
 
@@ -281,7 +302,19 @@ if (!is.null(mfh_status) && mfh_status$bad_rows > 0 && !mfh_not_executed) {
   ))
 }
 
-if (!is.null(mfh_status) && !mfh_not_executed) {
+if (!is.null(mfh_status) && !mfh_not_executed && !mfh_rule_applied) {
+  cat(sprintf(
+    paste0(
+      "<div class=\"alert alert-info\">",
+      "<strong>Selected MFH model:</strong> %s, as chosen in the setup. ",
+      "The MFH comparison tables and plots use this model's estimates from ",
+      "<code>pov_mfh.xlsx</code>. Other MFH variants are fitted only for diagnostics ",
+      "and are not part of the MFH estimate export.",
+      "</div>\n"
+    ),
+    mfh_status$diag_model
+  ))
+} else if (!is.null(mfh_status) && !mfh_not_executed) {
   cat(sprintf(
     paste0(
       "<div class=\"alert alert-info\">",
@@ -334,14 +367,79 @@ if (mfh_not_executed) {
 }
 ```
 
-## MFH Variance-Structure Selection
-
-The default procedure fits MFH3 first. If MFH3 does not converge or cannot be fitted, the reason is recorded and MFH2 is used. If MFH3 converges, its reference-variance tests compare the time-specific random-effect variances. MFH3 is retained when at least one adjusted test rejects equality at the configured level; otherwise MFH2 is selected. Bonferroni is the confirmatory default, while Benjamini-Hochberg (BH) is available as a less-conservative sensitivity option. These adjustments apply across pairwise **time-variance contrasts**, not across geographic areas. With two analysis years there is only one contrast, so raw, Bonferroni, and BH p-values are identical.
-
-```{r mfh-variance-selection-table}
-if (!is.null(mfh_variance_selection)) {
-  kable(mfh_variance_selection, digits = 4,
-        caption = "MFH3 convergence and reference-variance model-selection decision")
+```{r mfh-variance-structure, results='asis'}
+if (!mfh_rule_applied) {
+  # MFH1 or MFH2 was chosen in the setup: describe that model only.
+  cat("## MFH Variance Structure\n\n")
+  .mfh_model_note <- switch(
+    mfh_selected_model %||% "",
+    MFH1 = paste(
+      "MFH1 allows a different random-effect variance in each year and treats",
+      "the area random effects of different years as independent."
+    ),
+    MFH2 = paste(
+      "MFH2 assumes that the area random effects have the same variance in both",
+      "years and are correlated over time, with correlation rho between",
+      "consecutive years."
+    ),
+    ""
+  )
+  if (!is.null(mfh_status) && !mfh_not_executed && nzchar(.mfh_model_note)) {
+    cat(sprintf(
+      paste(
+        "The MFH model was chosen in the setup: **%s**. No data-driven",
+        "variance-structure test was run. %s Its estimated variance parameters",
+        "are listed in the MFH Convergence Check below.\n\n"
+      ),
+      mfh_selected_model, .mfh_model_note
+    ))
+  } else if (!is.na(mfh_selected_model) && nzchar(mfh_selected_model)) {
+    cat(sprintf("The MFH model was chosen in the setup: **%s**.\n\n", mfh_selected_model))
+  } else {
+    cat("MFH results are not available for this run.\n\n")
+  }
+} else {
+  cat("## MFH Variance-Structure Selection\n\n")
+  .rule_lead <- if (identical(mfh_requested_model, "AUTO")) {
+    "The automatic MFH rule (legacy AUTO setting) was requested, so MFH3 and MFH2 were compared."
+  } else {
+    "MFH3 was requested, so the MFH3/MFH2 variance-structure rule was applied."
+  }
+  .test_ran <- !is.null(mfh_variance_selection) &&
+    isTRUE(as.logical(mfh_variance_selection$test_available[1L]))
+  cat(paste(
+    .rule_lead,
+    "MFH3, which allows a different random-effect variance in each year, is fitted first.",
+    "If it does not converge or cannot be fitted, the reason is recorded and MFH2 is used.",
+    "If MFH3 converges, its reference-variance test compares the year-specific",
+    "random-effect variances: MFH3 is kept when at least one adjusted test rejects",
+    "equal variances at the configured level; otherwise MFH2 is used."
+  ))
+  if (.test_ran) {
+    cat(paste(
+      "",
+      "Bonferroni is the confirmatory default, while Benjamini-Hochberg (BH) is",
+      "available as a less-conservative sensitivity option. These adjustments apply",
+      "across pairwise **time-variance contrasts**, not across geographic areas.",
+      "With two analysis years there is only one contrast, so raw, Bonferroni, and",
+      "BH p-values are identical."
+    ))
+  }
+  cat("\n\n")
+  .rule_reason <- if (!is.null(mfh_status)) mfh_status$selection_reason else
+    mfh_variance_selection$reason[1L] %||% ""
+  if (!is.na(.rule_reason) && nzchar(.rule_reason) && !identical(.rule_reason, "not recorded")) {
+    cat("**Result:** ", .rule_reason, "\n\n", sep = "")
+  }
+  if (!is.null(mfh_variance_selection)) {
+    .sel_show <- mfh_variance_selection[, setdiff(names(mfh_variance_selection), "reason"),
+                                        drop = FALSE]
+    .sel_show <- .sel_show[, vapply(.sel_show, function(x) !all(is.na(x)), logical(1)),
+                           drop = FALSE]
+    print(kable(.sel_show, digits = 4, row.names = FALSE,
+                caption = "MFH3 convergence and reference-variance model-selection decision"))
+    cat("\n\n")
+  }
 }
 ```
 
@@ -422,6 +520,56 @@ if (!is.null(mfh_numerical_diag) && nrow(mfh_numerical_diag) > 0) {
   }
 } else {
   cat("*MFH numerical diagnostics were not exported for this run.*\n")
+}
+```
+
+## MFH Convergence Check
+
+The MFH variance parameters are estimated by msae's Fisher-scoring routine,
+which stops when the parameters change by less than a relative tolerance. That
+rule can stop at a point that is not a maximum of the REML likelihood. The
+table checks each fitted MFH model at msae's reported parameters: the REML
+score should be zero there. The Newton decrement summarises the score in one
+number (zero at a maximum); half of it approximates how much the REML
+log-likelihood could still rise. Status `ok` means a REML maximum (or a
+maximum on a bound, such as a variance of zero); `not_at_maximum` means msae
+reported convergence at a point that is not a maximum; `not_converged` means
+msae stopped at its iteration limit and its last iterate is used. The
+estimates are msae's in every case.
+
+```{r mfh-convergence-check, results='asis'}
+mfh_conv <- safe_read_csv("mfh_convergence_check.csv")
+if (!is.null(mfh_conv) && nrow(mfh_conv) > 0) {
+  conv_show <- mfh_conv[, intersect(c("model", "selected", "msae_converged", "iterations",
+                                      "sigma2", "sigma2_1", "sigma2_2", "rho",
+                                      "newton_decrement", "loglik_gain_approx", "status"),
+                                    names(mfh_conv)), drop = FALSE]
+  conv_show <- conv_show[, vapply(conv_show, function(x) !all(is.na(x)), logical(1)), drop = FALSE]
+  conv_labels <- c(model = "Model", selected = "Selected", msae_converged = "msae conv.",
+                   iterations = "Iter.", sigma2 = "sigma2", sigma2_1 = "sigma2 y1",
+                   sigma2_2 = "sigma2 y2", rho = "rho", newton_decrement = "Newton decr.",
+                   loglik_gain_approx = "logLik gain", status = "Status")
+  names(conv_show) <- unname(conv_labels[names(conv_show)])
+  conv_show[["Newton decr."]] <- signif(conv_show[["Newton decr."]], 3)
+  conv_show[["logLik gain"]] <- signif(conv_show[["logLik gain"]], 3)
+  print(kable(conv_show, digits = 5, row.names = FALSE,
+              caption = "REML check at msae's end point (one row per fitted MFH model)"))
+  cat("\n")
+  for (i in seq_len(nrow(mfh_conv))) {
+    cat(sprintf("- **%s%s:** %s\n", mfh_conv$model[i],
+                if (isTRUE(as.logical(mfh_conv$selected[i]))) " (selected)" else "",
+                mfh_conv$message[i]))
+  }
+  sel <- mfh_conv[as.logical(mfh_conv$selected) %in% TRUE, , drop = FALSE]
+  if (nrow(sel) > 0 && !identical(sel$status[1], "ok")) {
+    cat(sprintf(paste0(
+      "\n> **Review required:** the selected model (%s) is not at a REML maximum ",
+      "(status `%s`). Its estimates, MSEs and change tests rest on these variance ",
+      "parameters. Compare with the other MFH models and the UFH results before ",
+      "reporting.\n"), sel$model[1], sel$status[1]))
+  }
+} else {
+  cat("*The MFH convergence check was not exported for this run.*\n")
 }
 ```
 
@@ -551,16 +699,34 @@ cat(comparison_ai_section_html(ai_state, "precision",
 
 ## Poverty Maps
 
-Maps of the estimated poverty rates by domain and year. All poverty maps
-share one colour scale and one value range (across Direct, UFH and MFH and
-both years), so the same colour means the same poverty rate on every map:
-lighter areas indicate lower values and darker areas higher values. Domains
-without an estimate are shown in grey.
+Maps of the estimated poverty rates by domain and year, arranged as a table:
+one row per estimation method and one column per year, so that differences
+between methods can be read down a column and changes over time along a row.
+The rows are Direct, UFH and the selected MFH model; when benchmarking is on,
+each model's row is followed by its benchmarked estimates. In the HTML report,
+the **Methods** list above the maps selects which methods are shown, for
+example UFH and UFH benchmarked only. All poverty maps
+share one colour scale and one value range (across all methods and years), so
+the same colour means the same poverty rate in every panel: lighter areas
+indicate lower values and darker areas higher values. Domains without an
+estimate are shown in grey. The single maps are also saved separately in
+`outputs/figures/poverty_maps/`.
 
 ```{r poverty-maps, results='asis'}
 map_files <- list.files(file.path(fig_dir, "poverty_maps"),
                         pattern = "\\.png$", full.names = FALSE)
-if (length(map_files) > 0) {
+if ("grid_estimates.png" %in% map_files) {
+  label <- "Estimates by method and year"
+  cat(sprintf("\n### %s\n\n", label))
+  grid_path <- file.path(fig_dir, "poverty_maps", "grid_estimates.png")
+  if (exists("sae_map_grid_markdown")) {
+    cat(sae_map_grid_markdown(grid_path,
+                              file.path(fig_dir, "poverty_maps", "grid_panels"),
+                              id = "sae-map-picker-estimates", label = label))
+  } else {
+    cat(sprintf("![%s](%s)\n\n", label, grid_path))
+  }
+} else if (length(map_files) > 0) {
   for (f in sort(map_files)) {
     label <- gsub("_", " ", tools::file_path_sans_ext(f))
     cat(sprintf("\n### %s\n\n", label))
@@ -580,14 +746,29 @@ cat(comparison_ai_section_html(ai_state, "poverty_maps",
 ## RMSE Maps
 
 Maps of the root mean squared error (RMSE) of the poverty estimates, showing
-how estimation precision varies across domains. All RMSE maps share one
-colour scale and one value range: lighter areas indicate lower RMSE (higher
-precision), darker areas higher RMSE (lower precision).
+how estimation precision varies across domains, arranged in the same way:
+one row per method (with the benchmarked rows when benchmarking is on) and one
+column per year, with its own **Methods** list in the HTML report. All RMSE
+maps share one colour
+scale and one value range: lighter areas indicate lower RMSE (higher
+precision), darker areas higher RMSE (lower precision). The single maps are
+also saved separately in `outputs/figures/rmse_maps/`.
 
 ```{r rmse-maps, results='asis'}
 rmse_map_files <- list.files(file.path(fig_dir, "rmse_maps"),
                              pattern = "\\.png$", full.names = FALSE)
-if (length(rmse_map_files) > 0) {
+if ("grid_rmse.png" %in% rmse_map_files) {
+  label <- "RMSE by method and year"
+  cat(sprintf("\n### %s\n\n", label))
+  grid_path <- file.path(fig_dir, "rmse_maps", "grid_rmse.png")
+  if (exists("sae_map_grid_markdown")) {
+    cat(sae_map_grid_markdown(grid_path,
+                              file.path(fig_dir, "rmse_maps", "grid_panels"),
+                              id = "sae-map-picker-rmse", label = label))
+  } else {
+    cat(sprintf("![%s](%s)\n\n", label, grid_path))
+  }
+} else if (length(rmse_map_files) > 0) {
   for (f in sort(rmse_map_files)) {
     label <- gsub("_", " ", tools::file_path_sans_ext(f))
     cat(sprintf("\n### %s\n\n", label))
@@ -608,8 +789,7 @@ The table also reports Benjamini-Hochberg (BH) and Bonferroni adjustments across
 the geographic domains within each method. BH controls the false discovery rate;
 Bonferroni controls the family-wise probability of any false rejection. These
 are sensitivity results and do not control the figure colors or headline counts.
-They are separate from the MFH3 reference-variance test adjustment, which applies
-only to pairwise time-variance contrasts when MFH3 is fitted.
+`r if (mfh_rule_applied) "They are separate from the MFH3 reference-variance test adjustment, which applies only to pairwise time-variance contrasts when MFH3 is fitted." else ""`
 
 ```{r sig-comparison, results='asis'}
 sig_cmp <- tryCatch(

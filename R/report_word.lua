@@ -26,6 +26,9 @@ end
 
 function Div(el)
   if el.identifier == 'header' or el.identifier == 'TOC' then return {} end
+  -- Interactive blocks (the map method picker) exist only in the HTML report;
+  -- their static replacement is in a div hidden there and shown in Word.
+  if el.classes:includes('sae-html-only') then return {} end
   return el.content
 end
 
@@ -36,11 +39,21 @@ function Image(el)
   -- by Word's page limits when no dimensions can be read.
   local success, mime, data = pcall(pandoc.mediabag.fetch, el.src)
   local width = 6.5
+  local w, h = nil, nil
   if success and data and pandoc.image and pandoc.image.size then
     local sized, size = pcall(pandoc.image.size, data)
-    if sized and size.width and size.height and size.height > 0 then
-      width = math.min(width, 7.0 * size.width / size.height)
-    end
+    if sized and size.width and size.height then w, h = size.width, size.height end
+  end
+  -- pandoc.image needs Pandoc >= 3.1.13. With an older Pandoc, read the
+  -- size from the PNG header (the report figures are PNG), so that tall
+  -- figures such as the map grids still fit the page.
+  if (not h) and success and type(data) == 'string' and #data >= 24 and
+     data:sub(1, 8) == '\137PNG\r\n\26\n' then
+    local ok, pw, ph = pcall(string.unpack, '>I4>I4', data, 17)
+    if ok then w, h = pw, ph end
+  end
+  if w and h and h > 0 then
+    width = math.min(width, 7.0 * w / h)
   end
   el.attributes.width = string.format('%.3fin', width)
   el.attributes.height = nil

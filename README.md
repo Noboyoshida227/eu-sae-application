@@ -7,8 +7,8 @@ the application zip (`EU_SAE_520_….zip`), not the automatic "Source code"
 archives. Compare its SHA-256 with the value on the release page, then extract
 the whole zip. This is an independent project maintained by Nobuo Yoshida, not a
 World Bank Group repository. The package is a release candidate for review and
-testing; it is not an official World Bank Group product and is not approved for
-official statistics.
+testing. Whether to publish estimates as official statistics is for each
+national statistical office to decide.
 
 Install **R 4.2 or later** and run `install_packages.R` once to install the
 required packages. Use the newest R version that your organization has approved
@@ -41,16 +41,16 @@ Ports advance if occupied. There is no supplied wizard shell launcher; manual
 launch through R remains possible from the package root using
 `source("app_wizard.R")` after installing dependencies.
 
-- [Download and verification instructions](docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_9.pdf)
-- [Wizard reference](docs/README_WIZARD.md) and [slide guide](docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_9.pptx)
+- [Download and verification instructions](docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_10.pdf)
+- [Wizard reference](docs/README_WIZARD.md) and [slide guide](docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_10.pptx)
 - [Methodological guidance](docs/guidance/guidelines_v5_2_0_rc6_wizard.docx)
 - [Examples and your own input folders](Data/README.md)
 
 
 This is a revised release candidate based on the exact v5.1.0 tag. It includes
 the Shiny dashboard, UFH/MFH analysis scripts, reporting, audit controls, tests,
-and guidance. It is not yet approved for production official statistics; read
-`docs/REVISION_STATUS.md` and `docs/RELEASE_CHECKLIST.md` first.
+and guidance. The open review items are listed in `docs/REVISION_STATUS.md`
+and `docs/RELEASE_CHECKLIST.md`.
 
 ## HTML and Word reports
 

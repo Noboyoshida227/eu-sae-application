@@ -152,6 +152,33 @@ env$.sae_extract_pandoc <- function(archive, dest_dir) { dir.create(dest_dir, re
 res <- env$sae_ensure_pandoc(root = root, quiet = TRUE)
 check(!res$ok && grepl("could not be run", res$reason), "an executable that cannot run is reported, not used")
 
+# --- 11b. an old Pandoc (< 2.17) is not enough for the Word report ----------
+# Online: the pinned copy is downloaded and used. Offline: the old copy is
+# used for the HTML report only (word_ok = FALSE) with an explicit reason.
+env$.sae_extract_pandoc <- function(archive, dest_dir) {   # undo the stub of test 11
+  state$extracted <- state$extracted + 1L
+  make_pandoc(dest_dir, "3.11"); invisible(file.path(dest_dir, exe_name))
+}
+reset()
+old_dir <- make_pandoc(file.path(root, "tools", "pandoc"), "2.11.4")
+res <- env$sae_ensure_pandoc(root = root, quiet = TRUE)
+check(isTRUE(res$ok) && isTRUE(res$word_ok) && res$source == "downloaded" &&
+        as.character(res$version) == "3.11" && state$downloads == 1L,
+      "an old Pandoc (2.11.4) does not stop the download of the pinned copy")
+unlink(file.path(cache, "3.11-windows-x86_64"), recursive = TRUE)
+reset()
+res <- env$sae_ensure_pandoc(root = root, allow_download = FALSE, quiet = TRUE)
+check(isTRUE(res$ok) && !isTRUE(res$word_ok) && identical(res$dir, old_dir) &&
+        state$downloads == 0L && grepl("Word report needs Pandoc 2.17", res$reason, fixed = TRUE),
+      "offline with an old Pandoc: HTML only, Word skipped with a reason")
+reset()
+make_pandoc(file.path(root, "tools", "pandoc"), "2.17.1.1")
+res <- env$sae_ensure_pandoc(root = root, quiet = TRUE)
+check(isTRUE(res$ok) && isTRUE(res$word_ok) && state$downloads == 0L &&
+        as.character(res$version) == "2.17.1.1",
+      "Pandoc 2.17 is accepted for the Word report without a download")
+unlink(file.path(root, "tools"), recursive = TRUE)
+
 # --- 12. real helpers: platform key, timeout bound, checksum of a known file --
 key <- (function() { e2 <- new.env(); sys.source("R/pandoc_bootstrap.R", envir = e2); e2$sae_pandoc_platform() })()
 check(key %in% names(env$.sae_pandoc_release$assets), paste("platform key is pinned:", key))
