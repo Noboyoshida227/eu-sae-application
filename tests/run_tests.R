@@ -461,6 +461,17 @@ check(grepl('mfh_rule_applied <- isTRUE(mfh_requested_model %in% c("AUTO", "MFH3
               report_text, fixed = TRUE) &&
         !grepl("The default procedure fits MFH3 first", report_text, fixed = TRUE),
       "final report discusses the MFH3/MFH2 rule only when MFH3 was requested")
+comparison_script_text <- read_all("scripts/03_comparison.R")
+check(grepl('"indicator_info.csv"', comparison_script_text, fixed = TRUE) &&
+        grepl(".change_map_title <- function(method)", comparison_script_text, fixed = TRUE) &&
+        !grepl("Poverty Change Map", comparison_script_text, fixed = TRUE) &&
+        !grepl('"Poverty changes (%s - %s):"', comparison_script_text, fixed = TRUE) &&
+        grepl('indicator_info <- safe_read_csv("indicator_info.csv")', report_text, fixed = TRUE) &&
+        grepl("## Statistical Significance of `r indicator_title` Changes", report_text, fixed = TRUE) &&
+        grepl("change_figure_heading <- function(f)", report_text, fixed = TRUE) &&
+        !grepl('label <- gsub("_", " ", tools::file_path_sans_ext(f))\n    cat(sprintf("\\n### %s\\n\\n", label))\n    cat(sprintf("![%s](%s)\\n\\n", label,\n                file.path(fig_dir, "change_figures", f)))',
+               report_text, fixed = TRUE),
+      "change maps and significance plots are labelled with the run's indicator (mean welfare or poverty)")
 ai_report_keys <- c("overview", "normality", "rates", "precision",
                     "change_significance", "poverty_maps", "change_maps")
 check(grepl("params:", report_text, fixed = TRUE) &&
@@ -485,6 +496,47 @@ check(!grepl("render_comparison_ai_note", app_text, fixed = TRUE) &&
       "dashboard produces one combined human-readable report")
 
 source("R/pipeline_helpers.R")
+
+# Data Readiness loader: a pre-existing column with an internal name (here
+# `povline`) must not shadow the column mapped to that role (`povline_2019`).
+# Exercise the loader as defined in both app.R and app_support.R.
+readiness_collision_ok <- local({
+  fixture <- tempfile("readiness_collision_")
+  dir.create(fixture)
+  on.exit(unlink(fixture, recursive = TRUE), add = TRUE)
+  survey_csv <- file.path(fixture, "survey.csv")
+  aux_csv <- file.path(fixture, "aux.csv")
+  write.csv(data.frame(
+    year = 2022L, domain = c("A", "A", "B", "B"), psu = 1:4, weight = 1, hhsize = 2,
+    income = c(90, 110, 90, 110), povline = 100, povline_2019 = 120
+  ), survey_csv, row.names = FALSE)
+  write.csv(data.frame(domain = c("x", "y"), nuts = c("A", "B"), year = 2022L, cov = 1:2),
+            aux_csv, row.names = FALSE)
+  vm <- function(pl) list(year = "year", domain = "domain", psu = "psu", weight = "weight",
+                          strata = "", hh_size = "hhsize", welfare = "income", povline = pl)
+  vapply(c("app.R", "app_support.R"), function(src) {
+    declarations <- parse(src, encoding = "UTF-8")
+    wanted <- c("load_and_harmonize", "validate_mapped_input_columns")
+    defs <- Filter(function(x) is.call(x) && identical(x[[1]], as.name("<-")) &&
+      as.character(x[[2]]) %in% wanted, declarations)
+    if (length(defs) != 2L) return(FALSE)
+    env <- new.env(parent = globalenv())
+    for (d in defs) eval(d, env)
+    h19 <- env$load_and_harmonize(survey_csv, aux_csv, vm("povline_2019"), "nuts")
+    h00 <- env$load_and_harmonize(survey_csv, aux_csv, vm("povline"), "nuts")
+    sum(names(h19$survey) == "povline") == 1L &&
+      all(h19$survey$povline == 120) &&
+      all(h19$survey$povline_original == 100) &&
+      any(grepl("povline_2019", h19$notes, fixed = TRUE)) &&
+      identical(sort(h19$rhs$domain), c("A", "B")) &&
+      "domain_original" %in% names(h19$rhs) &&
+      all(h00$survey$povline == 100) &&
+      !any(grepl("survey mapping", h00$notes, fixed = TRUE))
+  }, logical(1))
+})
+check(all(readiness_collision_ok),
+      "Data Readiness uses the mapped poverty line when another column is already named povline")
+
 ess_boundary <- sae_effective_sample_size(
   sample_size = c(12, 20, 30),
   design_variance = c(0, 0.01, 0),
@@ -887,6 +939,58 @@ check(isTRUE(validate_app_config(list(years_keep = c(2012L, 2013L), analysis_see
                                       run = list(steps = "MFH"),
                                       mfh = list(variance_lower_multiplier = 5)))$valid),
       "the unused variance_lower_multiplier setting no longer blocks a run")
+
+# ---- Mean welfare: price deflation and percentage changes (w5k) ----
+.pi_ok <- list(enabled = TRUE, base_year = 2012L, values = list("2012" = 100, "2013" = 101.4))
+.pi_f <- sae_price_factors(.pi_ok, c(2012L, 2013L))
+.pi_d <- sae_apply_price_index(data.frame(year = c(2012L, 2013L, 2013L), welfare = c(1000, 1014, 2028)),
+                               .pi_ok, c(2012L, 2013L))
+check(isTRUE(all.equal(unname(.pi_f), c(1, 100 / 101.4))) &&
+        isTRUE(all.equal(.pi_d$welfare, c(1000, 1000, 2000))) &&
+        is.null(sae_price_factors(.pi_ok, c(2012L, 2013L), "poverty")) &&
+        is.null(sae_price_factors(list(enabled = FALSE), c(2012L, 2013L))) &&
+        identical(sae_apply_price_index(data.frame(year = 2013L, welfare = 5), .pi_ok,
+                                        c(2012L, 2013L), "poverty")$welfare, 5) &&
+        length(sae_price_index_problems(list(enabled = TRUE, values = list("2012" = 100)),
+                                        c(2012L, 2013L))) == 1L &&
+        length(sae_price_index_problems(list(enabled = TRUE, values = list("2012" = 100, "2013" = 0)),
+                                        c(2012L, 2013L))) == 1L &&
+        identical(sae_price_basis_label(.pi_ok, c(2012L, 2013L)),
+                  "constant 2012 prices (price index: 2012 = 100, 2013 = 101.4)") &&
+        identical(sae_price_basis_label(list(enabled = FALSE), c(2012L, 2013L)),
+                  "current prices (not deflated)"),
+      "price index: welfare in first-year prices for mean welfare only, with checks and label")
+.mw_cfg <- function(pi) list(years_keep = c(2012L, 2013L), analysis_seed = 123L,
+                             indicator_type = "mean_welfare", run = list(steps = "UFH"),
+                             price_index = pi)
+check(isTRUE(validate_app_config(.mw_cfg(.pi_ok))$valid) &&
+        !isTRUE(validate_app_config(.mw_cfg(list(enabled = TRUE, values = list("2012" = 100))))$valid) &&
+        isTRUE(validate_app_config(.mw_cfg(list(enabled = FALSE)))$valid),
+      "config check requires a positive price index for each year when deflation is on")
+.pc <- sae_percent_change(m1 = c(100, 100, -1), m2 = c(110, 90, 5), mse1 = c(4, 4, 1),
+                          mse2 = c(4, 4, 1), mse_diff = c(8, 4, 2))
+.v2 <- 4 / 100^2 + 4 / 90^2 - 2 * 2 / (100 * 90)
+check(isTRUE(all.equal(.pc$pct_change[1:2], c(10, -10))) &&
+        isTRUE(all.equal(.pc$log_ratio_var[1], 4 / 100^2 + 4 / 110^2)) &&
+        isTRUE(all.equal(.pc$log_ratio_var[2], .v2)) &&
+        isTRUE(all.equal(.pc$pct_lb[2], 100 * (exp(log(0.9) - qnorm(0.975) * sqrt(.v2)) - 1))) &&
+        all(.pc$pct_lb[1:2] < .pc$pct_change[1:2] & .pc$pct_change[1:2] < .pc$pct_ub[1:2]) &&
+        is.na(.pc$pct_change[3]),
+      "percentage change of the mean: log-ratio variance with the implied covariance")
+.app_txt <- paste(readLines("app.R", warn = FALSE), collapse = "\n")
+.wiz_txt <- paste(readLines("app_wizard.R", warn = FALSE), collapse = "\n")
+.ufh_txt <- paste(readLines("scripts/01_ufh.R", warn = FALSE), collapse = "\n")
+.mfh_txt <- paste(readLines("scripts/02_mfh.R", warn = FALSE), collapse = "\n")
+check(grepl('checkboxInput("deflate_welfare"', .app_txt, fixed = TRUE) &&
+        grepl('checkboxInput("deflate_welfare"', .wiz_txt, fixed = TRUE) &&
+        grepl('uiOutput("price_index_by_year_ui")', .wiz_txt, fixed = TRUE) &&
+        grepl("price_index     = get_price_index_config(years)", .app_txt, fixed = TRUE) &&
+        grepl("sae_apply_price_index(survey_all", .ufh_txt, fixed = TRUE) &&
+        grepl("sae_apply_price_index(survey_dt", .mfh_txt, fixed = TRUE) &&
+        grepl("sae_deflate_year_matrix(external_benchmark_mat", .ufh_txt, fixed = TRUE) &&
+        grepl("sae_deflate_year_matrix(regional_benchmark_mat", .mfh_txt, fixed = TRUE) &&
+        grepl('sig_mfh       <- .to_percent_change(sig_mfh, "MFH")', cmp_text, fixed = TRUE),
+      "price index reaches the config, both steps and external targets; mean-welfare changes become percentages")
 for (ui_file in c("app.R", "app_wizard.R")) {
   check(grepl("A grouped benchmark variable is still selected but is not used",
               paste(readLines(ui_file, warn = FALSE), collapse = "\n"), fixed = TRUE),

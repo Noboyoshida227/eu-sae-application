@@ -221,6 +221,12 @@ validate_app_config <- function(cfg) {
     }
   }
 
+  # Price index (mean welfare only): one positive value per analysis year.
+  price_probs <- sae_price_index_problems(cfg$price_index, years, ind_type)
+  if (length(price_probs)) {
+    errs <- c(errs, paste0("Price index: ", price_probs))
+  }
+
   list(valid = length(errs) == 0, errors = errs)
 }
 
@@ -342,7 +348,8 @@ validate_mapped_input_columns <- function(survey_raw, rhs_raw, var_map, rhs_doma
 # Helper: read uploaded or default data and harmonize variable names
 load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
                                povline_type = "column", povline_value = NULL,
-                               indicator_type = "poverty") {
+                               indicator_type = "poverty",
+                               price_index = NULL, years_keep = NULL) {
   survey_raw <- tryCatch(sae_read_table_input(survey_path, "Survey data"), error = function(e) NULL)
   rhs_raw    <- tryCatch(sae_read_table_input(rhs_path, "Auxiliary covariates"), error = function(e) NULL)
 
@@ -391,6 +398,18 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
   }
 
   survey_data <- survey_raw
+  # A column that already carries an internal name (for example `povline`)
+  # while a different column is mapped to that role (for example
+  # `povline_2019`) would otherwise end up as a second `povline` column, and
+  # the readiness tables would silently use the first one. Rename the
+  # pre-existing column to `<name>_original`, as the UFH and MFH steps do,
+  # and report it.
+  harmonize_notes <- utils::capture.output(
+    survey_data <- sae_resolve_rename_collisions(
+      survey_data, rename_vec[unname(rename_vec) %in% names(survey_data)],
+      context = "Data Readiness, survey mapping"
+    )
+  )
   for (new_name in names(rename_vec)) {
     old_name <- rename_vec[[new_name]]
     if (old_name %in% names(survey_data)) {
@@ -419,6 +438,16 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
       output_col = "povline"
     )
   }
+  # Mean welfare: constant prices of the first analysis year when a price
+  # index was entered (same rule as the UFH and MFH steps).
+  if (identical(indicator_type, "mean_welfare") &&
+      sae_price_index_enabled(price_index, indicator_type)) {
+    survey_data <- sae_apply_price_index(
+      survey_data, price_index,
+      years_keep %||% names(sae_price_index_values(price_index$values)),
+      indicator_type
+    )
+  }
   if (all(c("weight", "hh_size") %in% names(survey_data))) {
     survey_data$population_weight <- suppressWarnings(
       as.numeric(survey_data$weight) * as.numeric(survey_data$hh_size)
@@ -432,6 +461,16 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
   }
 
   rhs_data <- rhs_raw
+  rhs_rename <- c(
+    if (rhs_domain != "domain" && rhs_domain %in% names(rhs_data)) c(domain = rhs_domain),
+    if (!is.null(var_map$year) && var_map$year != "year" && var_map$year %in% names(rhs_data))
+      c(year = var_map$year)
+  )
+  harmonize_notes <- c(harmonize_notes, utils::capture.output(
+    rhs_data <- sae_resolve_rename_collisions(
+      rhs_data, rhs_rename, context = "Data Readiness, auxiliary mapping"
+    )
+  ))
   if (rhs_domain != "domain" && rhs_domain %in% names(rhs_data)) {
     names(rhs_data)[names(rhs_data) == rhs_domain] <- "domain"
   }
@@ -447,7 +486,9 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
     rhs_data$domain <- trimws(as.character(rhs_data$domain))
   }
 
-  list(survey = survey_data, rhs = rhs_data)
+  harmonize_notes <- trimws(harmonize_notes)
+  list(survey = survey_data, rhs = rhs_data,
+       notes = harmonize_notes[nzchar(harmonize_notes)])
 }
 
 # Helper: compute per-year data summaries for diagnostics / brief

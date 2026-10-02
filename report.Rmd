@@ -124,6 +124,26 @@ mfh_selected_model <- toupper(as.character(
 ))
 mfh_rule_applied <- isTRUE(mfh_requested_model %in% c("AUTO", "MFH3")) ||
   isTRUE(as.logical((mfh_variance_selection$test_available %||% NA)[1L]))
+
+# Indicator labels written by the Comparison step (poverty if absent).
+indicator_info <- safe_read_csv("indicator_info.csv")
+is_mean_welfare <- identical(as.character(indicator_info$indicator_type[1] %||% "poverty"),
+                             "mean_welfare")
+change_noun <- as.character(indicator_info$change_noun[1] %||% "poverty rate")
+if (is.na(change_noun) || !nzchar(change_noun)) change_noun <- "poverty rate"
+indicator_title <- if (is_mean_welfare) "Mean Welfare" else "Poverty"
+level_noun_plural <- if (is_mean_welfare) "mean welfare values" else "poverty rates"
+# Mean welfare: changes are percentage changes of the mean; prices as entered.
+change_is_percent <- is_mean_welfare &&
+  identical(as.character(indicator_info$change_unit[1] %||% ""), "%")
+change_unit_suffix <- if (change_is_percent) " (%)" else ""
+price_basis <- as.character(indicator_info$price_basis[1] %||% "")
+if (is.na(price_basis)) price_basis <- ""
+price_sentence <- if (is_mean_welfare && nzchar(price_basis)) {
+  paste0("Mean welfare is in ", price_basis, ".")
+} else {
+  ""
+}
 ```
 
 ```{r ai-report-styles, results='asis'}
@@ -243,6 +263,10 @@ if (!is.null(run_meta)) {
     ),
     check.names = FALSE
   )
+  if (is_mean_welfare && nzchar(price_basis)) {
+    setup_tbl <- rbind(setup_tbl, data.frame(Item = "Prices (mean welfare)",
+                                             Value = price_basis, check.names = FALSE))
+  }
   if (!mfh_rule_applied) {
     # MFH1 or MFH2 was chosen directly: the MFH3 test was not run.
     setup_tbl <- setup_tbl[setup_tbl$Item != "MFH3 reference-variance test adjustment", , drop = FALSE]
@@ -697,9 +721,9 @@ cat(comparison_ai_section_html(ai_state, "precision",
                                include_ai = isTRUE(params$include_ai)))
 ```
 
-## Poverty Maps
+## `r indicator_title` Maps
 
-Maps of the estimated poverty rates by domain and year, arranged as a table:
+Maps of the estimated `r level_noun_plural` by domain and year, arranged as a table:
 one row per estimation method and one column per year, so that differences
 between methods can be read down a column and changes over time along a row.
 The rows are Direct, UFH and the selected MFH model; when benchmarking is on,
@@ -707,10 +731,10 @@ each model's row is followed by its benchmarked estimates. In the HTML report,
 the **Methods** list above the maps selects which methods are shown, for
 example UFH and UFH benchmarked only. All poverty maps
 share one colour scale and one value range (across all methods and years), so
-the same colour means the same poverty rate in every panel: lighter areas
+the same colour means the same value in every panel: lighter areas
 indicate lower values and darker areas higher values. Domains without an
 estimate are shown in grey. The single maps are also saved separately in
-`outputs/figures/poverty_maps/`.
+`outputs/figures/poverty_maps/`. `r price_sentence`
 
 ```{r poverty-maps, results='asis'}
 map_files <- list.files(file.path(fig_dir, "poverty_maps"),
@@ -745,7 +769,7 @@ cat(comparison_ai_section_html(ai_state, "poverty_maps",
 
 ## RMSE Maps
 
-Maps of the root mean squared error (RMSE) of the poverty estimates, showing
+Maps of the root mean squared error (RMSE) of the `r tolower(indicator_title)` estimates, showing
 how estimation precision varies across domains, arranged in the same way:
 one row per method (with the benchmarked rows when benchmarking is on) and one
 column per year, with its own **Methods** list in the HTML report. All RMSE
@@ -780,7 +804,7 @@ if ("grid_rmse.png" %in% rmse_map_files) {
 }
 ```
 
-## Statistical Significance of Poverty Changes
+## Statistical Significance of `r indicator_title` Changes
 
 The primary significance status is pointwise at alpha = 0.05: a domain is
 classified as significant when its unadjusted two-sided p-value is below 0.05,
@@ -790,6 +814,8 @@ the geographic domains within each method. BH controls the false discovery rate;
 Bonferroni controls the family-wise probability of any false rejection. These
 are sensitivity results and do not control the figure colors or headline counts.
 `r if (mfh_rule_applied) "They are separate from the MFH3 reference-variance test adjustment, which applies only to pairwise time-variance contrasts when MFH3 is fitted." else ""`
+
+`r if (change_is_percent) paste("For mean welfare, each change is the percentage change of the estimated mean: 100 x (mean in the later year / mean in the earlier year - 1). Its 95% interval and p-value are computed on the log of that ratio, from the MSEs of the two estimates and their covariance (from the MCPE for MFH; UFH treats the two years as independent), so the interval is not symmetric around the estimate. The change in currency units is kept in the Excel tables (columns ending in _eur).", price_sentence) else ""`
 
 ```{r sig-comparison, results='asis'}
 sig_cmp <- tryCatch(
@@ -815,7 +841,9 @@ if (!is.null(sig_cmp)) {
     arrange(.method_order, is.na(.domain_order), .domain_order, domain) %>%
     select(-.method_order, -.domain_order)
   sig_labels <- c(
-    domain = "Domain", method = "Method", diff = "Change", mse = "MSE",
+    domain = "Domain", method = "Method",
+    diff = paste0("Change", change_unit_suffix),
+    mse = if (change_is_percent) "MSE of % change" else "MSE",
     lb = "95% CI lower", ub = "95% CI upper",
     p_value = "Pointwise p-value",
     significant_unadjusted = "Pointwise significant",
@@ -847,7 +875,7 @@ if (!is.null(sig_cmp)) {
 
 These two figures compare the **estimated changes themselves**, using the later
 year minus the earlier year. Poverty-rate changes are in **percentage points**;
-mean-welfare changes use the configured currency units. Negative values indicate
+mean-welfare changes are **percentage changes** of the mean. Negative values indicate
 a decrease. The same finite, matched domain pairs enter both plots. The boxplot
 shows the distribution across domains, not the uncertainty around each estimate.
 Below the scatterplot's equality line, the MFH estimate is lower than the UFH
@@ -865,8 +893,9 @@ if (!is.null(change_summary) && nrow(change_summary)) {
 }
 if (!is.null(change_paired) && nrow(change_paired)) {
   p <- change_paired[1, ]
-  cat(sprintf("\n\n**%s minus %s:** %d finite matched domains. MFH changes are lower in %d, higher in %d, and equal in %d domains. The median paired difference (MFH minus UFH) is %.2f %s. These are descriptive comparisons, not tests of the difference between estimators.\n\n",
-    p$year_to, p$year_from, p$finite_paired_domains, p$MFH_lower_domains,
+  cat(sprintf("\n\n**%s %s %s:** %d finite matched domains. MFH changes are lower in %d, higher in %d, and equal in %d domains. The median paired difference (MFH minus UFH) is %.2f %s. These are descriptive comparisons, not tests of the difference between estimators.\n\n",
+    p$year_to, if (change_is_percent) "relative to" else "minus", p$year_from,
+    p$finite_paired_domains, p$MFH_lower_domains,
     p$MFH_higher_domains, p$equal_domains, p$median_MFH_minus_UFH_change, p$unit))
   if (p$excluded_nonfinite_pairs + p$UFH_only_domains + p$MFH_only_domains > 0) {
     cat(sprintf("Excluded: %d matched pairs with nonfinite changes; %d UFH-only and %d MFH-only domains.\n\n",
@@ -985,16 +1014,44 @@ cat(comparison_ai_section_html(ai_state, "change_significance",
 ```
 
 Change maps use one diverging scale centred on zero, with the same range on
-every change map: blue indicates a decrease in the poverty rate between the
+every change map: blue indicates a decrease in `r change_noun` between the
 two years, white no change, and red an increase. Domains without an estimate
-are shown in grey.
+are shown in grey. The significance plots after the maps show the estimated
+change in each domain with its pointwise 95% confidence interval.
 
 ```{r change-figures, results='asis'}
 change_files <- list.files(file.path(fig_dir, "change_figures"),
                            pattern = "\\.png$", full.names = FALSE)
+# Headings from the method in the file name (change_map_<tag>.png,
+# significance_<tag>.png): the change maps first, then the significance plots,
+# each in method order.
+change_mfh_label <- as.character(indicator_info$mfh_model[1] %||% mfh_selected_model %||% "MFH")
+if (is.na(change_mfh_label) || !nzchar(change_mfh_label)) change_mfh_label <- "MFH"
+change_method_tags <- c(fh = "UFH", fh_benchmarked = "UFH benchmarked",
+                        mfh = change_mfh_label,
+                        mfh_benchmarked = paste(change_mfh_label, "benchmarked"))
+change_figure_heading <- function(f) {
+  stem <- tools::file_path_sans_ext(f)
+  kind <- if (startsWith(stem, "change_map_")) "map" else if (startsWith(stem, "significance_")) "sig" else "other"
+  tag <- sub("^(change_map_|significance_)", "", stem)
+  method <- if (tag %in% names(change_method_tags)) change_method_tags[[tag]] else gsub("_", " ", tag)
+  switch(kind,
+         map = sprintf("Change in %s%s: %s", change_noun, change_unit_suffix, method),
+         sig = sprintf("Significance of changes in %s%s: %s", change_noun, change_unit_suffix, method),
+         gsub("_", " ", stem))
+}
+change_figure_order <- function(files) {
+  stem <- tools::file_path_sans_ext(files)
+  tag <- sub("^(change_map_|significance_)", "", stem)
+  method_rank <- match(tag, names(change_method_tags))
+  method_rank[is.na(method_rank)] <- length(change_method_tags) + 1L
+  kind_rank <- ifelse(startsWith(stem, "change_map_"), 1L,
+                      ifelse(startsWith(stem, "significance_"), 2L, 3L))
+  files[order(kind_rank, method_rank, files)]
+}
 if (length(change_files) > 0) {
-  for (f in sort(change_files)) {
-    label <- gsub("_", " ", tools::file_path_sans_ext(f))
+  for (f in change_figure_order(change_files)) {
+    label <- change_figure_heading(f)
     cat(sprintf("\n### %s\n\n", label))
     cat(sprintf("![%s](%s)\n\n", label,
                 file.path(fig_dir, "change_figures", f)))

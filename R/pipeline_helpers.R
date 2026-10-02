@@ -810,3 +810,158 @@ sae_ic_none_problem <- function(model, lasso_enabled, vars_y1, vars_y2,
                 "and covariates fixed for both years, but %s. Choose AIC or BIC, or enter valid",
                 "covariates for both years with LASSO off."), model, reason)
 }
+
+# ---- Price deflation (mean welfare) -----------------------------------------
+# Household-survey welfare is usually in current (nominal) prices. For
+# mean-welfare runs the user can enter a price index (for example the CPI)
+# for each analysis year; welfare is then expressed in constant prices of the
+# FIRST analysis year: welfare_t * index(first year) / index(t). Levels are in
+# first-year prices and changes between years are real changes. Poverty runs
+# are never deflated (the poverty line is already in each year's prices).
+#
+# Config shape (app_config.yml):
+#   price_index:
+#     enabled: yes
+#     base_year: 2012
+#     values: {"2012": 100, "2013": 101.4}
+
+# Named numeric vector of index values by year (no recycling of a single value,
+# unlike the poverty-line helper: every year needs its own index).
+sae_price_index_values <- function(values) {
+  if (is.null(values) || length(values) == 0L) return(stats::setNames(numeric(0), character(0)))
+  v <- if (is.list(values) && !is.data.frame(values)) unlist(values, use.names = TRUE) else values
+  nm <- names(v)
+  out <- suppressWarnings(as.numeric(v))
+  names(out) <- if (is.null(nm)) rep("", length(out)) else nm
+  out[nzchar(names(out))]
+}
+
+sae_price_index_enabled <- function(price_index, indicator_type = "mean_welfare") {
+  identical(as.character(indicator_type %||% ""), "mean_welfare") &&
+    is.list(price_index) && isTRUE(as.logical(price_index$enabled %||% FALSE))
+}
+
+# Problems with the price-index settings for the analysis years (character(0)
+# when they are usable or deflation is off).
+sae_price_index_problems <- function(price_index, years_keep,
+                                     indicator_type = "mean_welfare") {
+  if (!sae_price_index_enabled(price_index, indicator_type)) return(character(0))
+  years_chr <- as.character(sort(as.integer(years_keep)))
+  vals <- sae_price_index_values(price_index$values)
+  missing <- setdiff(years_chr, names(vals))
+  probs <- character(0)
+  if (length(missing)) {
+    probs <- c(probs, sprintf("price index missing for year(s) %s",
+                              paste(missing, collapse = ", ")))
+  }
+  have <- intersect(years_chr, names(vals))
+  bad <- have[!is.finite(vals[have]) | vals[have] <= 0]
+  if (length(bad)) {
+    probs <- c(probs, sprintf("price index must be a positive number (year(s) %s)",
+                              paste(bad, collapse = ", ")))
+  }
+  base <- suppressWarnings(as.integer(price_index$base_year %||% years_chr[1]))
+  if (!is.na(base) && !as.character(base) %in% years_chr) {
+    probs <- c(probs, sprintf("price base year %s is not an analysis year", base))
+  }
+  probs
+}
+
+# Named factors index(base) / index(year), or NULL when deflation is off.
+sae_price_factors <- function(price_index, years_keep,
+                              indicator_type = "mean_welfare") {
+  if (!sae_price_index_enabled(price_index, indicator_type)) return(NULL)
+  probs <- sae_price_index_problems(price_index, years_keep, indicator_type)
+  if (length(probs)) {
+    stop("Price index: ", paste(probs, collapse = "; "), call. = FALSE)
+  }
+  years_chr <- as.character(sort(as.integer(years_keep)))
+  vals <- sae_price_index_values(price_index$values)[years_chr]
+  base <- as.character(price_index$base_year %||% years_chr[1])
+  stats::setNames(as.numeric(vals[[base]]) / as.numeric(vals), years_chr)
+}
+
+# Multiply welfare by the year's factor. Rows of other years are unchanged.
+sae_apply_price_index <- function(data, price_index, years_keep,
+                                  indicator_type = "mean_welfare",
+                                  welfare_col = "welfare", year_col = "year") {
+  factors <- sae_price_factors(price_index, years_keep, indicator_type)
+  if (is.null(factors) || !all(c(welfare_col, year_col) %in% names(data))) {
+    return(data)
+  }
+  f <- unname(factors[as.character(data[[year_col]])])
+  f[is.na(f)] <- 1
+  data[[welfare_col]] <- suppressWarnings(as.numeric(data[[welfare_col]])) * f
+  attr(data, "price_factors") <- factors
+  data
+}
+
+# Multiply the year columns of a target matrix (rows = groups, columns =
+# years) by the factors; used for external mean-welfare benchmark targets.
+sae_deflate_year_matrix <- function(mat, factors) {
+  if (is.null(mat) || is.null(factors)) return(mat)
+  for (yr in intersect(colnames(mat), names(factors))) {
+    mat[, yr] <- as.numeric(mat[, yr]) * factors[[yr]]
+  }
+  mat
+}
+
+# Short description for logs and the report.
+sae_price_basis_label <- function(price_index, years_keep,
+                                  indicator_type = "mean_welfare") {
+  if (!identical(as.character(indicator_type %||% ""), "mean_welfare")) {
+    return("not applicable (poverty indicator)")
+  }
+  if (!sae_price_index_enabled(price_index, indicator_type)) {
+    return("current prices (not deflated)")
+  }
+  years_chr <- as.character(sort(as.integer(years_keep)))
+  vals <- sae_price_index_values(price_index$values)
+  base <- as.character(price_index$base_year %||% years_chr[1])
+  sprintf("constant %s prices (price index: %s)", base,
+          paste(sprintf("%s = %s", years_chr,
+                        as.character(signif(as.numeric(vals[years_chr]), 8))),
+                collapse = ", "))
+}
+
+# ---- Percentage change of a mean (mean-welfare runs) --------------------------
+# The change in mean welfare is reported as a percentage of the earlier year's
+# mean: 100 * (m2 / m1 - 1). Inference uses the log ratio r = log(m2 / m1),
+# whose variance by the delta method is
+#   v = MSE1 / m1^2 + MSE2 / m2^2 - 2 * C / (m1 * m2),
+# where C is the covariance of the two estimates. C is implied by the MSE of the
+# difference that the UFH and MFH steps report: Var(m2 - m1) = MSE1 + MSE2 - 2C.
+# (UFH assumes independent years, so C = 0 there.) As in the MFH step, when the
+# covariance-adjusted variance is not above 1% of the independence variance the
+# independence variance is used. The 95% interval 100 * (exp(r +/- z se) - 1) is
+# asymmetric and never below -100%.
+sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05) {
+  n <- max(length(m1), length(m2))
+  m1 <- rep_len(as.numeric(m1), n); m2 <- rep_len(as.numeric(m2), n)
+  mse1 <- rep_len(as.numeric(mse1), n); mse2 <- rep_len(as.numeric(mse2), n)
+  mse_diff <- rep_len(as.numeric(mse_diff), n)
+  alpha <- rep_len(as.numeric(alpha), n)
+  alpha[!is.finite(alpha) | alpha <= 0 | alpha >= 1] <- 0.05
+  ok <- is.finite(m1) & is.finite(m2) & m1 > 0 & m2 > 0
+  r <- ifelse(ok, log(m2 / m1), NA_real_)
+  v_indep <- mse1 / m1^2 + mse2 / m2^2
+  cov12 <- ifelse(is.finite(mse_diff), (mse1 + mse2 - mse_diff) / 2, 0)
+  v_cov <- v_indep - 2 * cov12 / (m1 * m2)
+  use_cov <- is.finite(v_cov) & is.finite(v_indep) & v_cov > 0.01 * v_indep
+  v <- ifelse(use_cov, v_cov, v_indep)
+  v[!ok | !is.finite(v) | v <= 0] <- NA_real_
+  se <- sqrt(v)
+  z <- stats::qnorm(1 - alpha / 2)
+  p <- 2 * stats::pnorm(abs(r / se), lower.tail = FALSE)
+  data.frame(
+    pct_change = 100 * (exp(r) - 1),
+    pct_lb = 100 * (exp(r - z * se) - 1),
+    pct_ub = 100 * (exp(r + z * se) - 1),
+    pct_mse = (100 * exp(r))^2 * v,
+    log_ratio = r,
+    log_ratio_var = v,
+    log_ratio_covariance_used = use_cov & ok,
+    p_value = p,
+    stringsAsFactors = FALSE
+  )
+}

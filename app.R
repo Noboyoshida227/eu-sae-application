@@ -213,6 +213,8 @@ dashboard_setup_defaults <- function() {
       povline_numeric_by_year = list(),
       fgt_alpha = "0",
       currency_symbol = "EUR",
+      deflate_welfare = FALSE,
+      price_index_by_year = list(),
       rhs_domain = "prov",
       shp_domain = "prov",
       ufh_transformation = "arcsin",
@@ -318,7 +320,8 @@ validate_mapped_input_columns <- function(survey_raw, rhs_raw, var_map, rhs_doma
 # Helper: read uploaded or default data and harmonize variable names
 load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
                                povline_type = "column", povline_value = NULL,
-                               indicator_type = "poverty") {
+                               indicator_type = "poverty",
+                               price_index = NULL, years_keep = NULL) {
   survey_raw <- tryCatch(sae_read_table_input(survey_path, "Survey data"), error = function(e) NULL)
   rhs_raw    <- tryCatch(sae_read_table_input(rhs_path, "Auxiliary covariates"), error = function(e) NULL)
 
@@ -367,6 +370,18 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
   }
 
   survey_data <- survey_raw
+  # A column that already carries an internal name (for example `povline`)
+  # while a different column is mapped to that role (for example
+  # `povline_2019`) would otherwise end up as a second `povline` column, and
+  # the readiness tables would silently use the first one. Rename the
+  # pre-existing column to `<name>_original`, as the UFH and MFH steps do,
+  # and report it.
+  harmonize_notes <- utils::capture.output(
+    survey_data <- sae_resolve_rename_collisions(
+      survey_data, rename_vec[unname(rename_vec) %in% names(survey_data)],
+      context = "Data Readiness, survey mapping"
+    )
+  )
   for (new_name in names(rename_vec)) {
     old_name <- rename_vec[[new_name]]
     if (old_name %in% names(survey_data)) {
@@ -395,6 +410,16 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
       output_col = "povline"
     )
   }
+  # Mean welfare: constant prices of the first analysis year when a price
+  # index was entered (same rule as the UFH and MFH steps).
+  if (identical(indicator_type, "mean_welfare") &&
+      sae_price_index_enabled(price_index, indicator_type)) {
+    survey_data <- sae_apply_price_index(
+      survey_data, price_index,
+      years_keep %||% names(sae_price_index_values(price_index$values)),
+      indicator_type
+    )
+  }
   if (all(c("weight", "hh_size") %in% names(survey_data))) {
     survey_data$population_weight <- suppressWarnings(
       as.numeric(survey_data$weight) * as.numeric(survey_data$hh_size)
@@ -408,6 +433,16 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
   }
 
   rhs_data <- rhs_raw
+  rhs_rename <- c(
+    if (rhs_domain != "domain" && rhs_domain %in% names(rhs_data)) c(domain = rhs_domain),
+    if (!is.null(var_map$year) && var_map$year != "year" && var_map$year %in% names(rhs_data))
+      c(year = var_map$year)
+  )
+  harmonize_notes <- c(harmonize_notes, utils::capture.output(
+    rhs_data <- sae_resolve_rename_collisions(
+      rhs_data, rhs_rename, context = "Data Readiness, auxiliary mapping"
+    )
+  ))
   if (rhs_domain != "domain" && rhs_domain %in% names(rhs_data)) {
     names(rhs_data)[names(rhs_data) == rhs_domain] <- "domain"
   }
@@ -423,7 +458,9 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
     rhs_data$domain <- trimws(as.character(rhs_data$domain))
   }
 
-  list(survey = survey_data, rhs = rhs_data)
+  harmonize_notes <- trimws(harmonize_notes)
+  list(survey = survey_data, rhs = rhs_data,
+       notes = harmonize_notes[nzchar(harmonize_notes)])
 }
 
 # Helper: compute per-year data summaries for diagnostics / brief
@@ -1143,7 +1180,17 @@ ui <- fluidPage(
         textInput("currency_symbol",
           tip_label("Currency symbol",
                     "Short label appended to axis titles and table headers for mean welfare estimates."),
-          value = "EUR")
+          value = "EUR"),
+        # Price deflation (mean welfare only): welfare in constant prices of
+        # the first analysis year (sae_apply_price_index(), R/pipeline_helpers.R).
+        checkboxInput("deflate_welfare",
+          tip_label("Express welfare in constant prices",
+                    "Household-survey incomes are usually in current (nominal) prices, so a change in mean welfare would include inflation. Tick this and enter a price index (for example the CPI, any base year) for each analysis year: welfare is multiplied by index(first year) / index(year), so all mean-welfare levels are in prices of the first analysis year and changes between years are real changes. Leave it unticked if welfare is already in constant prices."),
+          value = FALSE),
+        conditionalPanel(
+          condition = "input.deflate_welfare && input.indicator_type == 'mean_welfare'",
+          uiOutput("price_index_by_year_ui")
+        )
       ),
 
       mapping_selectize("rhs_domain",
@@ -1888,6 +1935,70 @@ server <- function(input, output, session) {
     }))
   })
 
+  # ---- Price index by year (mean welfare, optional deflation) ----
+  # Values restored from a saved setup are kept here so they are used even
+  # before the (hidden) per-year inputs have been rendered.
+  price_index_restored <- reactiveVal(list())
+
+  get_price_index_by_year <- function(years_vec = parse_years(input$years)) {
+    years_vec <- sort(as.integer(years_vec))
+    restored <- price_index_restored()
+    vals <- lapply(years_vec, function(yr) {
+      val <- input[[paste0("price_index_", yr)]]
+      if (is.null(val)) val <- restored[[as.character(yr)]] %||% 100
+      as.numeric(val)
+    })
+    names(vals) <- as.character(years_vec)
+    vals
+  }
+
+  # list(enabled = FALSE) unless mean welfare is selected and the box ticked.
+  get_price_index_config <- function(years_vec = parse_years(input$years)) {
+    years_vec <- sort(as.integer(years_vec))
+    enabled <- identical(input$indicator_type %||% "poverty", "mean_welfare") &&
+      isTRUE(input$deflate_welfare) && length(years_vec) > 0L
+    if (!enabled) return(list(enabled = FALSE))
+    list(enabled = TRUE, base_year = years_vec[1],
+         values = get_price_index_by_year(years_vec))
+  }
+
+  # Readiness note on the price basis of mean welfare.
+  price_readiness_note <- function(years_vec) {
+    if (!identical(input$indicator_type %||% "poverty", "mean_welfare")) return(character(0))
+    cfg <- get_price_index_config(years_vec)
+    if (isTRUE(cfg$enabled)) {
+      sprintf("NOTE: Mean welfare is expressed in %s.",
+              sae_price_basis_label(cfg, years_vec, "mean_welfare"))
+    } else {
+      paste("NOTE: Mean welfare is in current (nominal) prices, so changes between years",
+            "include inflation. To report real changes, tick 'Express welfare in constant",
+            "prices' and enter a price index for each year.")
+    }
+  }
+
+  output$price_index_by_year_ui <- renderUI({
+    years_vec <- sort(parse_years(input$years))
+    if (length(years_vec) == 0L) {
+      return(helpText("Enter analysis years before entering the price index."))
+    }
+    restored <- isolate(price_index_restored())
+    tagList(
+      lapply(years_vec, function(yr) {
+        id <- paste0("price_index_", yr)
+        numericInput(
+          id,
+          tip_label(
+            paste("Price index", yr),
+            "Price index for this year, for example the consumer price index. Any base year works: only the ratio between the years is used."
+          ),
+          value = isolate(input[[id]] %||% restored[[as.character(yr)]] %||% 100),
+          min = 0
+        )
+      }),
+      helpText(sprintf("Mean welfare will be expressed in %s prices.", years_vec[1]))
+    )
+  })
+
   add_benchmark_metadata <- function(bench_list, source, level_label,
                                      level_variable, enabled) {
     if (is.null(bench_list)) return(bench_list)
@@ -1994,6 +2105,8 @@ server <- function(input, output, session) {
     if (length(inputs$povline_numeric_by_year) > 0L) {
       inputs$povline_numeric <- as.numeric(inputs$povline_numeric_by_year[[1]])
     }
+    inputs$price_index_by_year <- get_price_index_by_year(parse_years(inputs$years))
+    inputs$deflate_welfare <- isTRUE(input$deflate_welfare)
 
     # Never persist API keys. Remember only whether the AI section was enabled
     # and the language selection; users re-enter credentials per session.
@@ -2096,6 +2209,13 @@ server <- function(input, output, session) {
                       selected = as.character(x$fgt_alpha %||% "0"))
     updateTextInput(session, "currency_symbol",
                     value = x$currency_symbol %||% "EUR")
+    updateCheckboxInput(session, "deflate_welfare",
+                        value = isTRUE(x$deflate_welfare))
+    price_index_restored(as.list(x$price_index_by_year %||% list()))
+    for (.yr in names(x$price_index_by_year %||% list())) {
+      updateNumericInput(session, paste0("price_index_", .yr),
+                         value = as.numeric(x$price_index_by_year[[.yr]]))
+    }
     update_mapping_select("rhs_domain", x$rhs_domain %||% "prov")
     update_mapping_select("shp_domain", x$shp_domain %||% "prov")
     updateSelectInput(session, "ufh_ic_criterion",
@@ -3027,7 +3147,9 @@ server <- function(input, output, session) {
                          var_map, input$rhs_domain,
                          povline_type  = input$povline_type %||% "column",
                          povline_value = povline_numeric_map,
-                         indicator_type = input$indicator_type %||% "poverty"),
+                         indicator_type = input$indicator_type %||% "poverty",
+                         price_index   = get_price_index_config(requested_years),
+                         years_keep    = requested_years),
       error = function(e) {
         append_log(paste("ERROR while loading data:", conditionMessage(e)))
         NULL
@@ -3173,7 +3295,9 @@ server <- function(input, output, session) {
         conditionMessage(e)
       ))
     )
-    rr$messages <- c(year_msgs, geo_read$messages, rr$messages)
+    rr$messages <- c(harmonized$notes, price_readiness_note(requested_years), year_msgs,
+                     geo_read$messages, rr$messages)
+    for (.note in harmonized$notes) append_log(.note)
     readiness_result(rr)
     append_log(sprintf("Data readiness: %d diagnostic messages", length(rr$messages)))
 
@@ -3359,6 +3483,10 @@ server <- function(input, output, session) {
     }
     append_log(paste("Benchmark level:", benchmark_level_label))
     append_log(paste("Benchmark source:", benchmark_source_label))
+    if (identical(input$indicator_type %||% "poverty", "mean_welfare")) {
+      append_log(paste("Prices:", sae_price_basis_label(get_price_index_config(years), years,
+                                                         "mean_welfare")))
+    }
 
     # ---- Step 1: Validate input data ----
     advance_progress("Validation", "Checking input data")
@@ -3372,7 +3500,9 @@ server <- function(input, output, session) {
                          var_map, input$rhs_domain,
                          povline_type  = input$povline_type %||% "column",
                          povline_value = povline_numeric_map,
-                         indicator_type = input$indicator_type %||% "poverty"),
+                         indicator_type = input$indicator_type %||% "poverty",
+                         price_index   = get_price_index_config(years),
+                         years_keep    = years),
       error = function(e) {
         append_log(paste("ERROR while loading data:", conditionMessage(e)))
         NULL
@@ -3513,7 +3643,9 @@ server <- function(input, output, session) {
         ))
       )
       # Prepend year-variable checks to readiness messages
-      rr$messages <- c(year_msgs, geo_read$messages, rr$messages)
+      rr$messages <- c(harmonized$notes, price_readiness_note(years), year_msgs,
+                       geo_read$messages, rr$messages)
+      for (.note in harmonized$notes) append_log(.note)
       readiness_result(rr)
       append_log(sprintf("Data readiness: %d diagnostic messages", length(rr$messages)))
       readiness_errors <- isTRUE(flags$has_errors) ||
@@ -3819,6 +3951,9 @@ server <- function(input, output, session) {
       povline_type    = input$povline_type %||% "column",
       povline_value   = if (identical(input$povline_type, "numeric"))
                           povline_numeric_map else input$var_povline,
+      # Mean welfare only: price index by year; welfare is expressed in
+      # constant prices of the first analysis year (R/pipeline_helpers.R).
+      price_index     = get_price_index_config(years),
       run_id          = run_id,
       run_label       = run_label_raw,
       benchmarking    = list(

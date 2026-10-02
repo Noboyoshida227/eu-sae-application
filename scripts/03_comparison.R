@@ -544,6 +544,68 @@ comparison_dt <- sae_enrich_result_table(
   poverty_lines = comparison_poverty_lines
 )
 
+# ---- Mean welfare: changes as percentage changes of the mean ----------------
+# For mean-welfare runs the change between the two years is reported as
+# 100 * (mean2 / mean1 - 1), with its interval and test from the log ratio
+# (sae_percent_change(), R/pipeline_helpers.R). The level estimates and MSEs
+# come from comparison_dt; the covariance of the two years is implied by the
+# MSE of the difference reported by the UFH and MFH steps. The difference in
+# currency units is kept in columns ending in _eur. Poverty runs are unchanged.
+.change_is_percent <- identical(indicator_type, "mean_welfare")
+.to_percent_change <- function(sig, level_col) {
+  if (!.change_is_percent || !nrow(sig) || !"diff" %in% names(sig) ||
+      !all(c(level_col, paste0(level_col, "_MSE")) %in% names(comparison_dt))) {
+    return(sig)
+  }
+  lv <- data.frame(domain = as.character(comparison_dt$domain),
+                   year = as.integer(comparison_dt$year),
+                   m = as.numeric(comparison_dt[[level_col]]),
+                   mse = as.numeric(comparison_dt[[paste0(level_col, "_MSE")]]),
+                   stringsAsFactors = FALSE)
+  l1 <- lv[lv$year == years_keep[1], , drop = FALSE]
+  l2 <- lv[lv$year == years_keep[2], , drop = FALSE]
+  d <- as.character(sig$domain)
+  m1 <- l1$m[match(d, l1$domain)];   m2 <- l2$m[match(d, l2$domain)]
+  s1 <- l1$mse[match(d, l1$domain)]; s2 <- l2$mse[match(d, l2$domain)]
+  alpha <- if ("alpha" %in% names(sig)) suppressWarnings(as.numeric(sig$alpha)) else 0.05
+  diff_eur <- suppressWarnings(as.numeric(sig$diff))
+  mse_eur <- suppressWarnings(as.numeric(sig$mse))
+  gap <- abs(diff_eur - (m2 - m1))
+  if (any(is.finite(gap) & gap > 1e-6 * pmax(1, abs(m2 - m1)))) {
+    message(sprintf("NOTE: %s changes in the step output differ from the level estimates for %d domain(s); the percentage change uses the level estimates.",
+                    level_col, sum(is.finite(gap) & gap > 1e-6 * pmax(1, abs(m2 - m1)))))
+  }
+  pc <- sae_percent_change(m1, m2, s1, s2, mse_eur, alpha)
+  sig$diff_eur <- diff_eur
+  sig$mse_eur <- mse_eur
+  sig$lb_eur <- if ("lb" %in% names(sig)) suppressWarnings(as.numeric(sig$lb)) else NA_real_
+  sig$ub_eur <- if ("ub" %in% names(sig)) suppressWarnings(as.numeric(sig$ub)) else NA_real_
+  sig$p_value_eur <- if ("p_value" %in% names(sig)) suppressWarnings(as.numeric(sig$p_value)) else NA_real_
+  sig$diff <- pc$pct_change
+  sig$mse <- pc$pct_mse
+  sig$lb <- pc$pct_lb
+  sig$ub <- pc$pct_ub
+  sig$p_value <- pc$p_value
+  alpha_ok <- ifelse(is.finite(alpha) & alpha > 0 & alpha < 1, alpha, 0.05)
+  sig$significant_unadjusted <- pc$p_value < alpha_ok
+  sig$significant <- sig$significant_unadjusted
+  # Adjusted p-values are recomputed from the new p-values downstream.
+  sig$p_value_bh <- NULL
+  sig$p_value_bonferroni <- NULL
+  sig$significant_bh <- NULL
+  sig$significant_bonferroni <- NULL
+  sig$change_measure <- "percent change of the mean"
+  sig$covariance_used <- pc$log_ratio_covariance_used
+  sig
+}
+sig_fh        <- .to_percent_change(sig_fh, "FH")
+sig_fh_bench  <- .to_percent_change(sig_fh_bench, "FH_Bench")
+sig_mfh       <- .to_percent_change(sig_mfh, "MFH")
+sig_mfh_bench <- .to_percent_change(sig_mfh_bench, "MFH_Bench")
+if (.change_is_percent) {
+  message("Mean-welfare changes are reported as percentage changes of the mean.")
+}
+
 dir.create(here::here("outputs", "data"), recursive = TRUE, showWarnings = FALSE)
 
 # Use writexl for a conformant XLSX. openxlsx::write.xlsx() has produced
@@ -835,7 +897,12 @@ prepare_sig_tbl <- function(df, method_label, signif_true = c("TRUE", "Significa
       significance_rule = "pointwise_unadjusted",
       significant = pointwise_flag,
       method = method_label
-    )
+    ) -> out
+  # Mean welfare: keep the currency-unit difference next to the % change.
+  extra <- intersect(c("change_measure", "diff_eur", "mse_eur", "lb_eur", "ub_eur",
+                       "p_value_eur", "covariance_used"), names(df))
+  if (length(extra)) out <- dplyr::bind_cols(out, as.data.frame(df)[, extra, drop = FALSE])
+  out
 }
 
 
@@ -1535,17 +1602,65 @@ if (.mfh_not_executed) {
 # white is always "no change" and the same blue or red means the same change.
 .change_map_limits <- sae_shared_limits(sig_plot_dt, "diff", symmetric = TRUE)
 
+# ---- Labels for the change figures (change maps, significance plots) ----
+# Indicator-aware, so a mean-welfare run says "mean welfare", not "poverty".
+# Method names follow the map grids: UFH, UFH benchmarked, <MFH model>,
+# <MFH model> benchmarked.
+.is_mean_welfare <- identical(indicator_type, "mean_welfare")
+.change_noun <- if (.is_mean_welfare) {
+  "mean welfare"
+} else {
+  switch(as.character(fgt_alpha), "1" = "poverty gap", "2" = "poverty severity",
+         "poverty rate")
+}
+# Mean-welfare changes are percentage changes of the mean (see above).
+.change_unit_suffix <- if (.is_mean_welfare) " (%)" else ""
+.change_label_accuracy <- if (.is_mean_welfare) 0.1 else 0.01
+.change_method_label <- function(method) {
+  labs <- c("FH" = "UFH", "FH Benchmarked" = "UFH benchmarked",
+            "MFH" = diag_model, "MFH Benchmarked" = paste(diag_model, "benchmarked"))
+  out <- unname(labs[as.character(method)])
+  ifelse(is.na(out), as.character(method), out)
+}
+.change_period <- sprintf("%s to %s", years_keep[1], years_keep[2])
+.change_map_title <- function(method) {
+  sprintf("Change in %s%s, %s: %s", .change_noun, .change_unit_suffix,
+          .change_period, .change_method_label(method))
+}
+# Domains in natural order on the significance plots (1, 2, ..., 10), not
+# as text (1, 10, 11, ..., 2).
+.domain_axis_levels <- function(domains) {
+  d <- unique(as.character(domains))
+  num <- suppressWarnings(as.numeric(d))
+  if (all(!is.na(num))) d[order(num)] else sort(d)
+}
+
+# Labels for the report (read by report.Rmd), so its headings match the run.
+tryCatch({
+  utils::write.csv(data.frame(
+    indicator_type = indicator_type,
+    fgt_alpha = fgt_alpha,
+    log_transform = isTRUE(log_transform),
+    currency_symbol = currency_symbol,
+    indicator_short = as.character(pov_lab$short %||% "")[1],
+    change_noun = .change_noun,
+    change_unit = if (.is_mean_welfare) "%" else "",
+    change_measure = if (.is_mean_welfare) "percent change of the mean" else "difference",
+    price_basis = sae_price_basis_label(.cmp_cfg$price_index, years_keep, indicator_type),
+    mfh_model = diag_model,
+    stringsAsFactors = FALSE
+  ), here::here("outputs", "tables", "indicator_info.csv"), row.names = FALSE)
+}, error = function(e) message("indicator_info.csv not written: ", conditionMessage(e)))
+
 
 # ---- Confidence-interval width comparison ---------------------------------
 # Compare unbenchmarked UFH/FH and MFH pointwise 95% intervals for the change
 # estimates. Poverty-rate widths and changes are expressed in percentage
 # points; mean-welfare runs remain on the configured currency scale.
 .ci_multiplier <- if (identical(indicator_type, "poverty")) 100 else 1
-.ci_unit <- if (identical(indicator_type, "poverty")) {
-  "percentage points"
-} else {
-  currency_symbol
-}
+# Mean-welfare changes are percentage changes, so their interval widths are
+# in percentage points too.
+.ci_unit <- "percentage points"
 
 .ufh_ci <- sig_plot_dt %>%
   filter(as.character(method) == "FH") %>%
@@ -1639,7 +1754,8 @@ ci_width_paired_summary <- tibble(
 )
 
 change_comparison <- sae_change_comparison(
-  sig_plot_dt, years_keep, indicator_type, currency_symbol, fgt_alpha
+  sig_plot_dt, years_keep, indicator_type, currency_symbol, fgt_alpha,
+  change_unit = if (.change_is_percent) "%" else NULL
 )
 .write_xlsx_safe(
   list(`Domain changes` = change_comparison$domain,
@@ -1730,15 +1846,23 @@ plot_ci_width_paired <- function() {
 
 plot_significance <- function(data, method_name) {
   df <- data %>% filter(method == method_name)
-  ggplot(df, aes(x = factor(domain), y = diff, color = significant_label)) +
+  df$domain_axis <- factor(as.character(df$domain),
+                           levels = .domain_axis_levels(df$domain))
+  ggplot(df, aes(x = domain_axis, y = diff, color = significant_label)) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
     geom_point(size = 2.5, alpha = 0.8) +
     geom_errorbar(aes(ymin = lb, ymax = ub), width = 0.25, alpha = 0.5) +
     scale_color_manual(values = c("Not Significant" = "gray60", "Significant" = "red")) +
     labs(
-      title = paste(sprintf("Poverty changes (%s - %s):", years_keep[2], years_keep[1]), method_name),
+      title = if (.is_mean_welfare) {
+        sprintf("Percentage changes in mean welfare (%s vs %s): %s", years_keep[2],
+                years_keep[1], .change_method_label(method_name))
+      } else {
+        sprintf("Changes in %s (%s - %s): %s", .change_noun, years_keep[2],
+                years_keep[1], .change_method_label(method_name))
+      },
       x = "Domain",
-      y = "Estimated change",
+      y = paste0("Estimated change", .change_unit_suffix),
       color = "Pointwise status",
       caption = "Red points indicate pointwise significance (unadjusted p < 0.05); bars are pointwise 95% confidence intervals"
     ) +
@@ -1768,10 +1892,10 @@ change_map_fh <- shp_dt %>%
 
 ggplot(change_map_fh) +
   geom_sf(aes(fill = diff), color = NA) +
-  sae_fill_change(labels = label_number(accuracy = 0.01), limits = .change_map_limits, oob = scales::squish) +
+  sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy), limits = .change_map_limits, oob = scales::squish) +
   labs(caption = sae_map_caption(.map_attribution), 
-    title = "1. Poverty Change Map: FH",
-    fill = "Change"
+    title = .change_map_title("FH"),
+    fill = paste0("Change", .change_unit_suffix)
   ) +
   theme_minimal(base_size = 17) +
   theme(
@@ -1791,10 +1915,10 @@ if (.benchmark_enabled) {
 
   ggplot(change_map_fh_bench) +
     geom_sf(aes(fill = diff), color = NA) +
-    sae_fill_change(labels = label_number(accuracy = 0.01), limits = .change_map_limits, oob = scales::squish) +
+    sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy), limits = .change_map_limits, oob = scales::squish) +
     labs(caption = sae_map_caption(.map_attribution), 
-      title = "2. Poverty Change Map: FH Benchmarked",
-      fill = "Change"
+      title = .change_map_title("FH Benchmarked"),
+      fill = paste0("Change", .change_unit_suffix)
     ) +
     theme_minimal(base_size = 17) +
     theme(
@@ -1814,10 +1938,10 @@ if (!.mfh_not_executed) {
 
   ggplot(change_map_mfh) +
     geom_sf(aes(fill = diff), color = NA) +
-    sae_fill_change(labels = label_number(accuracy = 0.01), limits = .change_map_limits, oob = scales::squish) +
+    sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy), limits = .change_map_limits, oob = scales::squish) +
     labs(caption = sae_map_caption(.map_attribution), 
-      title = "3. Poverty Change Map: MFH",
-      fill = "Change"
+      title = .change_map_title("MFH"),
+      fill = paste0("Change", .change_unit_suffix)
     ) +
     theme_minimal(base_size = 17) +
     theme(
@@ -1836,10 +1960,10 @@ if (!.mfh_not_executed) {
 
     ggplot(change_map_mfh_bench) +
       geom_sf(aes(fill = diff), color = NA) +
-      sae_fill_change(labels = label_number(accuracy = 0.01), limits = .change_map_limits, oob = scales::squish) +
+      sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy), limits = .change_map_limits, oob = scales::squish) +
       labs(caption = sae_map_caption(.map_attribution), 
-        title = "4. Poverty Change Map: MFH Benchmarked",
-        fill = "Change"
+        title = .change_map_title("MFH Benchmarked"),
+        fill = paste0("Change", .change_unit_suffix)
       ) +
       theme_minimal(base_size = 17) +
       theme(
@@ -2280,23 +2404,23 @@ if (nrow(change_comparison$domain) > 0) {
 # ---- Change-over-time maps ----
 message("Exporting change-over-time maps ...")
 .change_map_specs <- list(
-  list(method = "FH",              title = "1. Poverty Change Map: FH",
+  list(method = "FH",              title = .change_map_title("FH"),
        tag = "fh")
 )
 if (.benchmark_enabled) {
   .change_map_specs <- c(.change_map_specs, list(
-    list(method = "FH Benchmarked",  title = "2. Poverty Change Map: FH Benchmarked",
+    list(method = "FH Benchmarked",  title = .change_map_title("FH Benchmarked"),
          tag = "fh_benchmarked")
   ))
 }
 if (!.mfh_not_executed) {
   .change_map_specs <- c(.change_map_specs, list(
-    list(method = "MFH",             title = "3. Poverty Change Map: MFH",
+    list(method = "MFH",             title = .change_map_title("MFH"),
          tag = "mfh")
   ))
   if (.benchmark_enabled) {
     .change_map_specs <- c(.change_map_specs, list(
-      list(method = "MFH Benchmarked", title = "4. Poverty Change Map: MFH Benchmarked",
+      list(method = "MFH Benchmarked", title = .change_map_title("MFH Benchmarked"),
            tag = "mfh_benchmarked")
     ))
   }
@@ -2311,8 +2435,8 @@ for (.spec in .change_map_specs) {
     )
   .p <- ggplot(.map_sf) +
     geom_sf(aes(fill = diff), color = NA) +
-    sae_fill_change(labels = label_number(accuracy = 0.01), limits = .change_map_limits, oob = scales::squish) +
-    labs(caption = sae_map_caption(.map_attribution), title = .spec$title, fill = "Change") +
+    sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy), limits = .change_map_limits, oob = scales::squish) +
+    labs(caption = sae_map_caption(.map_attribution), title = .spec$title, fill = paste0("Change", .change_unit_suffix)) +
     theme_minimal(base_size = 17) +
     theme(
       plot.title   = element_text(size = 24, face = "bold"),

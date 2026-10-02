@@ -286,6 +286,21 @@ if (identical(indicator_type, "poverty") && povline_type == "numeric") {
 if (!identical(indicator_type, "poverty") && !"povline" %in% names(survey_all)) {
   survey_all$povline <- NA_real_
 }
+# Mean-welfare runs: express welfare in constant prices of the first analysis
+# year when a price index was entered (R/pipeline_helpers.R). Poverty runs are
+# never deflated.
+.price_years <- as.integer(unlist(cfg_or_default(ufh_cfg$years_keep, c(2012L, 2013L))))
+price_index_cfg <- .app_cfg$price_index
+price_factors <- sae_price_factors(price_index_cfg, .price_years, indicator_type)
+if (identical(indicator_type, "mean_welfare")) {
+  cat("Prices:", sae_price_basis_label(price_index_cfg, .price_years, indicator_type), "\n")
+}
+if (!is.null(price_factors)) {
+  survey_all <- sae_apply_price_index(survey_all, price_index_cfg, .price_years, indicator_type)
+  cat(sprintf("Welfare multiplied by %s.\n",
+              paste(sprintf("%s in %s", signif(price_factors, 6), names(price_factors)),
+                    collapse = " and ")))
+}
 survey_all <- sae_add_population_weight(
   survey_all,
   weight_col = "weight",
@@ -1129,6 +1144,8 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
       years_keep = years_keep,
       level_col = benchmark_level_variable
     )
+    # External mean-welfare targets are in current prices like the survey.
+    external_benchmark_mat <- sae_deflate_year_matrix(external_benchmark_mat, price_factors)
 
     # Benchmark-level targets: uploaded targets if provided; otherwise the
     # population-weighted average of direct domain rates.

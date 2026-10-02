@@ -375,6 +375,20 @@ if (!use_strata && "strata" %in% names(survey_dt)) {
 if (!identical(indicator_type, "poverty") && !"povline" %in% names(survey_dt)) {
   survey_dt$povline <- NA_real_
 }
+# Mean-welfare runs: express welfare in constant prices of the first analysis
+# year when a price index was entered (R/pipeline_helpers.R).
+.price_years <- as.integer(unlist(cfg_or_default(mfh_cfg$years_keep, c(2012L, 2013L))))
+price_index_cfg <- cfg$price_index
+price_factors <- sae_price_factors(price_index_cfg, .price_years, indicator_type)
+if (identical(indicator_type, "mean_welfare")) {
+  cat("Prices:", sae_price_basis_label(price_index_cfg, .price_years, indicator_type), "\n")
+}
+if (!is.null(price_factors)) {
+  survey_dt <- sae_apply_price_index(survey_dt, price_index_cfg, .price_years, indicator_type)
+  cat(sprintf("Welfare multiplied by %s.\n",
+              paste(sprintf("%s in %s", signif(price_factors, 6), names(price_factors)),
+                    collapse = " and ")))
+}
 # When the poverty line is a numeric constant, create the column
 if (povline_type == "numeric") {
   survey_dt <- sae_apply_numeric_poverty_lines(
@@ -2310,6 +2324,8 @@ if (do_benchmark && !is.null(region_map)) {
     years_keep = years_keep,
     level_col = var_map$benchmark_level
   )
+  # External mean-welfare targets are in current prices like the survey.
+  regional_benchmark_mat <- sae_deflate_year_matrix(regional_benchmark_mat, price_factors)
   if (!is.null(regional_benchmark_mat)) {
     cat("Using Benchmark Target Database for MFH benchmarking:", benchmark_target_path, "\n")
   }

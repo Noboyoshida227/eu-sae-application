@@ -365,6 +365,84 @@ display: none;
 
 <div id="changelog" class="section level1">
 <h1>Changelog</h1>
+<div id="unreleased-w5k" class="section level2">
+<h2>Unreleased (w5k)</h2>
+<ul>
+<li>Mean welfare in constant prices (owner’s decision of 1 Oct): the
+Indicator step has a new <strong>Express welfare in constant
+prices</strong> box for mean-welfare runs, with a price index (for
+example the CPI, any base year) for each analysis year. Welfare is
+multiplied by index(first year) / index(year) in Data Readiness and in
+the UFH and MFH steps, so all mean-welfare levels are in prices of the
+first analysis year and changes are real changes; external mean-welfare
+benchmark targets are converted in the same way. The setting is saved
+with the dashboard setup, written to <code>app_config.yml</code> as
+<code>price_index</code> (enabled, base year, values) and checked before
+a run (one positive value per year). The step logs, the run log, the
+readiness messages, the wizard review page and the report state the
+price basis; when the box is not ticked, Data Readiness notes that
+changes include inflation. Poverty runs are not affected. Helpers
+<code>sae_price_factors()</code>, <code>sae_apply_price_index()</code>,
+<code>sae_price_index_problems()</code> and
+<code>sae_price_basis_label()</code> in
+<code>R/pipeline_helpers.R</code>. On the Spain example (log models)
+every UFH estimate for the second year, and every direct estimate, is
+the nominal value times index(first year) / index(second year); MFH
+estimates agree to within 0.01%.</li>
+<li>Mean-welfare changes are reported as percentage changes of the mean
+(owner’s decision of 1 Oct): 100 × (mean in the later year / mean in the
+earlier year − 1), with the 95% interval and p-value from the log of the
+ratio. Its variance, MSE1/mean1² + MSE2/mean2² − 2·C/(mean1·mean2), uses
+the MSEs of the two estimates and their covariance C implied by the
+change MSE of the UFH and MFH steps (zero for UFH; as in the MFH step,
+the independence variance is used when the covariance-adjusted one is
+not above 1% of it). This applies to UFH, MFH and both benchmarked
+estimates in the change maps, significance plots, significance table and
+counts, <code>statistical_significance_comparison.xlsx</code>,
+<code>EU_SAE_results.xlsx</code> and the change and interval-width
+comparisons; the difference in currency units is kept in columns ending
+in <code>_eur</code>. Change figures are labelled “Change in mean
+welfare (%)”. Helper <code>sae_percent_change()</code>;
+<code>sae_change_comparison()</code> gains <code>change_unit</code>. The
+difference of mean log welfare was not used because it measures the
+change in the geometric mean, which differs from the change in the mean
+by the change in the mean log deviation (on the Spain data, by up to 12
+percentage points). New checks in <code>tests/run_tests.R</code>.</li>
+<li>Mean-welfare runs: the change figures and their headings no longer
+say “poverty” (request from the Polish team). The change maps were
+titled “Poverty Change Map” and the significance plots “Poverty
+changes”, and the report headings 3.12.3 to 3.12.10 were the file names
+(“change map fh”, “significance mfh”). They now read, for example,
+“Change in mean welfare, 2012 to 2013: UFH” and “Significance of changes
+in mean welfare: MFH2 benchmarked” (“poverty rate”, “poverty gap” or
+“poverty severity” in poverty runs), with the method names of the map
+grids (UFH, UFH benchmarked, the selected MFH model). The section
+headings follow the indicator (“Mean Welfare Maps”, “Statistical
+Significance of Mean Welfare Changes”), the change-map legend shows the
+currency for mean welfare (“Change (EUR)”, whole units), and the
+significance plots order domains numerically (1, 2, …, 10) instead of as
+text. The Comparison step writes the labels to
+<code>outputs/tables/indicator_info.csv</code> for the report; older
+runs without it are labelled as poverty, as before. New check in
+<code>tests/run_tests.R</code>.</li>
+<li>Fix: Data Readiness ignored the selected poverty line when the
+survey file also had a column named exactly <code>povline</code> (for
+example <code>povline</code> and <code>povline_2019</code>, with
+<code>povline_2019</code> selected). The readiness loader renamed the
+selected column to <code>povline</code> without removing the existing
+one, so the tables used the first <code>povline</code> column: the
+national and domain poverty rates in the Data Readiness tab,
+<code>national_poverty.csv</code> and
+<code>domain_poverty_rates.csv</code> did not change with the selection.
+The UFH and MFH steps were not affected; they already renamed the
+existing column to <code>povline_original</code>.
+<code>load_and_harmonize()</code> (in <code>app.R</code> and
+<code>app_support.R</code>) now does the same for every mapped role in
+the survey and auxiliary files, and the Data Readiness messages and the
+run log say which column was renamed. Found by the Polish team. New
+check in <code>tests/run_tests.R</code>.</li>
+</ul>
+</div>
 <div id="rc.6-wizard.5.10---2026-10-01" class="section level2">
 <h2>5.2.0-rc.6-wizard.5.10 - 2026-10-01</h2>
 <ul>

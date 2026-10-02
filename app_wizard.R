@@ -824,7 +824,15 @@ ui <- fluidPage(
               textInput("currency_symbol",
                 tip_label("Currency symbol",
                           "Short label appended to axis titles and table headers for mean welfare estimates."),
-                value = "EUR")
+                value = "EUR"),
+              checkboxInput("deflate_welfare",
+                tip_label("Express welfare in constant prices",
+                          "Household-survey incomes are usually in current (nominal) prices, so a change in mean welfare would include inflation. Tick this and enter a price index (for example the CPI, any base year) for each analysis year: welfare is multiplied by index(first year) / index(year), so all mean-welfare levels are in prices of the first analysis year and changes between years are real changes. Leave it unticked if welfare is already in constant prices."),
+                value = FALSE),
+              conditionalPanel(
+                condition = "input.deflate_welfare && input.indicator_type == 'mean_welfare'",
+                uiOutput("price_index_by_year_ui")
+              )
             )
           ),
           tags$div(class = "wiz-col",
@@ -1502,7 +1510,11 @@ wizard_server <- function(input, output, session) {
             })
       ))
     } else {
-      rows <- c(rows, list(row("Currency symbol", wiz_fmt(input$currency_symbol))))
+      rows <- c(rows, list(
+        row("Currency symbol", wiz_fmt(input$currency_symbol)),
+        row("Prices", sae_price_basis_label(get_price_index_config(), parse_years(input$years),
+                                            "mean_welfare"))
+      ))
     }
 
     rows <- c(rows, list(

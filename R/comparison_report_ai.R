@@ -387,11 +387,9 @@ build_comparison_ai_prompts <- function(language = "en",
     )
 
   ci_multiplier <- if (identical(indicator_type, "poverty")) 100 else 1
-  ci_width_unit <- if (identical(indicator_type, "poverty")) {
-    "percentage points"
-  } else {
-    currency_symbol
-  }
+  # Mean-welfare changes are percentage changes of the mean (Comparison step),
+  # so their interval widths are in percentage points as well.
+  ci_width_unit <- "percentage points"
   ci_fh <- sig_plot_dt |>
     dplyr$filter(method == "FH") |>
     dplyr$transmute(
@@ -521,6 +519,11 @@ build_comparison_ai_prompts <- function(language = "en",
     "You are a statistician writing short commentary blocks for a Small Area Estimation comparison report.",
     sprintf("The indicator being modelled is the %s, expressed %s.",
             indicator_noun, indicator_unit_phrase),
+    if (identical(indicator_type, "mean_welfare")) {
+      "Changes between the two years are percentage changes of the mean (later year relative to the earlier year), in percent; describe them as percentage changes."
+    } else {
+      ""
+    },
     sprintf("Refer to the estimates as '%s' or '%s' rather than generic phrases.",
             indicator_noun, indicator_noun_plural),
     "Use only the supplied aggregate summaries.",

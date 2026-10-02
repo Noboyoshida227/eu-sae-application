@@ -1,12 +1,19 @@
 # Descriptive comparison of unbenchmarked changes, without refitting models.
 sae_change_comparison <- function(significance, years, indicator_type = "poverty",
-                                  currency_symbol = "EUR", fgt_alpha = 0L) {
+                                  currency_symbol = "EUR", fgt_alpha = 0L,
+                                  change_unit = NULL) {
   required <- c("domain", "method", "diff")
   if (!all(required %in% names(significance))) stop("Change comparison lacks domain, method or diff.")
   if (length(years) != 2L || anyNA(years) || years[2] <= years[1]) stop("Changes require two ascending years.")
   multiplier <- if (identical(indicator_type, "poverty")) 100 else 1
   unit <- if (identical(indicator_type, "poverty")) "percentage points" else currency_symbol
   label <- if (!identical(indicator_type, "poverty")) "mean-welfare" else if (fgt_alpha == 0L) "poverty-rate" else sprintf("FGT(%s)", fgt_alpha)
+  # Mean-welfare changes given as percentage changes of the mean.
+  if (identical(change_unit, "%")) {
+    multiplier <- 1
+    unit <- "%"
+    label <- "mean-welfare percentage"
+  }
   extract <- function(method, prefix) {
     d <- as.data.frame(significance[as.character(significance$method) == method, , drop = FALSE])
     d$domain <- trimws(as.character(d$domain))
@@ -47,7 +54,9 @@ sae_change_comparison <- function(significance, years, indicator_type = "poverty
     MFH_only_domains = sum(!mfh$domain %in% ufh$domain),
     MFH_lower_domains = sum(gap < 0), MFH_higher_domains = sum(gap > 0), equal_domains = sum(gap == 0),
     median_MFH_minus_UFH_change = if (length(gap)) median(gap) else NA_real_,
-    mean_MFH_minus_UFH_change = if (length(gap)) mean(gap) else NA_real_, unit = unit)
+    mean_MFH_minus_UFH_change = if (length(gap)) mean(gap) else NA_real_,
+    # A difference between two percentage changes is in percentage points.
+    unit = if (identical(unit, "%")) "percentage points" else unit)
   list(domain = paired, long = long, distribution = distribution, paired = summary,
        label = label, unit = unit, years = years)
 }
@@ -65,7 +74,7 @@ sae_plot_change_distribution <- function(comparison) {
     ggplot2::scale_color_manual(values = c(UFH = "#2563EB", MFH = "#D97706")) +
     ggplot2::scale_fill_manual(values = c(UFH = "#2563EB", MFH = "#D97706")) +
     ggplot2::labs(title = paste("Distribution of estimated", comparison$label, "changes"),
-      subtitle = sprintf("%s minus %s | Unbenchmarked estimates across %d matched domains", comparison$years[2], comparison$years[1], nrow(comparison$domain)),
+      subtitle = sprintf("%s %s %s | Unbenchmarked estimates across %d matched domains", comparison$years[2], if (identical(comparison$unit, "%")) "relative to" else "minus", comparison$years[1], nrow(comparison$domain)),
       x = NULL, y = sprintf("Estimated change (%s)", comparison$unit),
       caption = "Each point is one domain; boxes show the median and interquartile range.\nNegative values indicate a decrease. These are estimates, not confidence-interval widths.") +
     ggplot2::theme_minimal(base_size = 14) +
@@ -92,7 +101,7 @@ sae_plot_change_paired <- function(comparison) {
     ggplot2::scale_shape_manual(values = c(`MFH lower` = 16, `MFH higher or equal` = 1)) +
     ggplot2::coord_equal(xlim = limits, ylim = limits) +
     ggplot2::labs(title = paste("Domain-level comparison of estimated", comparison$label, "changes"),
-      subtitle = sprintf("%s minus %s | %d matched domains | Unbenchmarked\nBelow equality: a lower MFH change estimate", comparison$years[2], comparison$years[1], nrow(d)),
+      subtitle = sprintf("%s %s %s | %d matched domains | Unbenchmarked\nBelow equality: a lower MFH change estimate", comparison$years[2], if (identical(comparison$unit, "%")) "relative to" else "minus", comparison$years[1], nrow(d)),
       x = sprintf("UFH estimated change (%s)", comparison$unit),
       y = sprintf("MFH estimated change (%s)", comparison$unit), color = NULL, shape = NULL,
       caption = "Negative values indicate a decrease. Labels identify the four largest method gaps.\nA lower estimate does not imply greater accuracy or statistical significance.") +

@@ -69,6 +69,11 @@ step 1.
    label, and survey, auxiliary, geometry, and optional population files.
 2. **Mapping** — survey columns and the auxiliary/geometry join keys.
 3. **Indicator** — poverty (FGT) or mean welfare and its required settings.
+   For mean welfare, tick **Express welfare in constant prices** and enter a
+   price index (for example the CPI, any base year) for each analysis year when
+   the survey welfare is in current prices: welfare is multiplied by
+   index(first year) / index(year), so all mean-welfare levels are in prices
+   of the first analysis year and changes are real changes.
 4. **Models** — UFH and MFH choices, MCPE bootstrap replicates, benchmarking,
    covariate selection, and PSU consistency.
 5. **AI Assistant** — optional external-transfer consent, API key, and output
@@ -179,6 +184,21 @@ the run: the R process of the current step is terminated and the run
 finishes with the status *Stopped by user*. Files written before the stop
 remain in `outputs/` until the next run; nothing is archived and no report is
 produced. Press **Stop** before closing the black launcher window.
+
+### Changes in mean welfare
+
+In mean-welfare runs the report gives each change between the two years as a
+percentage change of the estimated mean, 100 × (mean in the later year /
+mean in the earlier year − 1). The 95% interval and the p-value come from the
+log of that ratio, using the MSEs of the two estimates and their covariance
+(from the MCPE for MFH; UFH treats the years as independent), so the interval
+is not symmetric around the estimate. Change maps, significance plots, the
+significance table and the change and interval-width comparisons use these
+percentage changes; the difference in currency units is kept in
+`statistical_significance_comparison.xlsx` (columns ending in `_eur`). The UFH
+and MFH step figures in `outputs/figures/` still show currency differences.
+With a price index (see **Indicator** above) these are real changes; without
+one they include inflation, and Data Readiness says so.
 
 ### Maps
 
