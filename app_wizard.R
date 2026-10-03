@@ -827,11 +827,13 @@ ui <- fluidPage(
                 value = "EUR"),
               checkboxInput("deflate_welfare",
                 tip_label("Express welfare in constant prices",
-                          "Household-survey incomes are usually in current (nominal) prices, so a change in mean welfare would include inflation. Tick this and enter a price index (for example the CPI, any base year) for each analysis year: welfare is multiplied by index(first year) / index(year), so all mean-welfare levels are in prices of the first analysis year and changes between years are real changes. Leave it unticked if welfare is already in constant prices."),
+                          "Household-survey incomes are usually in current (nominal) prices, so a change in mean welfare would include inflation. Tick this and enter a consumer price index (for example the CPI or HICP), either as index levels with a fixed reference year or as annual indices with the previous year = 100: welfare is multiplied by the price level of the base year / the price level of its own year, so all mean-welfare levels are in prices of the base year and changes between years are real changes. The base year is the first analysis year unless you choose another one. Leave it unticked if welfare is already in constant prices."),
                 value = FALSE),
               conditionalPanel(
                 condition = "input.deflate_welfare && input.indicator_type == 'mean_welfare'",
-                uiOutput("price_index_by_year_ui")
+                price_index_inputs(),
+                uiOutput("price_index_by_year_ui"),
+                uiOutput("price_base_index_ui")
               )
             )
           ),

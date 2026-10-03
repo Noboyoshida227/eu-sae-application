@@ -813,17 +813,32 @@ sae_ic_none_problem <- function(model, lasso_enabled, vars_y1, vars_y2,
 
 # ---- Price deflation (mean welfare) -----------------------------------------
 # Household-survey welfare is usually in current (nominal) prices. For
-# mean-welfare runs the user can enter a price index (for example the CPI)
-# for each analysis year; welfare is then expressed in constant prices of the
-# FIRST analysis year: welfare_t * index(first year) / index(t). Levels are in
-# first-year prices and changes between years are real changes. Poverty runs
-# are never deflated (the poverty line is already in each year's prices).
+# mean-welfare runs the user can enter a consumer price index (for example
+# the CPI or the HICP); welfare is then expressed in constant prices of a base
+# year: welfare_t * P(base year) / P(t), where P is the price level. The base
+# year is the first analysis year unless another one is chosen (for example
+# 2017, or the last analysis year). Levels are in base-year prices and changes
+# between years are real changes; percentage changes do not depend on the
+# base year. Poverty runs are never deflated (the poverty line is already in
+# each year's prices).
+#
+# Two kinds of index are accepted, as statistical offices publish both:
+#   index_type: fixed          an index with a fixed reference year (for
+#                              example 2015 = 100), one value per analysis
+#                              year and for a base year outside them;
+#   index_type: previous_year  annual indices with the previous year = 100
+#                              (for example 103.6 for 3.6% annual-average
+#                              inflation), one value for every year after the
+#                              earliest and up to the latest of the analysis
+#                              years and the base year. They are chained:
+#                              P(t) = P(t - 1) * index(t) / 100.
 #
 # Config shape (app_config.yml):
 #   price_index:
 #     enabled: yes
-#     base_year: 2012
-#     values: {"2012": 100, "2013": 101.4}
+#     index_type: fixed          # optional; default fixed
+#     base_year: 2017            # optional; default: first analysis year
+#     values: {"2012": 100, "2013": 101.4, "2017": 104.9}
 
 # Named numeric vector of index values by year (no recycling of a single value,
 # unlike the poverty-line helper: every year needs its own index).
@@ -841,6 +856,43 @@ sae_price_index_enabled <- function(price_index, indicator_type = "mean_welfare"
     is.list(price_index) && isTRUE(as.logical(price_index$enabled %||% FALSE))
 }
 
+# "fixed" (index with a fixed reference year; the default) or "previous_year"
+# (annual indices, previous year = 100). NA for any other value.
+sae_price_index_type <- function(price_index) {
+  raw <- if (is.list(price_index)) price_index$index_type else NULL
+  if (is.null(raw) || length(raw) == 0L || is.na(raw[[1]]) || !nzchar(trimws(as.character(raw[[1]])))) {
+    return("fixed")
+  }
+  type <- trimws(as.character(raw[[1]]))
+  if (type %in% c("fixed", "previous_year")) type else NA_character_
+}
+
+# The price base year as a whole number: price_index$base_year, or the first
+# analysis year when it is not set. NA when it is set but is not a calendar
+# year (1900-2100).
+sae_price_base_year <- function(price_index, years_keep) {
+  years_int <- sort(as.integer(years_keep))
+  raw <- if (is.list(price_index)) price_index$base_year else NULL
+  if (is.null(raw) || length(raw) == 0L ||
+      (length(raw) == 1L && is.character(raw) && !nzchar(trimws(raw)))) {
+    return(if (length(years_int)) years_int[1] else NA_integer_)
+  }
+  b <- suppressWarnings(as.numeric(raw[[1]]))
+  if (!is.finite(b) || b != round(b) || b < 1900 || b > 2100) return(NA_integer_)
+  as.integer(b)
+}
+
+# Years that need an annual index (previous year = 100): every year after the
+# earliest and up to the latest of the analysis years and the base year.
+sae_price_chain_years <- function(price_index, years_keep) {
+  yrs <- as.integer(years_keep)
+  base <- sae_price_base_year(price_index, years_keep)
+  if (!is.na(base)) yrs <- c(yrs, base)
+  yrs <- yrs[!is.na(yrs)]
+  if (length(yrs) == 0L || min(yrs) == max(yrs)) return(integer(0))
+  seq.int(min(yrs) + 1L, max(yrs))
+}
+
 # Problems with the price-index settings for the analysis years (character(0)
 # when they are usable or deflation is off).
 sae_price_index_problems <- function(price_index, years_keep,
@@ -848,8 +900,32 @@ sae_price_index_problems <- function(price_index, years_keep,
   if (!sae_price_index_enabled(price_index, indicator_type)) return(character(0))
   years_chr <- as.character(sort(as.integer(years_keep)))
   vals <- sae_price_index_values(price_index$values)
-  missing <- setdiff(years_chr, names(vals))
+  type <- sae_price_index_type(price_index)
   probs <- character(0)
+  if (is.na(type)) {
+    return(sprintf("price index type must be 'fixed' or 'previous_year' (got '%s')",
+                   as.character(price_index$index_type[[1]])))
+  }
+  base <- sae_price_base_year(price_index, years_keep)
+  if (is.na(base)) {
+    probs <- c(probs, "the price base year must be a calendar year, for example 2017")
+  }
+  if (identical(type, "previous_year")) {
+    need <- as.character(sae_price_chain_years(price_index, years_keep))
+    missing <- setdiff(need, names(vals))
+    if (length(missing)) {
+      probs <- c(probs, sprintf("annual price index (previous year = 100) missing for year(s) %s",
+                                paste(missing, collapse = ", ")))
+    }
+    have <- intersect(need, names(vals))
+    bad <- have[!is.finite(vals[have]) | vals[have] <= 0]
+    if (length(bad)) {
+      probs <- c(probs, sprintf("price index must be a positive number (year(s) %s)",
+                                paste(bad, collapse = ", ")))
+    }
+    return(probs)
+  }
+  missing <- setdiff(years_chr, names(vals))
   if (length(missing)) {
     probs <- c(probs, sprintf("price index missing for year(s) %s",
                               paste(missing, collapse = ", ")))
@@ -860,14 +936,36 @@ sae_price_index_problems <- function(price_index, years_keep,
     probs <- c(probs, sprintf("price index must be a positive number (year(s) %s)",
                               paste(bad, collapse = ", ")))
   }
-  base <- suppressWarnings(as.integer(price_index$base_year %||% years_chr[1]))
   if (!is.na(base) && !as.character(base) %in% years_chr) {
-    probs <- c(probs, sprintf("price base year %s is not an analysis year", base))
+    b <- as.character(base)
+    if (!b %in% names(vals)) {
+      probs <- c(probs, sprintf("price index missing for the base year %s", b))
+    } else if (!is.finite(vals[[b]]) || vals[[b]] <= 0) {
+      probs <- c(probs, sprintf("price index must be a positive number (base year %s)", b))
+    }
   }
   probs
 }
 
-# Named factors index(base) / index(year), or NULL when deflation is off.
+# Price levels by year for the analysis years and the base year: the entered
+# values for a fixed-reference index, or the chained annual indices (earliest
+# year = 100) for previous-year indices. Assumes the settings have no problems.
+sae_price_levels <- function(price_index, years_keep) {
+  vals <- sae_price_index_values(price_index$values)
+  base <- sae_price_base_year(price_index, years_keep)
+  years <- sort(unique(c(as.integer(years_keep), base)))
+  if (!identical(sae_price_index_type(price_index), "previous_year")) {
+    return(stats::setNames(as.numeric(vals[as.character(years)]), as.character(years)))
+  }
+  span <- seq.int(min(years), max(years))
+  lev <- stats::setNames(rep(100, length(span)), as.character(span))
+  for (k in seq_along(span)[-1L]) {
+    lev[k] <- lev[k - 1L] * as.numeric(vals[[as.character(span[k])]]) / 100
+  }
+  lev[as.character(years)]
+}
+
+# Named factors P(base) / P(year), or NULL when deflation is off.
 sae_price_factors <- function(price_index, years_keep,
                               indicator_type = "mean_welfare") {
   if (!sae_price_index_enabled(price_index, indicator_type)) return(NULL)
@@ -876,9 +974,9 @@ sae_price_factors <- function(price_index, years_keep,
     stop("Price index: ", paste(probs, collapse = "; "), call. = FALSE)
   }
   years_chr <- as.character(sort(as.integer(years_keep)))
-  vals <- sae_price_index_values(price_index$values)[years_chr]
-  base <- as.character(price_index$base_year %||% years_chr[1])
-  stats::setNames(as.numeric(vals[[base]]) / as.numeric(vals), years_chr)
+  lev <- sae_price_levels(price_index, years_keep)
+  base <- as.character(sae_price_base_year(price_index, years_keep))
+  stats::setNames(as.numeric(lev[[base]]) / as.numeric(lev[years_chr]), years_chr)
 }
 
 # Multiply welfare by the year's factor. Rows of other years are unchanged.
@@ -917,11 +1015,20 @@ sae_price_basis_label <- function(price_index, years_keep,
   }
   years_chr <- as.character(sort(as.integer(years_keep)))
   vals <- sae_price_index_values(price_index$values)
-  base <- as.character(price_index$base_year %||% years_chr[1])
-  sprintf("constant %s prices (price index: %s)", base,
-          paste(sprintf("%s = %s", years_chr,
-                        as.character(signif(as.numeric(vals[years_chr]), 8))),
-                collapse = ", "))
+  base_int <- sae_price_base_year(price_index, years_keep)
+  base <- if (is.na(base_int)) "(base year not set)" else as.character(base_int)
+  fmt <- function(y) as.character(signif(as.numeric(vals[y]), 8))
+  if (identical(sae_price_index_type(price_index), "previous_year")) {
+    chain <- as.character(sae_price_chain_years(price_index, years_keep))
+    return(sprintf("constant %s prices (annual price index, previous year = 100: %s)", base,
+                   if (length(chain)) paste(sprintf("%s = %s", chain, fmt(chain)), collapse = ", ")
+                   else "none needed"))
+  }
+  index_txt <- paste(sprintf("%s = %s", years_chr, fmt(years_chr)), collapse = ", ")
+  if (!is.na(base_int) && !base %in% years_chr) {
+    index_txt <- sprintf("%s; base year %s = %s", index_txt, base, fmt(base))
+  }
+  sprintf("constant %s prices (price index: %s)", base, index_txt)
 }
 
 # ---- Percentage change of a mean (mean-welfare runs) --------------------------

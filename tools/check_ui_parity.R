@@ -15,7 +15,8 @@ core <- file.path(root, "app.R")
 for (e in as.list(parse(core, keep.source = FALSE, encoding = "UTF-8"))) {
   if (is.call(e) && as.character(e[[1]])[1] %in% c("<-", "=") &&
       as.character(e[[2]])[1] %in% c("tip_label", "mapping_selectize",
-                                     "ic_criterion_input", "ui")) {
+                                     "ic_criterion_input", "price_index_inputs",
+                                     "ui")) {
     eval(e, envir = globalenv())
   }
 }

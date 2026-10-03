@@ -375,8 +375,9 @@ if (!use_strata && "strata" %in% names(survey_dt)) {
 if (!identical(indicator_type, "poverty") && !"povline" %in% names(survey_dt)) {
   survey_dt$povline <- NA_real_
 }
-# Mean-welfare runs: express welfare in constant prices of the first analysis
-# year when a price index was entered (R/pipeline_helpers.R).
+# Mean-welfare runs: express welfare in constant prices of the base year (by
+# default the first analysis year) when a price index was entered
+# (R/pipeline_helpers.R).
 .price_years <- as.integer(unlist(cfg_or_default(mfh_cfg$years_keep, c(2012L, 2013L))))
 price_index_cfg <- cfg$price_index
 price_factors <- sae_price_factors(price_index_cfg, .price_years, indicator_type)

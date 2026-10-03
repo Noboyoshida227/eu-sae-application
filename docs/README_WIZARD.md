@@ -69,11 +69,26 @@ step 1.
    label, and survey, auxiliary, geometry, and optional population files.
 2. **Mapping** — survey columns and the auxiliary/geometry join keys.
 3. **Indicator** — poverty (FGT) or mean welfare and its required settings.
-   For mean welfare, tick **Express welfare in constant prices** and enter a
-   price index (for example the CPI, any base year) for each analysis year when
-   the survey welfare is in current prices: welfare is multiplied by
-   index(first year) / index(year), so all mean-welfare levels are in prices
-   of the first analysis year and changes are real changes.
+   For mean welfare, tick **Express welfare in constant prices** when the
+   survey welfare is in current prices, and enter a consumer price index (for
+   example the CPI or HICP). **Price index type** sets how it is entered:
+   - **Fixed reference year** (for example 2015 = 100): the index level for
+     each analysis year;
+   - **Previous year = 100**: annual-average indices against the year before
+     (for example 103.6 for 3.6% inflation), one for every year after the
+     earliest and up to the latest analysis or base year; the app chains them.
+
+   Welfare is multiplied by the price level of the base year / the price level
+   of its own year, so all mean-welfare levels are in prices of the base year
+   and changes are real changes. **Price base year** is the first analysis
+   year by default; choose **Another year** to use, for example, 2017 prices
+   or the prices of the last analysis year. With a fixed-reference index, a
+   base year outside the analysis years needs its own index level, from the
+   same series. Percentage changes between years are the same whatever the
+   base year; only the levels change. Use annual averages for annual incomes,
+   not December-on-December or monthly indices, and if incomes refer to an
+   earlier period than the survey year (in EU-SILC, the previous calendar
+   year), enter the index of that period.
 4. **Models** — UFH and MFH choices, MCPE bootstrap replicates, benchmarking,
    covariate selection, and PSU consistency.
 5. **AI Assistant** — optional external-transfer consent, API key, and output

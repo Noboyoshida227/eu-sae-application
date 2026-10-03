@@ -959,7 +959,7 @@ check(isTRUE(all.equal(unname(.pi_f), c(1, 100 / 101.4))) &&
                   "constant 2012 prices (price index: 2012 = 100, 2013 = 101.4)") &&
         identical(sae_price_basis_label(list(enabled = FALSE), c(2012L, 2013L)),
                   "current prices (not deflated)"),
-      "price index: welfare in first-year prices for mean welfare only, with checks and label")
+      "price index: welfare in constant prices for mean welfare only, with checks and label")
 .mw_cfg <- function(pi) list(years_keep = c(2012L, 2013L), analysis_seed = 123L,
                              indicator_type = "mean_welfare", run = list(steps = "UFH"),
                              price_index = pi)
@@ -967,6 +967,69 @@ check(isTRUE(validate_app_config(.mw_cfg(.pi_ok))$valid) &&
         !isTRUE(validate_app_config(.mw_cfg(list(enabled = TRUE, values = list("2012" = 100))))$valid) &&
         isTRUE(validate_app_config(.mw_cfg(list(enabled = FALSE)))$valid),
       "config check requires a positive price index for each year when deflation is on")
+# Price base year: any calendar year (default the first analysis year); a base
+# year outside the analysis years needs its own index value.
+.pi_17 <- list(enabled = TRUE, base_year = 2017L,
+               values = list("2012" = 100, "2013" = 101.4, "2017" = 104.9))
+.pi_13 <- list(enabled = TRUE, base_year = 2013L, values = list("2012" = 100, "2013" = 101.4))
+.pi_nobase <- list(enabled = TRUE, values = list("2012" = 100, "2013" = 101.4))
+.pi_17_noidx <- .pi_17; .pi_17_noidx$values <- list("2012" = 100, "2013" = 101.4)
+.pi_17_zero <- .pi_17; .pi_17_zero$values[["2017"]] <- 0
+check(isTRUE(all.equal(unname(sae_price_factors(.pi_17, c(2012L, 2013L))),
+                       c(104.9 / 100, 104.9 / 101.4))) &&
+        isTRUE(all.equal(unname(sae_price_factors(.pi_13, c(2012L, 2013L))), c(1.014, 1))) &&
+        isTRUE(all.equal(unname(sae_price_factors(.pi_nobase, c(2012L, 2013L))), c(1, 100 / 101.4))) &&
+        identical(sae_price_base_year(.pi_nobase, c(2013L, 2012L)), 2012L) &&
+        is.na(sae_price_base_year(list(base_year = NA), c(2012L, 2013L))) &&
+        is.na(sae_price_base_year(list(base_year = 17), c(2012L, 2013L))) &&
+        identical(sae_price_index_problems(.pi_17_noidx, c(2012L, 2013L)),
+                  "price index missing for the base year 2017") &&
+        length(sae_price_index_problems(.pi_17_zero, c(2012L, 2013L))) == 1L &&
+        grepl("calendar year", sae_price_index_problems(modifyList(.pi_17, list(base_year = NA)),
+                                                        c(2012L, 2013L))) &&
+        length(sae_price_index_problems(.pi_17, c(2012L, 2013L))) == 0L &&
+        identical(sae_price_basis_label(.pi_17, c(2012L, 2013L)),
+                  "constant 2017 prices (price index: 2012 = 100, 2013 = 101.4; base year 2017 = 104.9)") &&
+        identical(sae_price_basis_label(.pi_13, c(2012L, 2013L)),
+                  "constant 2013 prices (price index: 2012 = 100, 2013 = 101.4)") &&
+        isTRUE(validate_app_config(.mw_cfg(.pi_17))$valid) &&
+        !isTRUE(validate_app_config(.mw_cfg(.pi_17_noidx))$valid),
+      "price base year: first analysis year by default, any calendar year with its own index")
+# Annual indices with the previous year = 100 are chained over every year from
+# the earliest to the latest of the analysis years and the base year, and give
+# the same factors as the equivalent fixed-reference index.
+.i17 <- 104.9 / (1.014 * 1.010 * 1.005 * 1.006)
+.pc_17 <- list(enabled = TRUE, index_type = "previous_year", base_year = 2017L,
+               values = list("2013" = 101.4, "2014" = 101.0, "2015" = 100.5, "2016" = 100.6, "2017" = .i17))
+.pc_first <- list(enabled = TRUE, index_type = "previous_year", values = list("2013" = 101.4))
+.pc_early <- list(enabled = TRUE, index_type = "previous_year", base_year = 2010L,
+                  values = list("2011" = 102, "2012" = 103, "2013" = 101))
+check(isTRUE(all.equal(sae_price_factors(.pc_17, c(2012L, 2013L)), sae_price_factors(.pi_17, c(2012L, 2013L)))) &&
+        isTRUE(all.equal(sae_price_factors(.pc_first, c(2012L, 2013L)), sae_price_factors(.pi_ok, c(2012L, 2013L)))) &&
+        isTRUE(all.equal(unname(sae_price_factors(.pc_early, c(2012L, 2013L))),
+                         c(1 / (1.02 * 1.03), 1 / (1.02 * 1.03 * 1.01)))) &&
+        identical(sae_price_chain_years(.pc_17, c(2012L, 2013L)), 2013:2017) &&
+        identical(sae_price_chain_years(list(index_type = "previous_year"), c(2019L, 2023L)), 2020:2023) &&
+        identical(sae_price_index_problems(list(enabled = TRUE, index_type = "previous_year", base_year = 2017L,
+                                                values = list("2013" = 101.4)), c(2012L, 2013L)),
+                  "annual price index (previous year = 100) missing for year(s) 2014, 2015, 2016, 2017") &&
+        length(sae_price_index_problems(list(enabled = TRUE, index_type = "monthly", values = list()),
+                                        c(2012L, 2013L))) == 1L &&
+        identical(sae_price_index_type(list(enabled = TRUE)), "fixed") &&
+        identical(sae_price_basis_label(.pc_first, c(2012L, 2013L)),
+                  "constant 2012 prices (annual price index, previous year = 100: 2013 = 101.4)") &&
+        isTRUE(validate_app_config(.mw_cfg(.pc_17))$valid) &&
+        !isTRUE(validate_app_config(.mw_cfg(list(enabled = TRUE, index_type = "previous_year", base_year = 2017L,
+                                                 values = list("2013" = 101.4))))$valid),
+      "price index type: previous year = 100 indices are chained and match a fixed-reference index")
+# Percentage changes do not depend on the base year (both years scale by the same constant).
+.pc_a <- sae_percent_change(m1 = 1000, m2 = 1030 * 100 / 101.4, mse1 = 25, mse2 = 30, mse_diff = 40)
+.k <- 104.9 / 100
+.pc_b <- sae_percent_change(m1 = 1000 * .k, m2 = 1030 * 100 / 101.4 * .k, mse1 = 25 * .k^2,
+                            mse2 = 30 * .k^2, mse_diff = 40 * .k^2)
+check(isTRUE(all.equal(unlist(.pc_a[c("pct_change", "pct_lb", "pct_ub")]),
+                       unlist(.pc_b[c("pct_change", "pct_lb", "pct_ub")]))),
+      "percentage change and its interval are the same whatever the price base year")
 .pc <- sae_percent_change(m1 = c(100, 100, -1), m2 = c(110, 90, 5), mse1 = c(4, 4, 1),
                           mse2 = c(4, 4, 1), mse_diff = c(8, 4, 2))
 .v2 <- 4 / 100^2 + 4 / 90^2 - 2 * 2 / (100 * 90)
@@ -984,6 +1047,10 @@ check(isTRUE(all.equal(.pc$pct_change[1:2], c(10, -10))) &&
 check(grepl('checkboxInput("deflate_welfare"', .app_txt, fixed = TRUE) &&
         grepl('checkboxInput("deflate_welfare"', .wiz_txt, fixed = TRUE) &&
         grepl('uiOutput("price_index_by_year_ui")', .wiz_txt, fixed = TRUE) &&
+        grepl("price_index_inputs(),", .app_txt, fixed = TRUE) &&
+        grepl("price_index_inputs(),", .wiz_txt, fixed = TRUE) &&
+        grepl('uiOutput("price_base_index_ui")', .wiz_txt, fixed = TRUE) &&
+        grepl("output$price_base_index_ui <- renderUI", .app_txt, fixed = TRUE) &&
         grepl("price_index     = get_price_index_config(years)", .app_txt, fixed = TRUE) &&
         grepl("sae_apply_price_index(survey_all", .ufh_txt, fixed = TRUE) &&
         grepl("sae_apply_price_index(survey_dt", .mfh_txt, fixed = TRUE) &&

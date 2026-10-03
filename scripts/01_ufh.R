@@ -286,9 +286,9 @@ if (identical(indicator_type, "poverty") && povline_type == "numeric") {
 if (!identical(indicator_type, "poverty") && !"povline" %in% names(survey_all)) {
   survey_all$povline <- NA_real_
 }
-# Mean-welfare runs: express welfare in constant prices of the first analysis
-# year when a price index was entered (R/pipeline_helpers.R). Poverty runs are
-# never deflated.
+# Mean-welfare runs: express welfare in constant prices of the base year (by
+# default the first analysis year) when a price index was entered
+# (R/pipeline_helpers.R). Poverty runs are never deflated.
 .price_years <- as.integer(unlist(cfg_or_default(ufh_cfg$years_keep, c(2012L, 2013L))))
 price_index_cfg <- .app_cfg$price_index
 price_factors <- sae_price_factors(price_index_cfg, .price_years, indicator_type)

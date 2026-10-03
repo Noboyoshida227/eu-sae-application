@@ -215,6 +215,11 @@ dashboard_setup_defaults <- function() {
       currency_symbol = "EUR",
       deflate_welfare = FALSE,
       price_index_by_year = list(),
+      price_index_type = "fixed",
+      price_change_by_year = list(),
+      price_base_mode = "first",
+      price_base_year = NA_integer_,
+      price_index_base = 100,
       rhs_domain = "prov",
       shp_domain = "prov",
       ufh_transformation = "arcsin",
@@ -410,7 +415,7 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
       output_col = "povline"
     )
   }
-  # Mean welfare: constant prices of the first analysis year when a price
+  # Mean welfare: constant prices of the base year when a price
   # index was entered (same rule as the UFH and MFH steps).
   if (identical(indicator_type, "mean_welfare") &&
       sae_price_index_enabled(price_index, indicator_type)) {
@@ -690,6 +695,46 @@ ic_criterion_input <- function(prefix, selected, tip_text) {
         tags$div(class = "form-control",
                  style = "background-color:#eee;color:#555;cursor:not-allowed;height:auto;",
                  "Not used: covariates fixed for both years"))
+    )
+  )
+}
+
+# Price-index settings for mean welfare in constant prices, used by the
+# dashboard and the wizard: the kind of index (a fixed reference year, or the
+# previous year = 100) and the price base year (the first analysis year by
+# default, or another calendar year such as 2017). The server renders the
+# index boxes (output$price_index_by_year_ui, output$price_base_index_ui) and
+# records the choices in price_index (get_price_index_config()).
+price_index_inputs <- function() {
+  tagList(
+    radioButtons("price_index_type",
+      tip_label("Price index type",
+                paste("How the index is published. 'Fixed reference year': index levels",
+                      "against one reference year (for example HICP 2015 = 100); enter one",
+                      "for each analysis year. 'Previous year = 100': annual-average indices",
+                      "against the year before (for example 103.6 for 3.6% inflation, as in",
+                      "Statistics Poland's annual table); enter one for every year after the",
+                      "earliest and up to the latest analysis or base year, and the app chains",
+                      "them. Use annual averages for annual incomes, not December-on-December",
+                      "or monthly indices.")),
+      choices = c("Fixed reference year (e.g. 2015 = 100)" = "fixed",
+                  "Previous year = 100" = "previous_year"),
+      selected = "fixed"),
+    radioButtons("price_base_mode",
+      tip_label("Price base year",
+                paste("Year whose prices mean welfare is expressed in. Choose 'Another year'",
+                      "for, say, 2017 prices or the prices of the last analysis year. With a",
+                      "fixed-reference index, a base year outside the analysis years needs its",
+                      "own index value, from the same series. Percentage changes between years",
+                      "do not depend on the base year; only the levels do.")),
+      choices = c("First analysis year" = "first", "Another year" = "other"),
+      selected = "first", inline = TRUE),
+    conditionalPanel(
+      condition = "input.price_base_mode == 'other'",
+      numericInput("price_base_year",
+        tip_label("Base year",
+                  "Calendar year whose prices mean welfare is expressed in, for example 2017."),
+        value = NA, min = 1900, max = 2100, step = 1)
     )
   )
 }
@@ -1182,14 +1227,17 @@ ui <- fluidPage(
                     "Short label appended to axis titles and table headers for mean welfare estimates."),
           value = "EUR"),
         # Price deflation (mean welfare only): welfare in constant prices of
-        # the first analysis year (sae_apply_price_index(), R/pipeline_helpers.R).
+        # a base year, by default the first analysis year
+        # (sae_apply_price_index(), R/pipeline_helpers.R).
         checkboxInput("deflate_welfare",
           tip_label("Express welfare in constant prices",
-                    "Household-survey incomes are usually in current (nominal) prices, so a change in mean welfare would include inflation. Tick this and enter a price index (for example the CPI, any base year) for each analysis year: welfare is multiplied by index(first year) / index(year), so all mean-welfare levels are in prices of the first analysis year and changes between years are real changes. Leave it unticked if welfare is already in constant prices."),
+                    "Household-survey incomes are usually in current (nominal) prices, so a change in mean welfare would include inflation. Tick this and enter a consumer price index (for example the CPI or HICP), either as index levels with a fixed reference year or as annual indices with the previous year = 100: welfare is multiplied by the price level of the base year / the price level of its own year, so all mean-welfare levels are in prices of the base year and changes between years are real changes. The base year is the first analysis year unless you choose another one. Leave it unticked if welfare is already in constant prices."),
           value = FALSE),
         conditionalPanel(
           condition = "input.deflate_welfare && input.indicator_type == 'mean_welfare'",
-          uiOutput("price_index_by_year_ui")
+          price_index_inputs(),
+          uiOutput("price_index_by_year_ui"),
+          uiOutput("price_base_index_ui")
         )
       ),
 
@@ -1939,7 +1987,14 @@ server <- function(input, output, session) {
   # Values restored from a saved setup are kept here so they are used even
   # before the (hidden) per-year inputs have been rendered.
   price_index_restored <- reactiveVal(list())
+  price_change_restored <- reactiveVal(list())
+  price_base_index_restored <- reactiveVal(NULL)
 
+  get_price_index_type <- function() {
+    if (identical(input$price_index_type, "previous_year")) "previous_year" else "fixed"
+  }
+
+  # Fixed-reference index: one value per analysis year (inputs price_index_<year>).
   get_price_index_by_year <- function(years_vec = parse_years(input$years)) {
     years_vec <- sort(as.integer(years_vec))
     restored <- price_index_restored()
@@ -1952,14 +2007,58 @@ server <- function(input, output, session) {
     vals
   }
 
+  # Price base year: the first analysis year, or the year entered under
+  # "Another year" (NA when that field is empty or not a calendar year).
+  get_price_base_year <- function(years_vec = parse_years(input$years)) {
+    years_vec <- sort(as.integer(years_vec))
+    if (!identical(input$price_base_mode %||% "first", "other")) {
+      return(if (length(years_vec)) years_vec[1] else NA_integer_)
+    }
+    sae_price_base_year(list(base_year = input$price_base_year %||% NA), years_vec)
+  }
+
+  # Previous year = 100: the years that need an annual index, and their values
+  # (inputs price_change_<year>).
+  get_price_chain_years <- function(years_vec = parse_years(input$years)) {
+    sae_price_chain_years(list(base_year = get_price_base_year(years_vec)), years_vec)
+  }
+
+  get_price_change_by_year <- function(years_vec = parse_years(input$years)) {
+    chain <- get_price_chain_years(years_vec)
+    restored <- price_change_restored()
+    vals <- lapply(chain, function(yr) {
+      val <- input[[paste0("price_change_", yr)]]
+      if (is.null(val)) val <- restored[[as.character(yr)]] %||% 100
+      as.numeric(val)
+    })
+    names(vals) <- as.character(chain)
+    vals
+  }
+
+  # Fixed-reference index of a base year outside the analysis years.
+  get_price_base_index <- function() {
+    val <- input$price_index_base
+    if (is.null(val)) val <- price_base_index_restored() %||% 100
+    as.numeric(val)
+  }
+
   # list(enabled = FALSE) unless mean welfare is selected and the box ticked.
   get_price_index_config <- function(years_vec = parse_years(input$years)) {
     years_vec <- sort(as.integer(years_vec))
     enabled <- identical(input$indicator_type %||% "poverty", "mean_welfare") &&
       isTRUE(input$deflate_welfare) && length(years_vec) > 0L
     if (!enabled) return(list(enabled = FALSE))
-    list(enabled = TRUE, base_year = years_vec[1],
-         values = get_price_index_by_year(years_vec))
+    base <- get_price_base_year(years_vec)
+    type <- get_price_index_type()
+    if (identical(type, "previous_year")) {
+      return(list(enabled = TRUE, index_type = type, base_year = base,
+                  values = get_price_change_by_year(years_vec)))
+    }
+    values <- get_price_index_by_year(years_vec)
+    if (!is.na(base) && !base %in% years_vec) {
+      values[[as.character(base)]] <- get_price_base_index()
+    }
+    list(enabled = TRUE, index_type = type, base_year = base, values = values)
   }
 
   # Readiness note on the price basis of mean welfare.
@@ -1976,10 +2075,37 @@ server <- function(input, output, session) {
     }
   }
 
+  price_period_tip <- paste(
+    "If incomes refer to an earlier period than the survey year (in EU-SILC, the",
+    "calendar year before the survey), use the index of that period."
+  )
+
   output$price_index_by_year_ui <- renderUI({
     years_vec <- sort(parse_years(input$years))
     if (length(years_vec) == 0L) {
       return(helpText("Enter analysis years before entering the price index."))
+    }
+    if (identical(get_price_index_type(), "previous_year")) {
+      chain <- get_price_chain_years(years_vec)
+      if (length(chain) == 0L) {
+        return(helpText("No annual index is needed: there is only one year."))
+      }
+      restored <- isolate(price_change_restored())
+      return(tagList(
+        lapply(chain, function(yr) {
+          id <- paste0("price_change_", yr)
+          numericInput(
+            id,
+            tip_label(
+              sprintf("Annual price index %s (%s = 100)", yr, yr - 1L),
+              paste("Average prices in", yr, "against the average of", yr - 1L,
+                    "= 100, for example 103.6 for 3.6% inflation.", price_period_tip)
+            ),
+            value = isolate(input[[id]] %||% restored[[as.character(yr)]] %||% 100),
+            min = 0
+          )
+        })
+      ))
     }
     restored <- isolate(price_index_restored())
     tagList(
@@ -1989,13 +2115,40 @@ server <- function(input, output, session) {
           id,
           tip_label(
             paste("Price index", yr),
-            "Price index for this year, for example the consumer price index. Any base year works: only the ratio between the years is used."
+            paste("Index level for this year, for example the consumer price index with",
+                  "2015 = 100. Any reference year works: only the ratios between years are",
+                  "used.", price_period_tip)
           ),
           value = isolate(input[[id]] %||% restored[[as.character(yr)]] %||% 100),
           min = 0
         )
-      }),
-      helpText(sprintf("Mean welfare will be expressed in %s prices.", years_vec[1]))
+      })
+    )
+  })
+
+  # Fixed-reference index of a base year outside the analysis years, and the
+  # resulting price basis.
+  output$price_base_index_ui <- renderUI({
+    years_vec <- sort(parse_years(input$years))
+    if (length(years_vec) == 0L) return(NULL)
+    base <- get_price_base_year(years_vec)
+    if (is.na(base)) {
+      return(helpText("Enter the base year, a calendar year such as 2017."))
+    }
+    fixed <- identical(get_price_index_type(), "fixed")
+    tagList(
+      if (fixed && !base %in% years_vec) {
+        numericInput(
+          "price_index_base",
+          tip_label(
+            sprintf("Price index %s (base year)", base),
+            "Index level of the base year, from the same series as the analysis years."
+          ),
+          value = isolate(input$price_index_base %||% price_base_index_restored() %||% 100),
+          min = 0
+        )
+      },
+      helpText(sprintf("Mean welfare will be expressed in %s prices.", base))
     )
   })
 
@@ -2107,6 +2260,11 @@ server <- function(input, output, session) {
     }
     inputs$price_index_by_year <- get_price_index_by_year(parse_years(inputs$years))
     inputs$deflate_welfare <- isTRUE(input$deflate_welfare)
+    inputs$price_index_type <- get_price_index_type()
+    inputs$price_change_by_year <- get_price_change_by_year(parse_years(inputs$years))
+    inputs$price_base_mode <- if (identical(input$price_base_mode, "other")) "other" else "first"
+    inputs$price_base_year <- suppressWarnings(as.integer(input$price_base_year %||% NA))
+    inputs$price_index_base <- get_price_base_index()
 
     # Never persist API keys. Remember only whether the AI section was enabled
     # and the language selection; users re-enter credentials per session.
@@ -2216,6 +2374,22 @@ server <- function(input, output, session) {
       updateNumericInput(session, paste0("price_index_", .yr),
                          value = as.numeric(x$price_index_by_year[[.yr]]))
     }
+    updateRadioButtons(session, "price_index_type",
+                       selected = if (identical(x$price_index_type, "previous_year")) "previous_year" else "fixed")
+    price_change_restored(as.list(x$price_change_by_year %||% list()))
+    for (.yr in names(x$price_change_by_year %||% list())) {
+      updateNumericInput(session, paste0("price_change_", .yr),
+                         value = as.numeric(x$price_change_by_year[[.yr]]))
+    }
+    updateRadioButtons(session, "price_base_mode",
+                       selected = if (identical(x$price_base_mode, "other")) "other" else "first")
+    .price_base_year <- suppressWarnings(as.numeric(x$price_base_year %||% NA))
+    if (length(.price_base_year) == 1L && is.finite(.price_base_year)) {
+      updateNumericInput(session, "price_base_year", value = .price_base_year)
+    }
+    price_base_index_restored(suppressWarnings(as.numeric(x$price_index_base %||% 100)))
+    updateNumericInput(session, "price_index_base",
+                       value = suppressWarnings(as.numeric(x$price_index_base %||% 100)))
     update_mapping_select("rhs_domain", x$rhs_domain %||% "prov")
     update_mapping_select("shp_domain", x$shp_domain %||% "prov")
     updateSelectInput(session, "ufh_ic_criterion",
@@ -3952,7 +4126,7 @@ server <- function(input, output, session) {
       povline_value   = if (identical(input$povline_type, "numeric"))
                           povline_numeric_map else input$var_povline,
       # Mean welfare only: price index by year; welfare is expressed in
-      # constant prices of the first analysis year (R/pipeline_helpers.R).
+      # constant prices of the chosen base year (R/pipeline_helpers.R).
       price_index     = get_price_index_config(years),
       run_id          = run_id,
       run_label       = run_label_raw,

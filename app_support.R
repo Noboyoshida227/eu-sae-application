@@ -221,7 +221,8 @@ validate_app_config <- function(cfg) {
     }
   }
 
-  # Price index (mean welfare only): one positive value per analysis year.
+  # Price index (mean welfare only): one positive value per analysis year and
+  # for a base year outside the analysis years.
   price_probs <- sae_price_index_problems(cfg$price_index, years, ind_type)
   if (length(price_probs)) {
     errs <- c(errs, paste0("Price index: ", price_probs))
@@ -438,7 +439,7 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
       output_col = "povline"
     )
   }
-  # Mean welfare: constant prices of the first analysis year when a price
+  # Mean welfare: constant prices of the base year when a price
   # index was entered (same rule as the UFH and MFH steps).
   if (identical(indicator_type, "mean_welfare") &&
       sae_price_index_enabled(price_index, indicator_type)) {
