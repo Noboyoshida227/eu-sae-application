@@ -223,87 +223,6 @@ wiz_head <- tags$head(
       });
     ")),
     tags$style(HTML("
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    #cover_page {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: linear-gradient(160deg, #0f1b3d 0%, #1a2f6b 35%, #1e4d8f 65%, #2a6cb0 100%);
-      z-index: 9999; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      color: #ffffff; text-align: center;
-      animation: fadeIn 1s ease-out;
-      overflow: hidden;
-    }
-    #cover_page::before {
-      content: ''; position: absolute; top: -50%; left: -50%;
-      width: 200%; height: 200%;
-      background: radial-gradient(ellipse at 30% 20%, rgba(109,213,237,0.08) 0%, transparent 50%),
-                  radial-gradient(ellipse at 70% 80%, rgba(59,130,200,0.06) 0%, transparent 50%);
-      pointer-events: none;
-    }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    #cover_page .cover-content {
-      position: relative; z-index: 1;
-      display: flex; flex-direction: column; align-items: center;
-      max-width: 780px; padding: 0 24px;
-    }
-    #cover_page .cover-illustration {
-      margin-bottom: 1.4em;
-    }
-    #cover_page .cover-illustration img {
-      border-radius: 10px;
-      box-shadow: 0 12px 48px rgba(0,0,0,0.35), 0 2px 12px rgba(0,0,0,0.2);
-      border: 1px solid rgba(255,255,255,0.08);
-      max-height: 58vh;
-      width: auto;
-      object-fit: contain;
-    }
-    #cover_page .cover-label {
-      font-size: 0.78em; font-weight: 600; letter-spacing: 3px;
-      text-transform: uppercase; color: rgba(157,213,245,0.85);
-      margin-bottom: 0.5em;
-    }
-    #cover_page h1 {
-      font-size: 2.6em; font-weight: 700; margin: 0 0 0.2em;
-      letter-spacing: -0.5px; line-height: 1.15;
-      background: linear-gradient(180deg, #ffffff 30%, rgba(200,225,255,0.85) 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    #cover_page .subtitle {
-      font-size: 1.05em; font-weight: 300; color: rgba(220,235,255,0.85);
-      max-width: 560px; line-height: 1.55; margin-bottom: 0.3em;
-    }
-    #cover_page .cover-divider {
-      width: 60px; height: 2px; margin: 0.7em auto 0.8em;
-      background: linear-gradient(90deg, transparent, rgba(109,213,237,0.5), transparent);
-      border: none;
-    }
-    #cover_page .tagline {
-      font-size: 0.85em; font-weight: 400; color: rgba(180,210,240,0.65);
-      letter-spacing: 0.5px; margin-bottom: 1.8em;
-    }
-    #enter_app_btn {
-      font-size: 1em; font-weight: 500; padding: 14px 52px;
-      background: linear-gradient(135deg, rgba(109,213,237,0.2), rgba(59,123,213,0.25));
-      color: #fff; letter-spacing: 0.8px;
-      border: 1.5px solid rgba(109,213,237,0.4);
-      border-radius: 50px; cursor: pointer;
-      transition: all 0.35s ease;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 2px 16px rgba(0,0,0,0.15);
-    }
-    #enter_app_btn:hover {
-      background: linear-gradient(135deg, rgba(109,213,237,0.35), rgba(59,123,213,0.4));
-      border-color: rgba(109,213,237,0.7);
-      transform: translateY(-2px);
-      box-shadow: 0 6px 28px rgba(109,213,237,0.2);
-    }
-    #cover_page .cover-footer {
-      margin-top: 1.8em;
-      text-align: center; font-size: 0.75em; font-weight: 400;
-      color: rgba(180,210,240,0.35); letter-spacing: 0.3px;
-    }
     #main_app { display: none; }
     #main_app.visible { display: block; }
 
@@ -582,29 +501,8 @@ wiz_head <- tags$head(
 ui <- fluidPage(
   wiz_head,
 
-  # ---- Cover page (unchanged from app.R) ----
-  div(id = "cover_page",
-    div(class = "cover-content",
-      div(class = "cover-illustration",
-        tags$img(src = "wizassets/cover_map_spain.png",
-                 alt = "Example map: poverty rate by Spanish province, 2013",
-                 style = "width: 90%; max-width: 680px;")
-      ),
-      div(class = "cover-label", "Small Area Estimation Platform"),
-      h1("EU Poverty Mapping"),
-      div(class = "subtitle",
-        "Poverty rate estimation across NUTS-3 areas using Fay\u2013Herriot models with benchmarking and AI-assisted diagnostics"
-      ),
-      tags$hr(class = "cover-divider"),
-      div(class = "tagline",
-        "Guided setup in six steps  \u00b7  Univariate & Multivariate FH  \u00b7  Benchmarked Estimates"
-      ),
-      actionButton("enter_app_btn", "Get Started", class = "btn"),
-      div(class = "cover-footer",
-        "Release candidate for review and testing"
-      )
-    )
-  ),
+  # ---- Shared landing page ----
+  sae_landing_page(wizard = TRUE),
 
   # ---- Main app ----
   div(id = "main_app",
@@ -714,7 +612,14 @@ ui <- fluidPage(
             fileInput("population_file",
               tip_label("Domain population sizes (optional)",
                         "Optional RDS/CSV/XLSX file with domain population sizes. Supports long domain-year-population format or wide domain-by-year format; leave blank to estimate domain populations from the survey as sum(weight * household size).")),
-            uiOutput("population_active_file")
+            uiOutput("population_active_file"),
+            fileInput("cpi_file",
+              tip_label("Consumer price index (optional)",
+                        "Optional file with one country's consumer price index (CPI or HICP) by year, used only for mean welfare in constant prices (Indicator step). One row per year: a year column and one or more CPI columns, for example index levels (2015 = 100), annual indices (previous year = 100) or annual changes in %. Decimal commas are accepted. In the Indicator step you choose the columns and say how the CPI is organised. Accepted formats: .csv, .tsv, .txt, .xlsx, .xls, .rds, .dta, .sav and the other table formats."),
+              accept = c(".rds", ".RData", ".rda", ".csv", ".tsv", ".txt", ".dat",
+                         ".dta", ".sav", ".zsav", ".por", ".sas7bdat", ".xpt",
+                         ".parquet", ".feather", ".xlsx", ".xls")),
+            uiOutput("cpi_active_file")
           )
         )
       ),
@@ -1284,6 +1189,11 @@ wizard_server <- function(input, output, session) {
           }
         }
       }
+    } else if (isTRUE(input$deflate_welfare)) {
+      # Mean welfare in constant prices: every needed index value present.
+      cfg <- session$userData$get_price_index_config()
+      probs <- sae_price_index_problems(cfg, parse_years(input$years))
+      if (length(probs)) msgs <- c(msgs, paste0("Price index: ", probs, "."))
     }
     msgs
   })
@@ -1353,7 +1263,7 @@ wizard_server <- function(input, output, session) {
       run       = "Ready."
     )
     subs <- list(
-      data      = "Choose the analysis years and point the app at your survey, auxiliary and geometry files.",
+      data      = "Choose the analysis years and point the app at your survey, auxiliary and geometry files (and, for mean welfare in constant prices, a CPI file).",
       mapping   = "Tell the app which column in each file holds which variable. Red fields are names not found in the selected dataset.",
       indicator = "Choose what is being modelled: a poverty measure (FGT) or mean welfare.",
       models    = "Fay-Herriot model settings, benchmarking and covariate selection. All have defaults.",
@@ -1485,6 +1395,7 @@ wizard_server <- function(input, output, session) {
       row("Auxiliary file", wiz_file_label(input$rhs_file, "rhs_file")),
       row("Geometry file", wiz_file_label(input$shp_file, "shp_file")),
       row("Population file", wiz_file_label(input$population_file, "population_file")),
+      row("CPI file", wiz_file_label(input$cpi_file, "cpi_file")),
 
       sec("2. Mapping"),
       row("year / domain", paste(wiz_fmt(input$var_year), "/", wiz_fmt(input$var_domain))),
@@ -1514,8 +1425,8 @@ wizard_server <- function(input, output, session) {
     } else {
       rows <- c(rows, list(
         row("Currency symbol", wiz_fmt(input$currency_symbol)),
-        row("Prices", sae_price_basis_label(get_price_index_config(), parse_years(input$years),
-                                            "mean_welfare"))
+        row("Prices", sae_price_basis_label(session$userData$get_price_index_config(),
+                                            parse_years(input$years), "mean_welfare"))
       ))
     }
 

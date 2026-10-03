@@ -346,3 +346,35 @@ sae_read_input_names <- function(path, kind = c("table", "geometry")) {
   }, error = function(e) NULL)
   unique(trimws(as.character(names(obj) %||% colnames(obj) %||% character())))
 }
+
+# CPI file (one country's consumer price index by year, Data step). Text files
+# are read with the delimiter found in the header line (comma, semicolon or
+# tab, as written by Excel in many European locales) and every column kept as
+# text, so that decimal commas ("101,4") survive; sae_cpi_series()
+# (R/pipeline_helpers.R) converts the numbers. Other formats are read by
+# sae_read_table_input().
+sae_read_cpi_input <- function(path, label = "CPI file") {
+  if (is.null(path) || !nzchar(path %||% "") || !file.exists(path)) {
+    stop(label, " does not exist: ", path %||% "(blank)", call. = FALSE)
+  }
+  ext <- sae_file_ext(path)
+  if (!ext %in% c("csv", "txt", "tsv", "dat")) {
+    return(as.data.frame(sae_read_table_input(path, label)))
+  }
+  enc <- sae_text_encoding_args(path, header_only = TRUE)
+  first <- tryCatch({
+    con <- if (!is.null(enc$fileEncoding)) file(path, encoding = enc$fileEncoding) else file(path)
+    on.exit(close(con), add = TRUE)
+    readLines(con, n = 1L, warn = FALSE)
+  }, error = function(e) "")
+  first <- gsub("\"[^\"]*\"", "", first[1] %||% "")
+  counts <- c(`\t` = lengths(regmatches(first, gregexpr("\t", first, fixed = TRUE))),
+              `;` = lengths(regmatches(first, gregexpr(";", first, fixed = TRUE))),
+              `,` = lengths(regmatches(first, gregexpr(",", first, fixed = TRUE))))
+  sep <- if (max(counts) > 0) names(counts)[which.max(counts)] else ","
+  out <- sae_read_text_table(utils::read.table, path, sep = sep, header = TRUE,
+                             quote = "\"", comment.char = "", check.names = FALSE,
+                             colClasses = "character", strip.white = TRUE,
+                             blank.lines.skip = TRUE)
+  as.data.frame(out)
+}

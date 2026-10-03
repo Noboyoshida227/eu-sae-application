@@ -368,39 +368,48 @@ display: none;
 <div id="unreleased-w5k" class="section level2">
 <h2>Unreleased (w5k)</h2>
 <ul>
-<li>Mean welfare in constant prices (owner’s decisions of 1 and 2 Oct):
+<li>Mean welfare in constant prices (owner’s decisions of 1 to 3 Oct):
 the Indicator step has a new <strong>Express welfare in constant
 prices</strong> box for mean-welfare runs, with a consumer price index
-(for example the CPI or HICP) entered in either of the two ways
-statistical offices publish it (<strong>Price index type</strong>):
-index levels with a fixed reference year (for example 2015 = 100), one
-for each analysis year, or annual-average indices with the previous year
-= 100 (for example 103.6 for 3.6% inflation, as in Statistics Poland’s
-annual table), one for every year after the earliest and up to the
-latest analysis or base year, which the app chains into price levels. A
-<strong>Price base year</strong> sets the prices in which mean welfare
-is expressed: the first analysis year (default) or another year, for
-example 2017 or the last analysis year; with a fixed-reference index, a
-base year outside the analysis years needs its own index level, from the
-same series. Welfare is multiplied by the price level of the base year /
-the price level of its own year in Data Readiness and in the UFH and MFH
-steps, so all mean-welfare levels are in prices of the base year and
-changes are real changes; percentage changes do not depend on the base
-year. External mean-welfare benchmark targets are converted in the same
-way. The settings are saved with the dashboard setup, written to
-<code>app_config.yml</code> as <code>price_index</code> (enabled, index
-type, base year, values) and checked before a run (every needed index
-value present and positive; the base year a calendar year). The step
-logs, the run log, the readiness messages, the wizard review page and
-the report state the price basis; when the box is not ticked, Data
-Readiness notes that changes include inflation. Poverty runs are not
-affected. Helpers <code>sae_price_index_type()</code>,
-<code>sae_price_base_year()</code>,
+(for example the CPI or HICP) typed in by year or read from a new
+optional <strong>Consumer price index</strong> file in the Data step
+(one country’s CPI by year; the user chooses its year column and CPI
+column, and the app takes the years it needs, lists them and reports
+missing ones; CSV files separated by commas or semicolons and decimal
+commas are accepted). <strong>How the CPI is organised</strong> covers
+the three ways statistical offices publish it: index levels with a fixed
+reference year (for example 2015 = 100), one for each analysis year;
+annual-average indices with the previous year = 100 (for example 103.6
+for 3.6% inflation, as in Statistics Poland’s annual table); or annual
+changes in % (3.6). Annual changes are needed for every year after the
+earliest and up to the latest analysis or base year, and the app chains
+them into price levels. A <strong>Price base year</strong> sets the
+prices in which mean welfare is expressed: the first analysis year
+(default) or another year, for example 2017 or the last analysis year;
+with a fixed-reference index, a base year outside the analysis years
+needs its own index level, from the same series. Welfare is multiplied
+by the price level of the base year / the price level of its own year in
+Data Readiness and in the UFH and MFH steps, so all mean-welfare levels
+are in prices of the base year and changes are real changes; percentage
+changes do not depend on the base year. External mean-welfare benchmark
+targets are converted in the same way. The settings and the CPI file are
+saved with the dashboard setup; the run writes
+<code>app_config.yml</code> with <code>price_index</code> (enabled,
+index type, base year, values and, for a CPI file, its name and columns)
+and checks it before a run (every needed value present and valid; the
+base year a calendar year); the wizard’s Indicator step lists any
+problem. The step logs, the run log, the readiness messages, the wizard
+review page and the report state the price basis, with the CPI file and
+column; when the box is not ticked, Data Readiness notes that changes
+include inflation. Poverty runs are not affected. Helpers
+<code>sae_price_index_type()</code>, <code>sae_price_base_year()</code>,
 <code>sae_price_chain_years()</code>, <code>sae_price_levels()</code>,
 <code>sae_price_factors()</code>, <code>sae_apply_price_index()</code>,
-<code>sae_price_index_problems()</code> and
-<code>sae_price_basis_label()</code> in
-<code>R/pipeline_helpers.R</code>; UI helper
+<code>sae_price_index_problems()</code>,
+<code>sae_price_basis_label()</code>, <code>sae_cpi_series()</code> and
+<code>sae_cpi_guess_columns()</code> in
+<code>R/pipeline_helpers.R</code> and <code>sae_read_cpi_input()</code>
+in <code>R/input_readers.R</code>; UI helper
 <code>price_index_inputs()</code> in <code>app.R</code> (also listed in
 <code>tools/check_ui_parity.R</code>). On the Spain example (log models)
 every UFH estimate for the second year, and every direct estimate, is

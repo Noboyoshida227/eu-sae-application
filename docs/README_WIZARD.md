@@ -66,29 +66,42 @@ step 1.
 ## Wizard steps
 
 1. **Data** — country or territory, analysis years, reproducibility seed, run
-   label, and survey, auxiliary, geometry, and optional population files.
+   label, and survey, auxiliary, geometry, and optional population files. For
+   mean welfare in constant prices, an optional **Consumer price index** file
+   holds one country's CPI by year (see the Indicator step).
 2. **Mapping** — survey columns and the auxiliary/geometry join keys.
 3. **Indicator** — poverty (FGT) or mean welfare and its required settings.
    For mean welfare, tick **Express welfare in constant prices** when the
-   survey welfare is in current prices, and enter a consumer price index (for
-   example the CPI or HICP). **Price index type** sets how it is entered:
-   - **Fixed reference year** (for example 2015 = 100): the index level for
-     each analysis year;
-   - **Previous year = 100**: annual-average indices against the year before
-     (for example 103.6 for 3.6% inflation), one for every year after the
-     earliest and up to the latest analysis or base year; the app chains them.
+   survey welfare is in current prices, and give a consumer price index (for
+   example the CPI or HICP). **Price index values** says where it comes from:
+   typed in by year, or read from the CPI file chosen in the Data step. The
+   CPI file has one row per year, with a year column (for example 2013, or
+   text such as 2013A00) and one or more CPI columns; you choose the **Year
+   column** and the **CPI column**, and the app takes the years it needs and
+   shows them, or the years that are missing. CSV files separated by commas or
+   semicolons and numbers with a decimal comma (101,4) are accepted.
+   **How the CPI is organised** says how the values are reported:
+   - **Index, fixed reference year** (for example 2015 = 100): the index level
+     for each analysis year;
+   - **Index, previous year = 100**: annual-average indices against the year
+     before (for example 103.6 for 3.6% inflation, as in Statistics Poland's
+     annual table);
+   - **Annual change in %**: the same as a rate (for example 3.6).
 
+   Annual changes are needed for every year after the earliest and up to the
+   latest analysis or base year; the app chains them into price levels.
    Welfare is multiplied by the price level of the base year / the price level
    of its own year, so all mean-welfare levels are in prices of the base year
    and changes are real changes. **Price base year** is the first analysis
    year by default; choose **Another year** to use, for example, 2017 prices
-   or the prices of the last analysis year. With a fixed-reference index, a
-   base year outside the analysis years needs its own index level, from the
-   same series. Percentage changes between years are the same whatever the
-   base year; only the levels change. Use annual averages for annual incomes,
-   not December-on-December or monthly indices, and if incomes refer to an
-   earlier period than the survey year (in EU-SILC, the previous calendar
-   year), enter the index of that period.
+   or the prices of the last analysis year. With a fixed-reference index, the
+   base year needs its own index level, from the same series (typed in, or
+   found in the CPI file). Percentage changes between years are the same
+   whatever the base year; only the levels change. Use annual averages for
+   annual incomes, not December-on-December or monthly indices, and if incomes
+   refer to an earlier period than the survey year (in EU-SILC, the previous
+   calendar year), use the index of that period. The run log, the readiness
+   messages, the review page and the report name the CPI file and column.
 4. **Models** — UFH and MFH choices, MCPE bootstrap replicates, benchmarking,
    covariate selection, and PSU consistency.
 5. **AI Assistant** — optional external-transfer consent, API key, and output

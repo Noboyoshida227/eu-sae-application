@@ -116,3 +116,4 @@ tools/bump_version.py
 tools/check_ui_parity.R
 tools/make_cover_map.R
 www/cover_map_spain.png
+R/landing_page.R

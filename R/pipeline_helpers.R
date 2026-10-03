@@ -822,16 +822,23 @@ sae_ic_none_problem <- function(model, lasso_enabled, vars_y1, vars_y2,
 # base year. Poverty runs are never deflated (the poverty line is already in
 # each year's prices).
 #
-# Two kinds of index are accepted, as statistical offices publish both:
-#   index_type: fixed          an index with a fixed reference year (for
-#                              example 2015 = 100), one value per analysis
-#                              year and for a base year outside them;
-#   index_type: previous_year  annual indices with the previous year = 100
-#                              (for example 103.6 for 3.6% annual-average
-#                              inflation), one value for every year after the
-#                              earliest and up to the latest of the analysis
-#                              years and the base year. They are chained:
-#                              P(t) = P(t - 1) * index(t) / 100.
+# Three ways of reporting the index are accepted, as statistical offices
+# publish all of them:
+#   index_type: fixed           an index with a fixed reference year (for
+#                               example 2015 = 100), one value per analysis
+#                               year and for a base year outside them;
+#   index_type: previous_year   annual indices with the previous year = 100
+#                               (for example 103.6 for 3.6% annual-average
+#                               inflation), one value for every year after
+#                               the earliest and up to the latest of the
+#                               analysis years and the base year. They are
+#                               chained: P(t) = P(t - 1) * index(t) / 100;
+#   index_type: percent_change  annual changes in % (for example 3.6), for the
+#                               same years; index(t) = 100 + change(t).
+# The values are typed in by year or read from a CPI file (one country's
+# CPI by year) chosen in the Data step; the app then records the file and
+# columns in source_file, year_column and value_column, and any problem
+# reading them in source_problem.
 #
 # Config shape (app_config.yml):
 #   price_index:
@@ -839,6 +846,9 @@ sae_ic_none_problem <- function(model, lasso_enabled, vars_y1, vars_y2,
 #     index_type: fixed          # optional; default fixed
 #     base_year: 2017            # optional; default: first analysis year
 #     values: {"2012": 100, "2013": 101.4, "2017": 104.9}
+#     source_file: cpi.xlsx      # optional (CPI file)
+#     year_column: year
+#     value_column: cpi
 
 # Named numeric vector of index values by year (no recycling of a single value,
 # unlike the poverty-line helper: every year needs its own index).
@@ -856,15 +866,22 @@ sae_price_index_enabled <- function(price_index, indicator_type = "mean_welfare"
     is.list(price_index) && isTRUE(as.logical(price_index$enabled %||% FALSE))
 }
 
-# "fixed" (index with a fixed reference year; the default) or "previous_year"
-# (annual indices, previous year = 100). NA for any other value.
+# "fixed" (index with a fixed reference year; the default), "previous_year"
+# (annual indices, previous year = 100) or "percent_change" (annual changes
+# in %). NA for any other value.
 sae_price_index_type <- function(price_index) {
   raw <- if (is.list(price_index)) price_index$index_type else NULL
   if (is.null(raw) || length(raw) == 0L || is.na(raw[[1]]) || !nzchar(trimws(as.character(raw[[1]])))) {
     return("fixed")
   }
   type <- trimws(as.character(raw[[1]]))
-  if (type %in% c("fixed", "previous_year")) type else NA_character_
+  if (type %in% c("fixed", "previous_year", "percent_change")) type else NA_character_
+}
+
+# Years whose value is an annual change (previous_year, percent_change) rather
+# than an index level.
+sae_price_index_is_chain <- function(price_index) {
+  sae_price_index_type(price_index) %in% c("previous_year", "percent_change")
 }
 
 # The price base year as a whole number: price_index$base_year, or the first
@@ -903,45 +920,58 @@ sae_price_index_problems <- function(price_index, years_keep,
   type <- sae_price_index_type(price_index)
   probs <- character(0)
   if (is.na(type)) {
-    return(sprintf("price index type must be 'fixed' or 'previous_year' (got '%s')",
+    return(sprintf("price index type must be 'fixed', 'previous_year' or 'percent_change' (got '%s')",
                    as.character(price_index$index_type[[1]])))
   }
+  src <- sae_price_source_text(price_index)
+  where <- if (nzchar(src)) sprintf(" in the %s", src) else ""
+  source_problem <- as.character(unlist(price_index$source_problem %||% character(0)))
+  source_problem <- source_problem[!is.na(source_problem) & nzchar(source_problem)]
+  if (length(source_problem)) probs <- c(probs, source_problem)
   base <- sae_price_base_year(price_index, years_keep)
   if (is.na(base)) {
     probs <- c(probs, "the price base year must be a calendar year, for example 2017")
   }
-  if (identical(type, "previous_year")) {
+  if (sae_price_index_is_chain(price_index)) {
     need <- as.character(sae_price_chain_years(price_index, years_keep))
     missing <- setdiff(need, names(vals))
+    what <- if (identical(type, "percent_change")) "annual price change (%)" else
+      "annual price index (previous year = 100)"
     if (length(missing)) {
-      probs <- c(probs, sprintf("annual price index (previous year = 100) missing for year(s) %s",
-                                paste(missing, collapse = ", ")))
+      probs <- c(probs, sprintf("%s missing for year(s) %s%s", what,
+                                paste(missing, collapse = ", "), where))
     }
     have <- intersect(need, names(vals))
-    bad <- have[!is.finite(vals[have]) | vals[have] <= 0]
+    bad <- if (identical(type, "percent_change")) {
+      have[!is.finite(vals[have]) | vals[have] <= -100]
+    } else {
+      have[!is.finite(vals[have]) | vals[have] <= 0]
+    }
     if (length(bad)) {
-      probs <- c(probs, sprintf("price index must be a positive number (year(s) %s)",
-                                paste(bad, collapse = ", ")))
+      probs <- c(probs, sprintf("%s (year(s) %s%s)",
+                                if (identical(type, "percent_change")) "annual price change must be a number above -100"
+                                else "price index must be a positive number",
+                                paste(bad, collapse = ", "), where))
     }
     return(probs)
   }
   missing <- setdiff(years_chr, names(vals))
   if (length(missing)) {
-    probs <- c(probs, sprintf("price index missing for year(s) %s",
-                              paste(missing, collapse = ", ")))
+    probs <- c(probs, sprintf("price index missing for year(s) %s%s",
+                              paste(missing, collapse = ", "), where))
   }
   have <- intersect(years_chr, names(vals))
   bad <- have[!is.finite(vals[have]) | vals[have] <= 0]
   if (length(bad)) {
-    probs <- c(probs, sprintf("price index must be a positive number (year(s) %s)",
-                              paste(bad, collapse = ", ")))
+    probs <- c(probs, sprintf("price index must be a positive number (year(s) %s%s)",
+                              paste(bad, collapse = ", "), where))
   }
   if (!is.na(base) && !as.character(base) %in% years_chr) {
     b <- as.character(base)
     if (!b %in% names(vals)) {
-      probs <- c(probs, sprintf("price index missing for the base year %s", b))
+      probs <- c(probs, sprintf("price index missing for the base year %s%s", b, where))
     } else if (!is.finite(vals[[b]]) || vals[[b]] <= 0) {
-      probs <- c(probs, sprintf("price index must be a positive number (base year %s)", b))
+      probs <- c(probs, sprintf("price index must be a positive number (base year %s%s)", b, where))
     }
   }
   probs
@@ -954,9 +984,11 @@ sae_price_levels <- function(price_index, years_keep) {
   vals <- sae_price_index_values(price_index$values)
   base <- sae_price_base_year(price_index, years_keep)
   years <- sort(unique(c(as.integer(years_keep), base)))
-  if (!identical(sae_price_index_type(price_index), "previous_year")) {
+  if (!sae_price_index_is_chain(price_index)) {
     return(stats::setNames(as.numeric(vals[as.character(years)]), as.character(years)))
   }
+  # Annual changes in % become indices with the previous year = 100.
+  if (identical(sae_price_index_type(price_index), "percent_change")) vals <- 100 + vals
   span <- seq.int(min(years), max(years))
   lev <- stats::setNames(rep(100, length(span)), as.character(span))
   for (k in seq_along(span)[-1L]) {
@@ -1018,17 +1050,128 @@ sae_price_basis_label <- function(price_index, years_keep,
   base_int <- sae_price_base_year(price_index, years_keep)
   base <- if (is.na(base_int)) "(base year not set)" else as.character(base_int)
   fmt <- function(y) as.character(signif(as.numeric(vals[y]), 8))
-  if (identical(sae_price_index_type(price_index), "previous_year")) {
+  src <- sae_price_source_text(price_index)
+  src_txt <- if (nzchar(src)) paste0("; from the ", src) else ""
+  type <- sae_price_index_type(price_index)
+  if (sae_price_index_is_chain(price_index)) {
     chain <- as.character(sae_price_chain_years(price_index, years_keep))
-    return(sprintf("constant %s prices (annual price index, previous year = 100: %s)", base,
+    what <- if (identical(type, "percent_change")) "annual price change in %" else
+      "annual price index, previous year = 100"
+    return(sprintf("constant %s prices (%s: %s%s)", base, what,
                    if (length(chain)) paste(sprintf("%s = %s", chain, fmt(chain)), collapse = ", ")
-                   else "none needed"))
+                   else "none needed", src_txt))
   }
   index_txt <- paste(sprintf("%s = %s", years_chr, fmt(years_chr)), collapse = ", ")
   if (!is.na(base_int) && !base %in% years_chr) {
     index_txt <- sprintf("%s; base year %s = %s", index_txt, base, fmt(base))
   }
-  sprintf("constant %s prices (price index: %s)", base, index_txt)
+  sprintf("constant %s prices (price index: %s%s)", base, index_txt, src_txt)
+}
+
+# "CPI file cpi.xlsx, column CPI" when the values came from a CPI file, else "".
+sae_price_source_text <- function(price_index) {
+  if (!is.list(price_index)) return("")
+  f <- as.character(unlist(price_index$source_file %||% ""))[1]
+  if (is.na(f) || !nzchar(f)) return("")
+  col <- as.character(unlist(price_index$value_column %||% ""))[1]
+  if (is.na(col) || !nzchar(col)) sprintf("CPI file %s", basename(f)) else
+    sprintf("CPI file %s, column %s", basename(f), col)
+}
+
+# ---- CPI file (one country's consumer price index by year) -------------------
+# Years: numbers, or text holding a four-digit year ("2013", "2013A00",
+# "2013-01-01"). Values: numbers, or text with a decimal comma ("101,4") or
+# spaces as thousands separators.
+sae_cpi_parse_year <- function(x) {
+  if (is.numeric(x)) {
+    y <- suppressWarnings(as.integer(round(x)))
+    y[!is.finite(x) | abs(x - round(x)) > 1e-8] <- NA_integer_
+  } else {
+    x <- as.character(x)
+    hit <- regexpr("(?<![0-9])(19|20|21)[0-9]{2}(?![0-9])", x, perl = TRUE)
+    found <- !is.na(hit) & hit > 0
+    y <- rep(NA_integer_, length(x))
+    y[found] <- as.integer(regmatches(x, hit))
+  }
+  y[!is.na(y) & (y < 1900 | y > 2100)] <- NA_integer_
+  y
+}
+
+sae_cpi_parse_number <- function(x) {
+  if (is.numeric(x)) return(as.numeric(x))
+  s <- trimws(gsub("[\\s\u00a0\u202f]", "", as.character(x), perl = TRUE))
+  s[s %in% c("", ":", "-", "..", "NA", "n/a")] <- NA_character_
+  has_comma <- grepl(",", s, fixed = TRUE); has_dot <- grepl(".", s, fixed = TRUE)
+  comma_last <- has_comma & (!has_dot | regexpr(",[^,]*$", s) > regexpr("\\.[^.]*$", s))
+  s[comma_last] <- gsub(",", ".", gsub(".", "", s[comma_last], fixed = TRUE), fixed = TRUE)
+  s[!comma_last] <- gsub(",", "", s[!comma_last], fixed = TRUE)
+  suppressWarnings(as.numeric(s))
+}
+
+# Guess the year column and the CPI column of a CPI table.
+sae_cpi_guess_columns <- function(df) {
+  nm <- names(df)
+  if (!length(nm)) return(list(year = "", value = ""))
+  year_names <- "^(year|years|rok|anno|ano|a\u00f1o|annee|ann\u00e9e|jahr|time|time_period|period|date)$"
+  year <- nm[grepl(year_names, nm, ignore.case = TRUE, perl = TRUE)][1]
+  if (is.na(year)) {
+    ok <- vapply(nm, function(n) {
+      y <- sae_cpi_parse_year(df[[n]])
+      sum(!is.na(y)) >= 2L && mean(!is.na(y)) >= 0.8 && !anyDuplicated(y[!is.na(y)])
+    }, logical(1))
+    year <- nm[ok][1]
+  }
+  if (is.na(year)) year <- ""
+  others <- setdiff(nm, year)
+  numeric_ok <- vapply(others, function(n) {
+    v <- sae_cpi_parse_number(df[[n]])
+    sum(is.finite(v)) >= 2L && mean(is.finite(v)) >= 0.8
+  }, logical(1))
+  cand <- others[numeric_ok]
+  pref <- cand[grepl("cpi|hicp|index|inflation|price|obs_value|value", cand, ignore.case = TRUE)]
+  value <- c(pref, cand)[1]
+  list(year = year, value = if (is.na(value)) "" else value)
+}
+
+# Values by year from a CPI table: list(values = named numeric sorted by year,
+# problems = character(), notes = character()).
+sae_cpi_series <- function(df, year_col, value_col) {
+  out <- list(values = stats::setNames(numeric(0), character(0)),
+              problems = character(0), notes = character(0))
+  if (is.null(df) || !nrow(df)) {
+    out$problems <- "the CPI file has no rows"
+    return(out)
+  }
+  for (col in c(year_col, value_col)) {
+    if (!nzchar(col %||% "") || !col %in% names(df)) {
+      out$problems <- c(out$problems, sprintf("column '%s' is not in the CPI file", col %||% ""))
+    }
+  }
+  if (length(out$problems)) return(out)
+  y <- sae_cpi_parse_year(df[[year_col]])
+  v <- sae_cpi_parse_number(df[[value_col]])
+  keep <- !is.na(y) & is.finite(v)
+  if (any(!is.na(y) & !is.finite(v))) {
+    out$notes <- c(out$notes, sprintf("no number in column '%s' for year(s) %s", value_col,
+                                      paste(sort(unique(y[!is.na(y) & !is.finite(v)])), collapse = ", ")))
+  }
+  y <- y[keep]; v <- v[keep]
+  if (!length(y)) {
+    out$problems <- sprintf("no year with a number found in columns '%s' and '%s'", year_col, value_col)
+    return(out)
+  }
+  dup <- unique(y[duplicated(y)])
+  clash <- dup[vapply(dup, function(d) length(unique(v[y == d])) > 1L, logical(1))]
+  if (length(clash)) {
+    out$problems <- sprintf(paste("the CPI file has different values for the same year (%s);",
+                                  "keep one row per year, or choose another column"),
+                            paste(sort(clash), collapse = ", "))
+    return(out)
+  }
+  keep <- !duplicated(y)
+  ord <- order(y[keep])
+  out$values <- stats::setNames(v[keep][ord], as.character(y[keep][ord]))
+  out
 }
 
 # ---- Percentage change of a mean (mean-welfare runs) --------------------------

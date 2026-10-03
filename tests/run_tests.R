@@ -1080,6 +1080,49 @@ check(isTRUE(all.equal(sae_price_factors(.pc_17, c(2012L, 2013L)), sae_price_fac
         !isTRUE(validate_app_config(.mw_cfg(list(enabled = TRUE, index_type = "previous_year", base_year = 2017L,
                                                  values = list("2013" = 101.4))))$valid),
       "price index type: previous year = 100 indices are chained and match a fixed-reference index")
+# Annual changes in % (index = 100 + change) and CPI files (one country's CPI by year).
+.pp_17 <- list(enabled = TRUE, index_type = "percent_change", base_year = 2017L,
+               values = list("2013" = 1.4, "2014" = 1.0, "2015" = 0.5, "2016" = 0.6, "2017" = .i17 - 100),
+               source_file = "C:/data/cpi_pl.xlsx", value_column = "rate")
+check(isTRUE(all.equal(sae_price_factors(.pp_17, c(2012L, 2013L)), sae_price_factors(.pc_17, c(2012L, 2013L)))) &&
+        length(sae_price_index_problems(modifyList(.pp_17, list(values = list("2013" = 0, "2014" = -1, "2015" = 0,
+                                                                              "2016" = 0, "2017" = 0))),
+                                        c(2012L, 2013L))) == 0L &&
+        identical(sae_price_index_problems(list(enabled = TRUE, index_type = "percent_change", base_year = 2014L,
+                                                values = list("2013" = 1, "2014" = -100)), c(2012L, 2013L)),
+                  "annual price change must be a number above -100 (year(s) 2014)") &&
+        grepl("annual price change in %: 2013 = 1.4, 2014 = 1, 2015 = 0.5, 2016 = 0.6, 2017 = 1.3", 
+              sae_price_basis_label(.pp_17, c(2012L, 2013L)), fixed = TRUE) &&
+        grepl("; from the CPI file cpi_pl.xlsx, column rate)", sae_price_basis_label(.pp_17, c(2012L, 2013L)), fixed = TRUE) &&
+        identical(sae_price_index_problems(list(enabled = TRUE, source_file = "cpi.csv", value_column = "x",
+                                                source_problem = "no CPI file is selected", values = list()),
+                                           c(2012L, 2013L))[1], "no CPI file is selected") &&
+        grepl("in the CPI file cpi.csv, column x", sae_price_index_problems(
+          list(enabled = TRUE, source_file = "cpi.csv", value_column = "x", values = list("2012" = 100)),
+          c(2012L, 2013L)), fixed = TRUE),
+      "price index type: annual change in % is chained like previous year = 100; file source in labels and problems")
+check(identical(sae_cpi_parse_year(c("2012", "2013A00", "2014-01-01", NA, "abc", "1850")),
+                c(2012L, 2013L, 2014L, NA, NA, NA)) &&
+        identical(sae_cpi_parse_year(c(2012, 2013.5)), c(2012L, NA)) &&
+        isTRUE(all.equal(sae_cpi_parse_number(c("101,4", "1 014,3", "1,014.3", "103.6", ":", " 99,9 ")),
+                         c(101.4, 1014.3, 1014.3, 103.6, NA, 99.9))),
+      "CPI file: years from numbers or text, numbers with decimal commas")
+.cpi_csv <- tempfile(fileext = ".csv")
+writeLines(c("Rok;Wskaznik (rok poprzedni = 100);Indeks 2015=100",
+             "2011;104,3;97,2", "2012;103,7;100,8", "2013;100,9;101,7", "2013;100,9;101,7", "2014;;101,7"),
+           .cpi_csv)
+.cpi_df <- sae_read_cpi_input(.cpi_csv)
+.cpi_guess <- sae_cpi_guess_columns(.cpi_df)
+.cpi_ser <- sae_cpi_series(.cpi_df, .cpi_guess$year, .cpi_guess$value)
+.cpi_clash <- .cpi_df; .cpi_clash[4, 2] <- "101,0"
+check(identical(ncol(.cpi_df), 3L) &&
+        identical(unlist(.cpi_guess), c(year = "Rok", value = "Wskaznik (rok poprzedni = 100)")) &&
+        isTRUE(all.equal(.cpi_ser$values, c(`2011` = 104.3, `2012` = 103.7, `2013` = 100.9))) &&
+        length(.cpi_ser$problems) == 0L && grepl("2014", .cpi_ser$notes) &&
+        grepl("different values for the same year (2013)",
+              sae_cpi_series(.cpi_clash, "Rok", "Wskaznik (rok poprzedni = 100)")$problems, fixed = TRUE) &&
+        grepl("not in the CPI file", sae_cpi_series(.cpi_df, "year", "cpi")$problems[1], fixed = TRUE),
+      "CPI file: semicolon CSV with decimal commas, column guess, duplicate and missing years")
 # Percentage changes do not depend on the base year (both years scale by the same constant).
 .pc_a <- sae_percent_change(m1 = 1000, m2 = 1030 * 100 / 101.4, mse1 = 25, mse2 = 30, mse_diff = 40)
 .k <- 104.9 / 100
@@ -1107,6 +1150,10 @@ check(grepl('checkboxInput("deflate_welfare"', .app_txt, fixed = TRUE) &&
         grepl('uiOutput("price_index_by_year_ui")', .wiz_txt, fixed = TRUE) &&
         grepl("price_index_inputs(),", .app_txt, fixed = TRUE) &&
         grepl("price_index_inputs(),", .wiz_txt, fixed = TRUE) &&
+        grepl('fileInput("cpi_file"', .app_txt, fixed = TRUE) &&
+        grepl('fileInput("cpi_file"', .wiz_txt, fixed = TRUE) &&
+        grepl("session$userData$get_price_index_config <- get_price_index_config", .app_txt, fixed = TRUE) &&
+        !grepl("[^$]get_price_index_config\\(", .wiz_txt) &&
         grepl('uiOutput("price_base_index_ui")', .wiz_txt, fixed = TRUE) &&
         grepl("output$price_base_index_ui <- renderUI", .app_txt, fixed = TRUE) &&
         grepl("price_index     = get_price_index_config(years)", .app_txt, fixed = TRUE) &&

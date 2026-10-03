@@ -125,6 +125,7 @@ source("R/input_paths.R")
 source("R/pipeline_helpers.R")
 source("R/release_controls.R")
 source("app_support.R")
+source("R/landing_page.R")
 source("R/validation_checks.R")
 source("R/multilingual.R")
 source("R/llm_assistant.R")
@@ -188,7 +189,8 @@ dashboard_setup_defaults <- function() {
       rhs_file = "",
       shp_file = "",
       regional_benchmark_file = "",
-      population_file = ""
+      population_file = "",
+      cpi_file = ""
     ),
     inputs = list(
       years = "2012,2013",
@@ -215,8 +217,12 @@ dashboard_setup_defaults <- function() {
       currency_symbol = "EUR",
       deflate_welfare = FALSE,
       price_index_by_year = list(),
+      price_index_source = "manual",
+      cpi_year_col = "",
+      cpi_value_col = "",
       price_index_type = "fixed",
       price_change_by_year = list(),
+      price_pct_by_year = list(),
       price_base_mode = "first",
       price_base_year = NA_integer_,
       price_index_base = 100,
@@ -700,33 +706,55 @@ ic_criterion_input <- function(prefix, selected, tip_text) {
 }
 
 # Price-index settings for mean welfare in constant prices, used by the
-# dashboard and the wizard: the kind of index (a fixed reference year, or the
-# previous year = 100) and the price base year (the first analysis year by
-# default, or another calendar year such as 2017). The server renders the
-# index boxes (output$price_index_by_year_ui, output$price_base_index_ui) and
-# records the choices in price_index (get_price_index_config()).
+# dashboard and the wizard: where the values come from (typed in by year, or
+# the CPI file chosen in the Data step, with its year and CPI columns), how
+# the CPI is organised (index with a fixed reference year, index with the
+# previous year = 100, or annual change in %) and the price base year (the
+# first analysis year by default, or another calendar year such as 2017).
+# The server renders the per-year boxes (output$price_index_by_year_ui,
+# output$price_base_index_ui) and the CPI file check (output$cpi_file_status)
+# and records the choices in price_index (get_price_index_config()).
 price_index_inputs <- function() {
   tagList(
+    radioButtons("price_index_source",
+      tip_label("Price index values",
+                paste("Type the index in by year, or read it from the CPI file chosen in the",
+                      "Data step (one country's CPI by year). With the file, choose its year",
+                      "column and CPI column below; the app takes the years it needs.")),
+      choices = c("Type them in by year" = "manual",
+                  "Read them from the CPI file (Data step)" = "file"),
+      selected = "manual"),
+    conditionalPanel(
+      condition = "input.price_index_source == 'file'",
+      selectInput("cpi_year_col",
+        tip_label("Year column", "Column of the CPI file that holds the year (for example 2013, or text such as 2013A00)."),
+        choices = character(0)),
+      selectInput("cpi_value_col",
+        tip_label("CPI column", "Column of the CPI file with the values to use. Say below how they are organised."),
+        choices = character(0)),
+      uiOutput("cpi_file_status")
+    ),
     radioButtons("price_index_type",
-      tip_label("Price index type",
-                paste("How the index is published. 'Fixed reference year': index levels",
-                      "against one reference year (for example HICP 2015 = 100); enter one",
-                      "for each analysis year. 'Previous year = 100': annual-average indices",
-                      "against the year before (for example 103.6 for 3.6% inflation, as in",
-                      "Statistics Poland's annual table); enter one for every year after the",
-                      "earliest and up to the latest analysis or base year, and the app chains",
-                      "them. Use annual averages for annual incomes, not December-on-December",
-                      "or monthly indices.")),
-      choices = c("Fixed reference year (e.g. 2015 = 100)" = "fixed",
-                  "Previous year = 100" = "previous_year"),
+      tip_label("How the CPI is organised",
+                paste("How the values are reported. 'Index, fixed reference year': index levels",
+                      "against one reference year (for example HICP 2015 = 100), needed for each",
+                      "analysis year. 'Index, previous year = 100': annual-average indices against",
+                      "the year before (for example 103.6 for 3.6% inflation, as in Statistics",
+                      "Poland's annual table). 'Annual change in %': the same as a rate (3.6).",
+                      "Annual changes are needed for every year after the earliest and up to the",
+                      "latest analysis or base year, and the app chains them. Use annual averages",
+                      "for annual incomes, not December-on-December or monthly figures.")),
+      choices = c("Index, fixed reference year (e.g. 2015 = 100)" = "fixed",
+                  "Index, previous year = 100 (e.g. 103.6)" = "previous_year",
+                  "Annual change in % (e.g. 3.6)" = "percent_change"),
       selected = "fixed"),
     radioButtons("price_base_mode",
       tip_label("Price base year",
                 paste("Year whose prices mean welfare is expressed in. Choose 'Another year'",
                       "for, say, 2017 prices or the prices of the last analysis year. With a",
-                      "fixed-reference index, a base year outside the analysis years needs its",
-                      "own index value, from the same series. Percentage changes between years",
-                      "do not depend on the base year; only the levels do.")),
+                      "fixed-reference index typed in by year, a base year outside the analysis",
+                      "years needs its own index value, from the same series. Percentage changes",
+                      "between years do not depend on the base year; only the levels do.")),
       choices = c("First analysis year" = "first", "Another year" = "other"),
       selected = "first", inline = TRUE),
     conditionalPanel(
@@ -810,87 +838,6 @@ ui <- fluidPage(
       });
     ")),
     tags$style(HTML("
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    #cover_page {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: linear-gradient(160deg, #0f1b3d 0%, #1a2f6b 35%, #1e4d8f 65%, #2a6cb0 100%);
-      z-index: 9999; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      color: #ffffff; text-align: center;
-      animation: fadeIn 1s ease-out;
-      overflow: hidden;
-    }
-    #cover_page::before {
-      content: ''; position: absolute; top: -50%; left: -50%;
-      width: 200%; height: 200%;
-      background: radial-gradient(ellipse at 30% 20%, rgba(109,213,237,0.08) 0%, transparent 50%),
-                  radial-gradient(ellipse at 70% 80%, rgba(59,130,200,0.06) 0%, transparent 50%);
-      pointer-events: none;
-    }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    #cover_page .cover-content {
-      position: relative; z-index: 1;
-      display: flex; flex-direction: column; align-items: center;
-      max-width: 780px; padding: 0 24px;
-    }
-    #cover_page .cover-illustration {
-      margin-bottom: 1.4em;
-    }
-    #cover_page .cover-illustration img {
-      border-radius: 10px;
-      box-shadow: 0 12px 48px rgba(0,0,0,0.35), 0 2px 12px rgba(0,0,0,0.2);
-      border: 1px solid rgba(255,255,255,0.08);
-      max-height: 58vh;
-      width: auto;
-      object-fit: contain;
-    }
-    #cover_page .cover-label {
-      font-size: 0.78em; font-weight: 600; letter-spacing: 3px;
-      text-transform: uppercase; color: rgba(157,213,245,0.85);
-      margin-bottom: 0.5em;
-    }
-    #cover_page h1 {
-      font-size: 2.6em; font-weight: 700; margin: 0 0 0.2em;
-      letter-spacing: -0.5px; line-height: 1.15;
-      background: linear-gradient(180deg, #ffffff 30%, rgba(200,225,255,0.85) 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    #cover_page .subtitle {
-      font-size: 1.05em; font-weight: 300; color: rgba(220,235,255,0.85);
-      max-width: 560px; line-height: 1.55; margin-bottom: 0.3em;
-    }
-    #cover_page .cover-divider {
-      width: 60px; height: 2px; margin: 0.7em auto 0.8em;
-      background: linear-gradient(90deg, transparent, rgba(109,213,237,0.5), transparent);
-      border: none;
-    }
-    #cover_page .tagline {
-      font-size: 0.85em; font-weight: 400; color: rgba(180,210,240,0.65);
-      letter-spacing: 0.5px; margin-bottom: 1.8em;
-    }
-    #enter_app_btn {
-      font-size: 1em; font-weight: 500; padding: 14px 52px;
-      background: linear-gradient(135deg, rgba(109,213,237,0.2), rgba(59,123,213,0.25));
-      color: #fff; letter-spacing: 0.8px;
-      border: 1.5px solid rgba(109,213,237,0.4);
-      border-radius: 50px; cursor: pointer;
-      transition: all 0.35s ease;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 2px 16px rgba(0,0,0,0.15);
-    }
-    #enter_app_btn:hover {
-      background: linear-gradient(135deg, rgba(109,213,237,0.35), rgba(59,123,213,0.4));
-      border-color: rgba(109,213,237,0.7);
-      transform: translateY(-2px);
-      box-shadow: 0 6px 28px rgba(109,213,237,0.2);
-    }
-    #cover_page .cover-footer {
-      margin-top: 1.8em;
-      text-align: center; font-size: 0.75em; font-weight: 400;
-      color: rgba(180,210,240,0.35); letter-spacing: 0.3px;
-    }
     #main_app { display: none; }
     #main_app.visible { display: block; }
 
@@ -982,30 +929,8 @@ ui <- fluidPage(
     }
   "))),
 
-  div(id = "cover_page",
-    div(class = "cover-content",
-      div(class = "cover-illustration",
-        tags$img(src = "cover_map_spain.png",
-                 alt = "Example map: poverty rate by Spanish province, 2013",
-                 style = "width: 90%; max-width: 680px;")
-      ),
-      div(class = "cover-label", "Small Area Estimation Platform"),
-      h1("EU Poverty Mapping"),
-      div(class = "subtitle",
-        "Poverty rate estimation across NUTS-3 areas using Fay\u2013Herriot models with benchmarking and AI-assisted diagnostics"
-      ),
-      tags$hr(class = "cover-divider"),
-      div(class = "tagline",
-        "Univariate & Multivariate FH  \u00b7  Benchmarked Estimates  \u00b7  Automated Reporting"
-      ),
-      actionButton("enter_app_btn", "Get Started", class = "btn"),
-      div(class = "cover-footer",
-        "Release candidate for review and testing"
-      )
-    )
-  ),
+  sae_landing_page(wizard = FALSE),
 
-  # ---- Main App (hidden until cover is dismissed) ----
   div(id = "main_app",
     titlePanel("EU Poverty Mapping App"),
     sidebarLayout(
@@ -1143,6 +1068,13 @@ ui <- fluidPage(
         tip_label("Domain population sizes (optional)",
                   "Optional RDS/CSV/XLSX file with domain population sizes. Supports long domain-year-population format or wide domain-by-year format; leave blank to estimate domain populations from the survey as sum(weight * household size).")),
       uiOutput("population_active_file"),
+      fileInput("cpi_file",
+        tip_label("Consumer price index (optional)",
+                  "Optional file with one country's consumer price index (CPI or HICP) by year, used only for mean welfare in constant prices (Indicator step). One row per year: a year column and one or more CPI columns, for example index levels (2015 = 100), annual indices (previous year = 100) or annual changes in %. Decimal commas are accepted. In the Indicator step you choose the columns and say how the CPI is organised. Accepted formats: .csv, .tsv, .txt, .xlsx, .xls, .rds, .dta, .sav and the other table formats."),
+        accept = c(".rds", ".RData", ".rda", ".csv", ".tsv", ".txt", ".dat",
+                   ".dta", ".sav", ".zsav", ".por", ".sas7bdat", ".xpt",
+                   ".parquet", ".feather", ".xlsx", ".xls")),
+      uiOutput("cpi_active_file"),
       tags$hr(),
 
       # ---- Variable mapping ----
@@ -1988,23 +1920,33 @@ server <- function(input, output, session) {
   # before the (hidden) per-year inputs have been rendered.
   price_index_restored <- reactiveVal(list())
   price_change_restored <- reactiveVal(list())
+  price_pct_restored <- reactiveVal(list())
   price_base_index_restored <- reactiveVal(NULL)
+  cpi_cols_restored <- reactiveVal(list(year = "", value = ""))
 
   get_price_index_type <- function() {
-    if (identical(input$price_index_type, "previous_year")) "previous_year" else "fixed"
+    type <- input$price_index_type %||% "fixed"
+    if (type %in% c("previous_year", "percent_change")) type else "fixed"
+  }
+
+  price_from_file <- function() identical(input$price_index_source, "file")
+
+  # Values typed in by year: input <prefix><year>, else the restored value,
+  # else the default (100 for an index, 0 for a change in %).
+  typed_values <- function(prefix, years, restored, default) {
+    years <- sort(as.integer(years))
+    vals <- lapply(years, function(yr) {
+      val <- input[[paste0(prefix, yr)]]
+      if (is.null(val)) val <- restored[[as.character(yr)]] %||% default
+      as.numeric(val)
+    })
+    names(vals) <- as.character(years)
+    vals
   }
 
   # Fixed-reference index: one value per analysis year (inputs price_index_<year>).
   get_price_index_by_year <- function(years_vec = parse_years(input$years)) {
-    years_vec <- sort(as.integer(years_vec))
-    restored <- price_index_restored()
-    vals <- lapply(years_vec, function(yr) {
-      val <- input[[paste0("price_index_", yr)]]
-      if (is.null(val)) val <- restored[[as.character(yr)]] %||% 100
-      as.numeric(val)
-    })
-    names(vals) <- as.character(years_vec)
-    vals
+    typed_values("price_index_", years_vec, price_index_restored(), 100)
   }
 
   # Price base year: the first analysis year, or the year entered under
@@ -2017,22 +1959,18 @@ server <- function(input, output, session) {
     sae_price_base_year(list(base_year = input$price_base_year %||% NA), years_vec)
   }
 
-  # Previous year = 100: the years that need an annual index, and their values
-  # (inputs price_change_<year>).
+  # Annual changes (previous year = 100, or in %): the years that need one,
+  # and the values typed in (inputs price_change_<year> and price_pct_<year>).
   get_price_chain_years <- function(years_vec = parse_years(input$years)) {
     sae_price_chain_years(list(base_year = get_price_base_year(years_vec)), years_vec)
   }
 
   get_price_change_by_year <- function(years_vec = parse_years(input$years)) {
-    chain <- get_price_chain_years(years_vec)
-    restored <- price_change_restored()
-    vals <- lapply(chain, function(yr) {
-      val <- input[[paste0("price_change_", yr)]]
-      if (is.null(val)) val <- restored[[as.character(yr)]] %||% 100
-      as.numeric(val)
-    })
-    names(vals) <- as.character(chain)
-    vals
+    typed_values("price_change_", get_price_chain_years(years_vec), price_change_restored(), 100)
+  }
+
+  get_price_pct_by_year <- function(years_vec = parse_years(input$years)) {
+    typed_values("price_pct_", get_price_chain_years(years_vec), price_pct_restored(), 0)
   }
 
   # Fixed-reference index of a base year outside the analysis years.
@@ -2040,6 +1978,87 @@ server <- function(input, output, session) {
     val <- input$price_index_base
     if (is.null(val)) val <- price_base_index_restored() %||% 100
     as.numeric(val)
+  }
+
+  # ---- CPI file (Data step): one country's CPI by year ----
+  cpi_file_name <- function() selected_setup_file_name(input$cpi_file, "cpi_file")
+
+  cpi_table <- reactive({
+    path <- resolve_upload(input$cpi_file, fallback = saved_setup_path_for("cpi_file"))
+    if (is.null(path) || !nzchar(path) || !file.exists(path)) return(NULL)
+    tryCatch(
+      list(df = sae_read_cpi_input(path, "CPI file"), error = NULL),
+      error = function(e) list(df = NULL, error = conditionMessage(e))
+    )
+  })
+
+  # Column choices follow the file: the last choice (or the one restored from
+  # a saved setup) when that column exists, otherwise a guess of the year and
+  # CPI columns. Choices the user makes are remembered for the next file.
+  observe({
+    tbl <- cpi_table()
+    cols <- if (!is.null(tbl) && !is.null(tbl$df)) names(tbl$df) else character(0)
+    saved <- cpi_cols_restored()
+    guess <- if (length(cols)) sae_cpi_guess_columns(tbl$df) else list(year = "", value = "")
+    pick <- function(...) {
+      for (cand in c(...)) {
+        if (length(cand) == 1L && !is.na(cand) && nzchar(cand) && cand %in% cols) return(cand)
+      }
+      if (length(cols)) cols[1] else character(0)
+    }
+    updateSelectInput(session, "cpi_year_col", choices = cols,
+                      selected = pick(saved$year, guess$year))
+    updateSelectInput(session, "cpi_value_col", choices = cols,
+                      selected = pick(saved$value, guess$value))
+  })
+  observeEvent(list(input$cpi_year_col, input$cpi_value_col), {
+    tbl <- cpi_table()
+    cols <- if (!is.null(tbl) && !is.null(tbl$df)) names(tbl$df) else character(0)
+    y <- input$cpi_year_col %||% ""; v <- input$cpi_value_col %||% ""
+    if (length(cols) && y %in% cols && v %in% cols) {
+      cpi_cols_restored(list(year = y, value = v))
+    }
+  }, ignoreInit = TRUE)
+
+  # Price-index values from the CPI file for the years this run needs.
+  price_index_from_file <- function(years_vec, type, base) {
+    cfg <- list(enabled = TRUE, index_type = type, base_year = base, values = list(),
+                source = "file", source_file = cpi_file_name(),
+                year_column = input$cpi_year_col %||% "",
+                value_column = input$cpi_value_col %||% "")
+    tbl <- cpi_table()
+    if (is.null(tbl)) {
+      cfg$source_problem <- "no CPI file is selected (choose one in the Data step)"
+      return(cfg)
+    }
+    if (!is.null(tbl$error)) {
+      cfg$source_problem <- paste("the CPI file could not be read:", tbl$error)
+      return(cfg)
+    }
+    # Until the column lists have been filled in the browser, use the last
+    # choice or the guess.
+    cols <- names(tbl$df)
+    guess <- sae_cpi_guess_columns(tbl$df)
+    saved <- cpi_cols_restored()
+    first_in <- function(...) {
+      for (cand in c(...)) if (length(cand) == 1L && !is.na(cand) && cand %in% cols) return(cand)
+      ""
+    }
+    cfg$year_column <- first_in(cfg$year_column, saved$year, guess$year)
+    cfg$value_column <- first_in(cfg$value_column, saved$value, guess$value)
+    ser <- sae_cpi_series(tbl$df, cfg$year_column, cfg$value_column)
+    if (length(ser$problems)) {
+      cfg$source_problem <- paste(ser$problems, collapse = "; ")
+      return(cfg)
+    }
+    need <- if (type %in% c("previous_year", "percent_change")) {
+      sae_price_chain_years(list(base_year = base), years_vec)
+    } else {
+      c(years_vec, if (!is.na(base) && !base %in% years_vec) base)
+    }
+    have <- intersect(as.character(need), names(ser$values))
+    cfg$values <- as.list(ser$values[have])
+    cfg
   }
 
   # list(enabled = FALSE) unless mean welfare is selected and the box ticked.
@@ -2050,9 +2069,14 @@ server <- function(input, output, session) {
     if (!enabled) return(list(enabled = FALSE))
     base <- get_price_base_year(years_vec)
     type <- get_price_index_type()
+    if (price_from_file()) return(price_index_from_file(years_vec, type, base))
     if (identical(type, "previous_year")) {
       return(list(enabled = TRUE, index_type = type, base_year = base,
                   values = get_price_change_by_year(years_vec)))
+    }
+    if (identical(type, "percent_change")) {
+      return(list(enabled = TRUE, index_type = type, base_year = base,
+                  values = get_price_pct_by_year(years_vec)))
     }
     values <- get_price_index_by_year(years_vec)
     if (!is.na(base) && !base %in% years_vec) {
@@ -2060,6 +2084,8 @@ server <- function(input, output, session) {
     }
     list(enabled = TRUE, index_type = type, base_year = base, values = values)
   }
+  # Shared with the wizard (app_wizard.R), whose server runs this one.
+  session$userData$get_price_index_config <- get_price_index_config
 
   # Readiness note on the price basis of mean welfare.
   price_readiness_note <- function(years_vec) {
@@ -2077,32 +2103,38 @@ server <- function(input, output, session) {
 
   price_period_tip <- paste(
     "If incomes refer to an earlier period than the survey year (in EU-SILC, the",
-    "calendar year before the survey), use the index of that period."
+    "calendar year before the survey), use the value of that period."
   )
 
   output$price_index_by_year_ui <- renderUI({
+    if (price_from_file()) return(NULL)
     years_vec <- sort(parse_years(input$years))
     if (length(years_vec) == 0L) {
       return(helpText("Enter analysis years before entering the price index."))
     }
-    if (identical(get_price_index_type(), "previous_year")) {
+    type <- get_price_index_type()
+    if (type %in% c("previous_year", "percent_change")) {
       chain <- get_price_chain_years(years_vec)
       if (length(chain) == 0L) {
-        return(helpText("No annual index is needed: there is only one year."))
+        return(helpText("No annual change is needed: there is only one year."))
       }
-      restored <- isolate(price_change_restored())
+      pct <- identical(type, "percent_change")
+      prefix <- if (pct) "price_pct_" else "price_change_"
+      restored <- isolate(if (pct) price_pct_restored() else price_change_restored())
       return(tagList(
         lapply(chain, function(yr) {
-          id <- paste0("price_change_", yr)
+          id <- paste0(prefix, yr)
           numericInput(
             id,
             tip_label(
-              sprintf("Annual price index %s (%s = 100)", yr, yr - 1L),
-              paste("Average prices in", yr, "against the average of", yr - 1L,
-                    "= 100, for example 103.6 for 3.6% inflation.", price_period_tip)
+              if (pct) sprintf("Annual price change %s (%%)", yr)
+              else sprintf("Annual price index %s (%s = 100)", yr, yr - 1L),
+              if (pct) paste("Change in average prices from", yr - 1L, "to", yr,
+                             "in %, for example 3.6.", price_period_tip)
+              else paste("Average prices in", yr, "against the average of", yr - 1L,
+                         "= 100, for example 103.6 for 3.6% inflation.", price_period_tip)
             ),
-            value = isolate(input[[id]] %||% restored[[as.character(yr)]] %||% 100),
-            min = 0
+            value = isolate(input[[id]] %||% restored[[as.character(yr)]] %||% (if (pct) 0 else 100))
           )
         })
       ))
@@ -2126,8 +2158,8 @@ server <- function(input, output, session) {
     )
   })
 
-  # Fixed-reference index of a base year outside the analysis years, and the
-  # resulting price basis.
+  # Fixed-reference index of a base year outside the analysis years (typed
+  # in), and the resulting price basis.
   output$price_base_index_ui <- renderUI({
     years_vec <- sort(parse_years(input$years))
     if (length(years_vec) == 0L) return(NULL)
@@ -2135,9 +2167,9 @@ server <- function(input, output, session) {
     if (is.na(base)) {
       return(helpText("Enter the base year, a calendar year such as 2017."))
     }
-    fixed <- identical(get_price_index_type(), "fixed")
+    typed_fixed <- identical(get_price_index_type(), "fixed") && !price_from_file()
     tagList(
-      if (fixed && !base %in% years_vec) {
+      if (typed_fixed && !base %in% years_vec) {
         numericInput(
           "price_index_base",
           tip_label(
@@ -2149,6 +2181,37 @@ server <- function(input, output, session) {
         )
       },
       helpText(sprintf("Mean welfare will be expressed in %s prices.", base))
+    )
+  })
+
+  # What the app found in the CPI file for this run.
+  output$cpi_file_status <- renderUI({
+    box <- function(color, ...) tags$div(style = sprintf("font-size: 12px; color: %s; margin: -6px 0 12px 0;", color), ...)
+    tbl <- cpi_table()
+    if (is.null(tbl)) {
+      return(box("#b26a00", "No CPI file selected. Choose one in the Data step (Consumer price index)."))
+    }
+    if (!is.null(tbl$error)) {
+      return(box("#b00020", paste("The CPI file could not be read:", tbl$error)))
+    }
+    years_vec <- sort(parse_years(input$years))
+    cfg <- get_price_index_config(years_vec)
+    ser <- sae_cpi_series(tbl$df, cfg$year_column %||% input$cpi_year_col %||% "",
+                          cfg$value_column %||% input$cpi_value_col %||% "")
+    if (length(ser$problems)) {
+      return(box("#b00020", paste0("CPI file: ", paste(ser$problems, collapse = "; "), ".")))
+    }
+    yrs <- as.integer(names(ser$values))
+    found <- sprintf("%s: %d years with values (%d to %d).", cpi_file_name(), length(yrs), min(yrs), max(yrs))
+    probs <- if (isTRUE(cfg$enabled) && length(years_vec)) sae_price_index_problems(cfg, years_vec) else character(0)
+    used <- if (length(cfg$values)) {
+      vals <- sae_price_index_values(cfg$values)
+      paste0("Values used: ", paste(sprintf("%s = %s", names(vals), signif(vals, 6)), collapse = ", "), ".")
+    } else ""
+    tags$div(
+      box(if (length(probs)) "#b00020" else "#2e7d32", found, " ", used),
+      if (length(probs)) box("#b00020", paste0(paste(probs, collapse = "; "), ".")),
+      if (length(ser$notes)) box("#666", paste0("Note: ", paste(ser$notes, collapse = "; "), "."))
     )
   })
 
@@ -2261,7 +2324,9 @@ server <- function(input, output, session) {
     inputs$price_index_by_year <- get_price_index_by_year(parse_years(inputs$years))
     inputs$deflate_welfare <- isTRUE(input$deflate_welfare)
     inputs$price_index_type <- get_price_index_type()
+    inputs$price_index_source <- if (price_from_file()) "file" else "manual"
     inputs$price_change_by_year <- get_price_change_by_year(parse_years(inputs$years))
+    inputs$price_pct_by_year <- get_price_pct_by_year(parse_years(inputs$years))
     inputs$price_base_mode <- if (identical(input$price_base_mode, "other")) "other" else "first"
     inputs$price_base_year <- suppressWarnings(as.integer(input$price_base_year %||% NA))
     inputs$price_index_base <- get_price_base_index()
@@ -2283,7 +2348,8 @@ server <- function(input, output, session) {
         } else {
           selected_setup_file_ref(input$regional_benchmark_file, "regional_benchmark_file")
         },
-        population_file = selected_setup_file_ref(input$population_file, "population_file")
+        population_file = selected_setup_file_ref(input$population_file, "population_file"),
+        cpi_file = selected_setup_file_ref(input$cpi_file, "cpi_file")
       ),
       inputs = inputs
     )
@@ -2375,7 +2441,17 @@ server <- function(input, output, session) {
                          value = as.numeric(x$price_index_by_year[[.yr]]))
     }
     updateRadioButtons(session, "price_index_type",
-                       selected = if (identical(x$price_index_type, "previous_year")) "previous_year" else "fixed")
+                       selected = if (isTRUE(x$price_index_type %in% c("previous_year", "percent_change")))
+                         x$price_index_type else "fixed")
+    updateRadioButtons(session, "price_index_source",
+                       selected = if (identical(x$price_index_source, "file")) "file" else "manual")
+    cpi_cols_restored(list(year = as.character(x$cpi_year_col %||% ""),
+                           value = as.character(x$cpi_value_col %||% "")))
+    price_pct_restored(as.list(x$price_pct_by_year %||% list()))
+    for (.yr in names(x$price_pct_by_year %||% list())) {
+      updateNumericInput(session, paste0("price_pct_", .yr),
+                         value = as.numeric(x$price_pct_by_year[[.yr]]))
+    }
     price_change_restored(as.list(x$price_change_by_year %||% list()))
     for (.yr in names(x$price_change_by_year %||% list())) {
       updateNumericInput(session, paste0("price_change_", .yr),
@@ -2578,6 +2654,9 @@ server <- function(input, output, session) {
       },
       if (nzchar(setup_file_name_for("population_file"))) {
         file_line("Population", "population_file")
+      },
+      if (nzchar(setup_file_name_for("cpi_file"))) {
+        file_line("CPI", "cpi_file")
       }
     )
   })
@@ -2639,6 +2718,9 @@ server <- function(input, output, session) {
   })
   output$population_active_file <- renderUI({
     active_file_ui("population file", input$population_file, "population_file", required = FALSE)
+  })
+  output$cpi_active_file <- renderUI({
+    active_file_ui("CPI file", input$cpi_file, "cpi_file", required = FALSE)
   })
 
   read_dataset_columns <- function(path, kind = c("table", "geometry")) {
@@ -2875,6 +2957,11 @@ server <- function(input, output, session) {
   observeEvent(input$population_file, {
     if (nzchar(input$population_file$name %||% "")) {
       set_active_setup_file("population_file", input$population_file$name)
+    }
+  }, ignoreInit = TRUE)
+  observeEvent(input$cpi_file, {
+    if (nzchar(input$cpi_file$name %||% "")) {
+      set_active_setup_file("cpi_file", input$cpi_file$name)
     }
   }, ignoreInit = TRUE)
 
@@ -4149,6 +4236,7 @@ server <- function(input, output, session) {
           selected_setup_file_name(input$regional_benchmark_file, "regional_benchmark_file")
         },
         population_file = selected_setup_file_name(input$population_file, "population_file"),
+        cpi_file = selected_setup_file_name(input$cpi_file, "cpi_file"),
         survey_path = survey_path,
         rhs_path = rhs_path,
         shp_path = shp_path

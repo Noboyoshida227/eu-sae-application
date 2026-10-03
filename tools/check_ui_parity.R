@@ -10,6 +10,7 @@ supported_languages <- function() c(English = "en", French = "fr")
 # Run from the package root:  Rscript tools/check_ui_parity.R
 root <- if (basename(getwd()) == "tools") ".." else "."
 core <- file.path(root, "app.R")
+source(file.path(root, "R", "landing_page.R"))
 
 # Pull only the UI helpers and the `ui` object out of app.R.
 for (e in as.list(parse(core, keep.source = FALSE, encoding = "UTF-8"))) {
