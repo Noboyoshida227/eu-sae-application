@@ -245,6 +245,21 @@ and **Clear** reset the list. The poverty and RMSE grids have separate lists.
 The panels for this view are in the `grid_panels/` subfolders. The Word report
 cannot run the list and shows the full grid.
 
+The report also shows, in one row, box plots of the change between the two
+years across domains and of the RMSE of that change, with one box per method:
+Direct, UFH, the selected MFH model and, with benchmarking on, UFH benchmarked
+and MFH benchmarked. For poverty indicators both are in percentage points; for
+mean welfare the change is in ln mean welfare (ln of the later mean minus ln of
+the earlier mean) and the RMSE is on the same log scale. The RMSE of a direct
+change adds the two years' direct MSEs; UFH also treats the years as
+independent, and MFH uses the covariance between the years. In the HTML report
+a **Methods** list selects the boxes shown, the axes fit the selected methods,
+and hovering over a point shows its domain and value; the Word report shows all
+methods. The values are in `outputs/tables/change_rmse_by_method.csv` and in
+the "Change and RMSE" sheets of `change_estimate_comparison.xlsx` and
+`EU_SAE_results.xlsx`; the figure is
+`outputs/figures/change_comparisons/change_rmse_boxplots.png`.
+
 ### AI assistance
 
 AI assistance is optional. When enabled, it requires both an API key and a

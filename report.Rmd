@@ -144,6 +144,14 @@ price_sentence <- if (is_mean_welfare && nzchar(price_basis)) {
 } else {
   ""
 }
+# Units of the change/RMSE box plots (sae_change_rmse_by_method()).
+change_box_units <- if (is_mean_welfare) {
+  paste("For mean welfare, the change is in ln mean welfare: ln(mean in the later",
+        "year) minus ln(mean in the earlier year), close to the proportional change",
+        "(times 100, roughly the percentage change); its RMSE is on the same log scale.")
+} else {
+  sprintf("Changes in the %s and their RMSEs are in percentage points.", change_noun)
+}
 ```
 
 ```{r ai-report-styles, results='asis'}
@@ -871,16 +879,62 @@ if (!is.null(sig_cmp)) {
 }
 ```
 
-### Distribution and paired comparison of estimated changes
+### Estimated changes and their RMSEs by method
 
-These two figures compare the **estimated changes themselves**, using the later
-year minus the earlier year. Poverty-rate changes are in **percentage points**;
-mean-welfare changes are **percentage changes** of the mean. Negative values indicate
-a decrease. The same finite, matched domain pairs enter both plots. The boxplot
-shows the distribution across domains, not the uncertainty around each estimate.
-Below the scatterplot's equality line, the MFH estimate is lower than the UFH
-estimate; that does not establish greater accuracy or statistical significance.
-These comparisons use unbenchmarked estimates, as do the CI-width figures below.
+The box plots below compare, across domains, the **estimated change** between
+the two years (the later year minus the earlier year) and the **RMSE of that
+change** for each method: Direct, UFH, the selected MFH model and, when
+benchmarking is on, UFH benchmarked and MFH benchmarked. `r change_box_units`
+Each point is one domain; boxes show the median and interquartile range, and
+whiskers reach the most extreme value within 1.5 times the interquartile range.
+The boxes show how the changes and their precision vary across domains, not the
+uncertainty around one domain's estimate; a lower RMSE means a more precise
+estimate of the change. The RMSE of a direct change treats the two survey years
+as independent, as UFH does; MFH uses the covariance between the years. In the
+HTML report, the **Methods** list selects the methods shown and the axes fit
+the selected methods; the Word report shows all methods.
+
+```{r change-rmse-boxplots, results='asis'}
+change_rmse_csv <- file.path(table_dir, "change_rmse_by_method.csv")
+change_rmse_png <- file.path(fig_dir, "change_comparisons", "change_rmse_boxplots.png")
+if (file.exists(change_rmse_csv) || file.exists(change_rmse_png)) {
+  cat(sae_box_picker_markdown(change_rmse_csv, change_rmse_png,
+                              id = "sae-box-picker-changes",
+                              label = "Estimated changes and their RMSEs by method"))
+} else {
+  cat("*Changes and RMSEs by method were not available for this run.*\n\n")
+}
+change_rmse_summary <- tryCatch(
+  read_excel(file.path(data_dir, "change_estimate_comparison.xlsx"),
+             sheet = "Change and RMSE summary"),
+  error = function(e) NULL
+)
+if (!is.null(change_rmse_summary) && nrow(change_rmse_summary)) {
+  display <- data.frame(
+    Method = change_rmse_summary$method,
+    Domains = change_rmse_summary$domains,
+    `Median change` = change_rmse_summary$change_median,
+    `Change, 25th percentile` = change_rmse_summary$change_percentile_25,
+    `Change, 75th percentile` = change_rmse_summary$change_percentile_75,
+    `Median RMSE` = change_rmse_summary$rmse_median,
+    `Mean RMSE` = change_rmse_summary$rmse_mean,
+    check.names = FALSE
+  )
+  print(kable(display, digits = if (is_mean_welfare) 4 else 2,
+              caption = sprintf("Estimated changes and their RMSEs across domains (%s; unweighted domain summaries)",
+                                change_rmse_summary$unit[1])))
+}
+```
+
+### Paired comparison of UFH and MFH changes
+
+The figure below compares the **estimated changes themselves** domain by
+domain, using the later year minus the earlier year. Poverty-rate changes are
+in **percentage points**; mean-welfare changes are **percentage changes** of
+the mean. Negative values indicate a decrease. Below the equality line, the MFH
+estimate is lower than the UFH estimate; that does not establish greater
+accuracy or statistical significance. This comparison uses unbenchmarked
+estimates, as do the CI-width comparisons below.
 
 ```{r change-estimate-summary, results='asis'}
 change_path <- file.path(data_dir, "change_estimate_comparison.xlsx")
@@ -905,8 +959,7 @@ if (!is.null(change_paired) && nrow(change_paired)) {
 ```
 
 ```{r change-estimate-figures}
-change_paths <- file.path(fig_dir, "change_comparisons",
-  c("change_distribution_ufh_mfh.png", "change_paired_ufh_mfh.png"))
+change_paths <- file.path(fig_dir, "change_comparisons", "change_paired_ufh_mfh.png")
 change_paths <- change_paths[file.exists(change_paths)]
 if (length(change_paths)) knitr::include_graphics(change_paths) else
   cat("*No finite matched UFH-MFH changes are available for these figures.*\n")
@@ -914,10 +967,10 @@ if (length(change_paths)) knitr::include_graphics(change_paths) else
 
 ### Distribution of 95% confidence-interval widths
 
-The figures below compare the full width of each pointwise 95% confidence
-interval (`upper bound - lower bound`) across matched domains. The first figure
-shows the two distributions; the second preserves the domain-level pairing.
-Points below the dashed equality line have narrower MFH intervals. A narrower
+The table and figure below compare the full width of each pointwise 95%
+confidence interval (`upper bound - lower bound`) across matched domains; the
+figure preserves the domain-level pairing. Points below the dashed equality
+line have narrower MFH intervals. A narrower
 interval does not by itself imply a significant change, because significance
 also depends on how far the estimated change lies from zero.
 
@@ -976,7 +1029,7 @@ if (!is.null(ci_width_paired) && nrow(ci_width_paired) > 0) {
 ci_figure_paths <- file.path(
   fig_dir,
   "uncertainty_comparisons",
-  c("ci_width_distribution_ufh_mfh.png", "ci_width_paired_ufh_mfh.png")
+  "ci_width_paired_ufh_mfh.png"
 )
 ci_figure_paths <- ci_figure_paths[file.exists(ci_figure_paths)]
 if (length(ci_figure_paths) > 0) {

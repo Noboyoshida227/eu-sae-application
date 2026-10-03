@@ -486,7 +486,10 @@ check(grepl("Complete statistical significance comparison", report_text, fixed =
         !grepl("head(sig_display, 30)", report_text, fixed = TRUE) &&
         grepl("full-significance-table", report_text, fixed = TRUE),
       "final report displays the complete pointwise/BH/Bonferroni table in a scrollable pane")
-check(grepl("ci_width_distribution_ufh_mfh.png", report_text, fixed = TRUE) &&
+check(!grepl("ci_width_distribution_ufh_mfh.png", report_text, fixed = TRUE) &&
+        !grepl("change_distribution_ufh_mfh.png", report_text, fixed = TRUE) &&
+        grepl("sae_box_picker_markdown(change_rmse_csv", report_text, fixed = TRUE) &&
+        grepl("change_rmse_boxplots.png", report_text, fixed = TRUE) &&
         grepl("ci_width_paired_ufh_mfh.png", report_text, fixed = TRUE) &&
         grepl("ci_width_comparison.xlsx", report_text, fixed = TRUE) &&
         grepl("EU_SAE_results.xlsx", report_text, fixed = TRUE),
@@ -743,16 +746,71 @@ check(nrow(change_filtered$domain)==1L && all(change_filtered$distribution$domai
 check(inherits(try(sae_change_comparison(rbind(change_fixture,change_fixture[1,]),c(2012,2013)),silent=TRUE),"try-error"),
       "duplicate domain-method observations cannot create Cartesian comparisons")
 change_empty <- sae_change_comparison(change_fixture[change_fixture$method=="FH",],c(2012,2013))
-check(nrow(change_empty$domain)==0L && is.null(sae_plot_change_paired(change_empty)) &&
-      is.null(sae_plot_change_distribution(change_empty)),
+check(nrow(change_empty$domain)==0L && is.null(sae_plot_change_paired(change_empty)),
       "UFH-only runs do not fabricate MFH changes or figures")
 change_currency <- sae_change_comparison(change_fixture,c(2012,2013),"mean_welfare","EUR")
 check(identical(change_currency$unit,"EUR") &&
       isTRUE(all.equal(change_currency$domain$UFH_change,c(.03,-.02))),
       "mean-welfare changes retain currency units without percentage scaling")
+# Changes and their RMSEs for every method (box plots in the report).
+cr_levels <- data.frame(domain = rep(c("1", "2"), 2), year = rep(c(2012L, 2013L), each = 2),
+                        geographic_name = rep(c("North", "South"), 2),
+                        Direct = c(.20, .30, .25, .28), Direct_MSE = c(4e-4, 9e-4, 4e-4, 1e-4),
+                        FH = c(.21, .29, .24, .27), FH_MSE = c(1e-4, 2e-4, 1e-4, 2e-4))
+cr_sig <- list(FH = data.frame(domain = c("2", "1"), diff = c(-.02, .03), mse = c(4e-4, 2e-4)),
+               FH_Bench = NULL,
+               MFH = data.frame(domain = c("1", "2"), diff = c(.01, NA), mse = c(1e-4, NA)))
+cr <- sae_change_rmse_by_method(cr_levels, cr_sig, c(2012, 2013), labels = c(MFH = "MFH2"))
+cr_d <- cr$long[cr$long$method_key == "Direct", ]
+cr_f <- cr$long[cr$long$method_key == "FH", ]
+check(identical(unique(cr$long$method), c("Direct", "UFH", "MFH2")) &&
+        isTRUE(all.equal(cr_d$change, c(5, -2))) &&
+        isTRUE(all.equal(cr_d$rmse, 100 * sqrt(c(8e-4, 1e-3)))) &&
+        identical(cr_f$domain, c("1", "2")) && isTRUE(all.equal(cr_f$change, c(3, -2))) &&
+        isTRUE(all.equal(cr_f$rmse, 100 * sqrt(c(2e-4, 4e-4)))) &&
+        identical(cr$long$domain[cr$long$method_key == "MFH"], "1") &&
+        identical(cr_d$name, c("North", "South")) &&
+        identical(cr$summary$domains, c(2L, 2L, 1L)) &&
+        grepl("percentage points", cr$change_label, fixed = TRUE),
+      "changes and RMSEs by method: percentage points for poverty, direct MSEs added, missing methods left out")
+cr_mw_levels <- data.frame(domain = rep(c("1", "2"), 2), year = rep(c(2012L, 2013L), each = 2),
+                           Direct = c(1000, 2000, 1100, 1900), Direct_MSE = c(400, 900, 400, 900),
+                           FH = c(1000, 2000, 1050, 2100), FH_MSE = c(100, 400, 100, 400))
+cr_mw_sig <- list(FH = data.frame(domain = c("1", "2"), diff = c(5, 5), mse = c(1, 1),
+                                  mse_eur = c(200, 800)))
+cr_mw <- sae_change_rmse_by_method(cr_mw_levels, cr_mw_sig, c(2012, 2013), "mean_welfare")
+cr_mw_f <- cr_mw$long[cr_mw$long$method_key == "FH", ]
+cr_mw_d <- cr_mw$long[cr_mw$long$method_key == "Direct", ]
+check(isTRUE(all.equal(cr_mw_f$change, log(c(1.05, 1.05)))) &&
+        isTRUE(all.equal(cr_mw_f$rmse, sqrt(c(100 / 1000^2 + 100 / 1050^2, 400 / 2000^2 + 400 / 2100^2)))) &&
+        isTRUE(all.equal(cr_mw_d$change, log(c(1.1, 0.95)))) &&
+        isTRUE(all.equal(cr_mw_d$rmse, sqrt(c(400 / 1000^2 + 400 / 1100^2, 900 / 2000^2 + 900 / 1900^2)))) &&
+        grepl("ln mean welfare", cr_mw$change_label, fixed = TRUE),
+      "changes and RMSEs by method: ln mean welfare with the delta-method RMSE of the log ratio")
 set.seed(19); change_seed <- .Random.seed
-invisible(ggplot2::ggplot_build(sae_plot_change_distribution(change_result)))
-check(identical(change_seed,.Random.seed),"descriptive plot jitter does not alter the analysis RNG state")
+invisible(ggplot2::ggplot_build(sae_plot_change_rmse_boxplots(cr)))
+check(identical(change_seed,.Random.seed) &&
+        is.null(sae_plot_change_rmse_boxplots(list(long = cr$long[0, ]))),
+      "descriptive plot jitter does not alter the analysis RNG state")
+source("R/report_map_picker.R")
+cr_csv <- tempfile(fileext = ".csv")
+cr_out <- cr$long; cr_out$color <- unname(sae_method_colors()[cr_out$method_key])
+utils::write.csv(cr_out, cr_csv, row.names = FALSE)
+cr_html <- sae_box_picker_html(cr_csv, "box test")
+cr_json <- sub("(?s).*<script type=\"application/json\" id=\"box-test-data\">(.*?)</script>.*", "\\1",
+               cr_html, perl = TRUE)
+cr_payload <- jsonlite::fromJSON(cr_json, simplifyVector = FALSE)
+check(grepl("<!--sae-html-only-start-->", cr_html, fixed = TRUE) &&
+        grepl('svg data-panel="change"', cr_html, fixed = TRUE) &&
+        grepl('svg data-panel="rmse"', cr_html, fixed = TRUE) &&
+        grepl('value="MFH" data-label="MFH2" checked', cr_html, fixed = TRUE) &&
+        identical(names(cr_payload$methods), c("Direct", "FH", "MFH")) &&
+        identical(cr_payload$methods$FH$color, "#2a78d6") &&
+        isTRUE(all.equal(unlist(cr_payload$points$FH$change), c(3, -2))) &&
+        is.null(sae_box_picker_html(tempfile(), "x")) &&
+        identical(sae_box_picker_markdown(tempfile(), "static.png", "x", "Label"), "") &&
+        grepl("sae-word-only", sae_box_picker_markdown(cr_csv, cr_csv, "x", "Label"), fixed = TRUE),
+      "box-plot picker embeds the methods, colours and values and falls back to the static figure")
 change_all_zero <- change_fixture;change_all_zero$diff <- 0
 check(!inherits(try(ggplot2::ggplot_build(sae_plot_change_paired(sae_change_comparison(change_all_zero,c(2012,2013)))),silent=TRUE),"try-error"),
       "paired change axes remain valid when every change is zero")

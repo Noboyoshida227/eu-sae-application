@@ -61,24 +61,188 @@ sae_change_comparison <- function(significance, years, indicator_type = "poverty
        label = label, unit = unit, years = years)
 }
 
-sae_plot_change_distribution <- function(comparison) {
-  if (!nrow(comparison$domain)) return(NULL)
-  ggplot2::ggplot(comparison$long, ggplot2::aes(x = method, y = change, color = method, fill = method)) +
-    ggplot2::geom_hline(yintercept = 0, color = "#64748B", linetype = "dashed") +
-    ggplot2::geom_boxplot(width = .42, alpha = .12, outlier.shape = NA, linewidth = .8) +
-    ggplot2::geom_point(position = ggplot2::position_jitter(width = .08, height = 0, seed = 123), alpha = .55, size = 2.2) +
-    ggplot2::stat_summary(fun = median, geom = "text", ggplot2::aes(label = sprintf("Median %+.2f", ggplot2::after_stat(y))),
-                          position = ggplot2::position_nudge(x = .26), hjust = 0, vjust = .5,
-                          size = 3.8, fontface = "bold", show.legend = FALSE) +
-    ggplot2::scale_x_discrete(expand = ggplot2::expansion(add = c(.45, .85))) +
-    ggplot2::scale_color_manual(values = c(UFH = "#2563EB", MFH = "#D97706")) +
-    ggplot2::scale_fill_manual(values = c(UFH = "#2563EB", MFH = "#D97706")) +
-    ggplot2::labs(title = paste("Distribution of estimated", comparison$label, "changes"),
-      subtitle = sprintf("%s %s %s | Unbenchmarked estimates across %d matched domains", comparison$years[2], if (identical(comparison$unit, "%")) "relative to" else "minus", comparison$years[1], nrow(comparison$domain)),
-      x = NULL, y = sprintf("Estimated change (%s)", comparison$unit),
-      caption = "Each point is one domain; boxes show the median and interquartile range.\nNegative values indicate a decrease. These are estimates, not confidence-interval widths.") +
-    ggplot2::theme_minimal(base_size = 14) +
-    ggplot2::theme(legend.position = "none", plot.title = ggplot2::element_text(face = "bold"), panel.grid.major.x = ggplot2::element_blank())
+# ---- Changes and their RMSEs for every method (box plots in the report) ----
+# Colours of the five methods in the change/RMSE box plots, by method key:
+# a neutral grey for the direct estimates, then the reference categorical
+# order (validated for adjacent pairs on a light surface). The method names
+# under each box carry the identity as well.
+sae_method_colors <- function() {
+  c(Direct = "#6b6a65", FH = "#2a78d6", FH_Bench = "#4a3aa7",
+    MFH = "#eb6834", MFH_Bench = "#1baf7a")
+}
+
+# Domain-level change between the two years and the RMSE of that change, for
+# Direct, UFH, UFH benchmarked, MFH and MFH benchmarked (methods whose inputs
+# are missing are left out).
+#   levels  domain-by-year table with the level estimates and MSEs (columns
+#           Direct, Direct_MSE, FH, FH_MSE, ...), as comparison_dt in
+#           scripts/03_comparison.R.
+#   sig     named list of the steps' change tables (FH, FH_Bench, MFH,
+#           MFH_Bench) with domain, diff and mse; for mean welfare, after
+#           the conversion to percentage changes, with mse_eur (the MSE of
+#           the change in currency units).
+#   labels  named display labels, for example c(MFH = "MFH2").
+# Poverty indicators: the change is the later minus the earlier rate in
+# percentage points and the RMSE is the square root of the change MSE the
+# step reports (UFH: years independent; MFH: with the covariance between the
+# years). Mean welfare: the change is in ln mean welfare, log(m2 / m1), and the
+# RMSE is the delta-method standard error of that log ratio
+# (sae_percent_change(), R/pipeline_helpers.R), with the same covariance.
+# Direct changes treat the two survey years as independent:
+# MSE = MSE(year 1) + MSE(year 2).
+sae_change_rmse_by_method <- function(levels, sig, years, indicator_type = "poverty",
+                                      fgt_alpha = 0L, labels = NULL) {
+  if (length(years) != 2L || anyNA(years)) stop("Changes require two years.")
+  years <- sort(as.integer(years))
+  is_mean <- identical(indicator_type, "mean_welfare")
+  default_labels <- c(Direct = "Direct", FH = "UFH", FH_Bench = "UFH benchmarked",
+                      MFH = "MFH", MFH_Bench = "MFH benchmarked")
+  if (length(labels)) default_labels[names(labels)] <- labels
+  labels <- default_labels
+  lv <- as.data.frame(levels)
+  lv$domain <- trimws(as.character(lv$domain))
+  lv$year <- suppressWarnings(as.integer(lv$year))
+  names_col <- intersect(c("geographic_name", "domain_name"), names(lv))
+  level_pair <- function(col) {
+    if (!all(c(col, paste0(col, "_MSE")) %in% names(lv))) return(NULL)
+    y1 <- lv[lv$year == years[1], , drop = FALSE]
+    y2 <- lv[lv$year == years[2], , drop = FALSE]
+    dom <- intersect(y1$domain, y2$domain)
+    if (!length(dom)) return(NULL)
+    i1 <- match(dom, y1$domain); i2 <- match(dom, y2$domain)
+    data.frame(domain = dom,
+               m1 = suppressWarnings(as.numeric(y1[[col]][i1])),
+               m2 = suppressWarnings(as.numeric(y2[[col]][i2])),
+               s1 = suppressWarnings(as.numeric(y1[[paste0(col, "_MSE")]][i1])),
+               s2 = suppressWarnings(as.numeric(y2[[paste0(col, "_MSE")]][i2])),
+               stringsAsFactors = FALSE)
+  }
+  one_method <- function(key) {
+    if (identical(key, "Direct")) {
+      pr <- level_pair("Direct")
+      if (is.null(pr)) return(NULL)
+      mse_diff <- pr$s1 + pr$s2
+      if (is_mean) {
+        pc <- sae_percent_change(pr$m1, pr$m2, pr$s1, pr$s2, mse_diff)
+        change <- pc$log_ratio; rmse <- sqrt(pc$log_ratio_var)
+      } else {
+        change <- 100 * (pr$m2 - pr$m1); rmse <- 100 * sqrt(mse_diff)
+      }
+      return(data.frame(domain = pr$domain, change = change, rmse = rmse,
+                        stringsAsFactors = FALSE))
+    }
+    d <- sig[[key]]
+    if (is.null(d) || !nrow(d) || !all(c("domain", "diff", "mse") %in% names(d))) return(NULL)
+    d <- as.data.frame(d)
+    d$domain <- trimws(as.character(d$domain))
+    if (is_mean) {
+      pr <- level_pair(key)
+      if (is.null(pr)) return(NULL)
+      mse_eur <- if ("mse_eur" %in% names(d)) d$mse_eur else d$mse
+      mse_diff <- suppressWarnings(as.numeric(mse_eur))[match(pr$domain, d$domain)]
+      keep <- pr$domain %in% d$domain
+      pr <- pr[keep, , drop = FALSE]; mse_diff <- mse_diff[keep]
+      pc <- sae_percent_change(pr$m1, pr$m2, pr$s1, pr$s2, mse_diff)
+      return(data.frame(domain = pr$domain, change = pc$log_ratio,
+                        rmse = sqrt(pc$log_ratio_var), stringsAsFactors = FALSE))
+    }
+    mse <- suppressWarnings(as.numeric(d$mse))
+    data.frame(domain = d$domain,
+               change = 100 * suppressWarnings(as.numeric(d$diff)),
+               rmse = ifelse(is.finite(mse) & mse >= 0, 100 * sqrt(mse), NA_real_),
+               stringsAsFactors = FALSE)
+  }
+  keys <- c("Direct", "FH", "FH_Bench", "MFH", "MFH_Bench")
+  parts <- lapply(seq_along(keys), function(k) {
+    out <- one_method(keys[k])
+    if (is.null(out) || !nrow(out)) return(NULL)
+    out <- out[is.finite(out$change) | is.finite(out$rmse), , drop = FALSE]
+    if (!nrow(out)) return(NULL)
+    out$method_key <- keys[k]
+    out$method <- unname(labels[keys[k]])
+    out$method_order <- k
+    out
+  })
+  long <- do.call(rbind, parts[!vapply(parts, is.null, logical(1))])
+  if (is.null(long)) {
+    long <- data.frame(domain = character(), change = numeric(), rmse = numeric(),
+                       method_key = character(), method = character(),
+                       method_order = integer(), stringsAsFactors = FALSE)
+  }
+  long$name <- if (length(names_col)) {
+    nm <- lv[[names_col[1]]][match(long$domain, lv$domain)]
+    ifelse(is.na(nm) | !nzchar(as.character(nm)), long$domain, as.character(nm))
+  } else long$domain
+  ord <- suppressWarnings(as.numeric(long$domain))
+  long <- long[order(long$method_order, is.na(ord), ord, long$domain), , drop = FALSE]
+  rownames(long) <- NULL
+  noun <- if (is_mean) "ln mean welfare" else
+    switch(as.character(fgt_alpha), "1" = "poverty gap", "2" = "poverty severity", "poverty rate")
+  unit <- if (is_mean) "log points (ln mean welfare)" else "percentage points"
+  change_label <- if (is_mean) sprintf("Change in ln mean welfare, %s to %s", years[1], years[2]) else
+    sprintf("Change in %s, %s to %s (percentage points)", noun, years[1], years[2])
+  rmse_label <- if (is_mean) "RMSE of the change in ln mean welfare" else
+    sprintf("RMSE of the change in %s (percentage points)", noun)
+  long$change_label <- rep(change_label, nrow(long))
+  long$rmse_label <- rep(rmse_label, nrow(long))
+  long$unit <- rep(unit, nrow(long))
+  stat <- function(x, f) { x <- x[is.finite(x)]; if (length(x)) f(x) else NA_real_ }
+  methods <- unique(long[, c("method_order", "method_key", "method")])
+  summary <- do.call(rbind, lapply(seq_len(nrow(methods)), function(k) {
+    d <- long[long$method_key == methods$method_key[k], , drop = FALSE]
+    data.frame(
+      method = methods$method[k],
+      domains = sum(is.finite(d$change)),
+      change_median = stat(d$change, stats::median),
+      change_percentile_25 = stat(d$change, function(x) unname(stats::quantile(x, 0.25))),
+      change_percentile_75 = stat(d$change, function(x) unname(stats::quantile(x, 0.75))),
+      change_mean = stat(d$change, mean),
+      rmse_median = stat(d$rmse, stats::median),
+      rmse_percentile_25 = stat(d$rmse, function(x) unname(stats::quantile(x, 0.25))),
+      rmse_percentile_75 = stat(d$rmse, function(x) unname(stats::quantile(x, 0.75))),
+      rmse_mean = stat(d$rmse, mean),
+      unit = unit, stringsAsFactors = FALSE)
+  }))
+  if (is.null(summary)) summary <- data.frame()
+  list(long = long, summary = summary, years = years, change_label = change_label,
+       rmse_label = rmse_label, unit = unit, indicator_type = indicator_type)
+}
+
+# Static version of the report's box plots (Word report and outputs folder):
+# the change and its RMSE side by side in one row, one box per method.
+sae_plot_change_rmse_boxplots <- function(x) {
+  d <- x$long
+  if (is.null(d) || !nrow(d)) return(NULL)
+  meth <- unique(d[order(d$method_order), c("method_key", "method")])
+  cols <- sae_method_colors()[meth$method_key]
+  names(cols) <- meth$method
+  panel_names <- c(x$change_label, x$rmse_label)
+  long <- rbind(
+    data.frame(method = d$method, panel = panel_names[1], value = d$change, stringsAsFactors = FALSE),
+    data.frame(method = d$method, panel = panel_names[2], value = d$rmse, stringsAsFactors = FALSE))
+  long <- long[is.finite(long$value), , drop = FALSE]
+  long$method <- factor(long$method, levels = meth$method)
+  long$panel <- factor(long$panel, levels = panel_names)
+  zero <- data.frame(panel = factor(panel_names[1], levels = panel_names), y = 0)
+  ggplot2::ggplot(long, ggplot2::aes(x = method, y = value, color = method, fill = method)) +
+    ggplot2::geom_hline(data = zero, ggplot2::aes(yintercept = y), color = "#64748B",
+                        linetype = "dashed", inherit.aes = FALSE) +
+    ggplot2::geom_boxplot(width = .55, alpha = .12, outlier.shape = NA, linewidth = .7) +
+    ggplot2::geom_point(position = ggplot2::position_jitter(width = .14, height = 0, seed = 123),
+                        alpha = .55, size = 1.6) +
+    ggplot2::facet_wrap(~panel, nrow = 1, scales = "free_y") +
+    ggplot2::scale_color_manual(values = cols) +
+    ggplot2::scale_fill_manual(values = cols) +
+    ggplot2::scale_x_discrete(labels = function(v) sub(" benchmarked$", "\nbenchmarked", v)) +
+    ggplot2::labs(x = NULL, y = NULL,
+      title = "Estimated changes and their RMSEs by method",
+      caption = paste("Each point is one domain. Boxes show the median and interquartile range;",
+                      "whiskers extend to 1.5 times the interquartile range.")) +
+    ggplot2::theme_minimal(base_size = 13) +
+    ggplot2::theme(legend.position = "none", plot.title = ggplot2::element_text(face = "bold"),
+                   strip.text = ggplot2::element_text(face = "bold", size = 12),
+                   panel.grid.major.x = ggplot2::element_blank(),
+                   panel.spacing = grid::unit(1.5, "lines"))
 }
 
 sae_plot_change_paired <- function(comparison) {

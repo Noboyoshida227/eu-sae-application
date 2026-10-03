@@ -413,6 +413,38 @@ changes to within 0.013 percentage points (msae’s optimiser), with the
 same significant domains. Entering the same prices as annual indices
 (previous year = 100) gives the same results as the fixed-reference
 index.</li>
+<li>Report: box plots of changes and their RMSEs for every method
+(owner’s request, 2 Oct). The box plots of UFH and MFH changes and of
+their 95% confidence-interval widths are replaced by box plots, side by
+side in one row, of the change between the two years across domains and
+of the RMSE of that change, with one box per method: Direct, UFH, the
+selected MFH model and, with benchmarking on, UFH benchmarked and MFH
+benchmarked. For poverty indicators both are in percentage points; for
+mean welfare the change is in ln mean welfare (ln of the later mean
+minus ln of the earlier mean) and the RMSE is the delta-method standard
+error of that log ratio. The RMSE of a direct change adds the two years’
+direct MSEs (independent samples); UFH also treats the years as
+independent and MFH uses the covariance between the years, as in the
+significance tests. In the HTML report a <strong>Methods</strong>
+drop-down list, as for the map grids, selects the boxes shown; the axes
+fit the selected methods, and hovering over a point shows its domain and
+value. The Word report shows all methods
+(<code>outputs/figures/change_comparisons/change_rmse_boxplots.png</code>).
+A table gives the median and interquartile range of the changes and the
+median and mean RMSE by method. The values are in
+<code>outputs/tables/change_rmse_by_method.csv</code> and in the new
+sheets “Change and RMSE by method” and “Change and RMSE summary” of
+<code>change_estimate_comparison.xlsx</code> and
+<code>EU_SAE_results.xlsx</code>. The paired UFH-MFH scatter plots of
+changes and of CI widths, and their tables, are unchanged;
+<code>change_distribution_ufh_mfh.png</code> and
+<code>ci_width_distribution_ufh_mfh.png</code> are no longer produced.
+Helpers <code>sae_change_rmse_by_method()</code>,
+<code>sae_plot_change_rmse_boxplots()</code> and
+<code>sae_method_colors()</code> in <code>R/change_comparison.R</code>
+and <code>sae_box_picker_html()</code> in
+<code>R/report_map_picker.R</code>. New checks in
+<code>tests/run_tests.R</code>.</li>
 <li>Mean-welfare changes are reported as percentage changes of the mean
 (owner’s decision of 1 Oct): 100 × (mean in the later year / mean in the
 earlier year − 1), with the 95% interval and p-value from the log of the

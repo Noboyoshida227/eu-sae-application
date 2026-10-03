@@ -1757,15 +1757,49 @@ change_comparison <- sae_change_comparison(
   sig_plot_dt, years_keep, indicator_type, currency_symbol, fgt_alpha,
   change_unit = if (.change_is_percent) "%" else NULL
 )
+# Changes between the two years and their RMSEs for every method (Direct,
+# UFH, UFH benchmarked, the selected MFH model and its benchmarked estimates),
+# for the box plots in the report: percentage points for poverty indicators,
+# ln mean welfare for mean welfare (sae_change_rmse_by_method(),
+# R/change_comparison.R).
+change_rmse <- tryCatch(
+  sae_change_rmse_by_method(
+    comparison_dt,
+    list(FH = sig_fh,
+         FH_Bench = if (.benchmark_enabled) sig_fh_bench else NULL,
+         MFH = if (!.mfh_not_executed) sig_mfh else NULL,
+         MFH_Bench = if (.benchmark_enabled && !.mfh_not_executed) sig_mfh_bench else NULL),
+    years_keep, indicator_type, fgt_alpha,
+    labels = c(MFH = diag_model, MFH_Bench = paste(diag_model, "benchmarked"))
+  ),
+  error = function(e) {
+    message("WARN: changes and RMSEs by method not computed: ", conditionMessage(e))
+    NULL
+  }
+)
+if (!is.null(change_rmse)) {
+  change_rmse$long$color <- unname(sae_method_colors()[change_rmse$long$method_key])
+  utils::write.csv(change_rmse$long[, c("domain", "name", "method_key", "method", "method_order",
+                                        "change", "rmse", "unit", "change_label", "rmse_label",
+                                        "color")],
+                   here::here("outputs", "tables", "change_rmse_by_method.csv"),
+                   row.names = FALSE)
+}
+.change_rmse_sheets <- if (is.null(change_rmse)) list() else list(
+  `Change and RMSE by method` = change_rmse$long[, c("domain", "name", "method", "change", "rmse", "unit")],
+  `Change and RMSE summary` = change_rmse$summary
+)
+
 .write_xlsx_safe(
-  list(`Domain changes` = change_comparison$domain,
-       `Distribution summary` = change_comparison$distribution,
-       `Paired summary` = change_comparison$paired),
+  c(list(`Domain changes` = change_comparison$domain,
+         `Distribution summary` = change_comparison$distribution,
+         `Paired summary` = change_comparison$paired),
+    .change_rmse_sheets),
   here::here("outputs", "data", "change_estimate_comparison.xlsx")
 )
 
 .write_xlsx_safe(
-  list(
+  c(list(
     `Estimate comparison` = .comparison_export,
     `Statistical significance` = sig_plot_dt,
     `Significance summary` = sig_summary_tbl,
@@ -1775,40 +1809,9 @@ change_comparison <- sae_change_comparison(
     `Change estimates by domain` = change_comparison$domain,
     `Change distribution` = change_comparison$distribution,
     `Change paired summary` = change_comparison$paired
-  ),
+  ), .change_rmse_sheets),
   here::here("outputs", "data", "EU_SAE_results.xlsx")
 )
-
-plot_ci_width_distribution <- function() {
-  if (nrow(ci_width_long) == 0) return(NULL)
-  ggplot(ci_width_long, aes(x = method, y = width, color = method, fill = method)) +
-    geom_boxplot(width = 0.42, alpha = 0.12, outlier.shape = NA, linewidth = 0.8) +
-    geom_jitter(width = 0.08, height = 0, alpha = 0.55, size = 2.2) +
-    stat_summary(
-      fun = median,
-      geom = "text",
-      aes(label = sprintf("Median %.1f", after_stat(y))),
-      vjust = -1.1,
-      fontface = "bold",
-      show.legend = FALSE
-    ) +
-    scale_color_manual(values = c(UFH = "#2563EB", MFH = "#D97706")) +
-    scale_fill_manual(values = c(UFH = "#2563EB", MFH = "#D97706")) +
-    labs(
-      title = "Distribution of pointwise 95% confidence-interval widths",
-      subtitle = sprintf("Unbenchmarked poverty-change estimates across %d matched domains", nrow(ci_width_domain)),
-      x = NULL,
-      y = sprintf("Full 95%% CI width (%s)", .ci_unit),
-      caption = "Each point is one domain; boxes show the median and interquartile range."
-    ) +
-    theme_minimal(base_size = 14) +
-    theme(
-      legend.position = "none",
-      plot.title = element_text(face = "bold"),
-      panel.grid.major.x = element_blank()
-    )
-}
-
 
 plot_ci_width_paired <- function() {
   if (nrow(ci_width_domain) == 0) return(NULL)
@@ -2380,11 +2383,6 @@ for (.spec in .sig_specs) {
 if (nrow(ci_width_domain) > 0) {
   message("Exporting confidence-interval width comparisons ...")
   .safe_ggsave(
-    plot_ci_width_distribution(),
-    file.path(figures_root, "uncertainty_comparisons", "ci_width_distribution_ufh_mfh.png"),
-    width = 10, height = 6, dpi = 300
-  )
-  .safe_ggsave(
     plot_ci_width_paired(),
     file.path(figures_root, "uncertainty_comparisons", "ci_width_paired_ufh_mfh.png"),
     width = 8, height = 7, dpi = 300
@@ -2392,10 +2390,15 @@ if (nrow(ci_width_domain) > 0) {
 }
 
 # ---- Estimated-change comparisons (distinct from CI widths) ----
+# Box plots of the changes and their RMSEs for every method, in one row (the
+# HTML report draws its own version with a Methods list from
+# outputs/tables/change_rmse_by_method.csv).
+if (!is.null(change_rmse) && nrow(change_rmse$long) > 0) {
+  .safe_ggsave(sae_plot_change_rmse_boxplots(change_rmse),
+    file.path(figures_root, "change_comparisons", "change_rmse_boxplots.png"),
+    width = 12, height = 5.4, dpi = 300)
+}
 if (nrow(change_comparison$domain) > 0) {
-  .safe_ggsave(sae_plot_change_distribution(change_comparison),
-    file.path(figures_root, "change_comparisons", "change_distribution_ufh_mfh.png"),
-    width = 11, height = 6.5, dpi = 300)
   .safe_ggsave(sae_plot_change_paired(change_comparison),
     file.path(figures_root, "change_comparisons", "change_paired_ufh_mfh.png"),
     width = 10, height = 8.5, dpi = 300)
@@ -2513,10 +2516,19 @@ for (.spec in .change_map_specs) {
   "  `direct`, `fh`, `fh_benchmarked`, `mfh`, `mfh_benchmarked`.",
   "",
   "## uncertainty_comparisons/",
-  "Distribution and paired-domain comparisons of pointwise 95% confidence-interval widths:",
+  "Paired-domain comparison of UFH and MFH pointwise 95% confidence-interval widths:",
   "",
-  "- `ci_width_distribution_ufh_mfh.png`",
   "- `ci_width_paired_ufh_mfh.png`",
+  "",
+  "## change_comparisons/",
+  "",
+  "- `change_rmse_boxplots.png`: box plots of the change between the two years",
+  "  and its RMSE across domains, in one row, for Direct, UFH, UFH benchmarked,",
+  "  the selected MFH model and MFH benchmarked (percentage points for poverty",
+  "  indicators, ln mean welfare for mean welfare). The data are in",
+  "  `outputs/tables/change_rmse_by_method.csv`; the HTML report draws the same",
+  "  box plots with a Methods list.",
+  "- `change_paired_ufh_mfh.png`: UFH and MFH changes compared domain by domain.",
   "",
   "## change_figures/",
   "Significance plots and maps of the domain-level change between the two",
