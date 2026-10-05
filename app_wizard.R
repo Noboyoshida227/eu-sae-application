@@ -833,11 +833,11 @@ ui <- fluidPage(
             ),
             textInput("ufh_candidates_y1",
               tip_label("UFH covariates for Year 1 (comma-separated, optional)",
-                        "Forces specific covariates into the UFH model for the first analysis year. If left blank, the app selects automatically from auxiliary data."),
+                        "If LASSO is on, these variables define the candidate pool for the first analysis year. If LASSO is off, they define the fixed UFH specification. Leave blank to use the eligible auxiliary variables."),
               value = ""),
             textInput("ufh_candidates_y2",
               tip_label("UFH covariates for Year 2 (comma-separated, optional)",
-                        "Forces specific covariates into the UFH model for the second analysis year. If left blank, the app selects automatically from auxiliary data."),
+                        "If LASSO is on, these variables define the candidate pool for the second analysis year. If LASSO is off, they define the fixed UFH specification. Leave blank to use the eligible auxiliary variables."),
               value = "")
           ),
           tags$div(class = "wiz-col",
@@ -856,7 +856,7 @@ ui <- fluidPage(
                 tip_label("Transformation (MFH)",
                           paste(
                             "Transformation applied to the MFH model. Independent of the UFH choice above.",
-                            "'log' fits MFH on log(welfare) per year, then back-transforms each (domain, year) cell with a per-domain-year smearing factor anchored to the population-weighted arithmetic mean of welfare. MCPE is back-transformed to currency units via a delta-method approximation, so cross-year change analysis stays on the EUR scale.",
+                            "'log' fits MFH on log(welfare) per year, then back-transforms each (domain, year) cell with a per-domain-year smearing factor anchored to the population-weighted arithmetic mean of welfare. MCPE is back-transformed to currency units via a delta-method approximation, so the variance of the change between the years is computed in currency units (the report shows mean-welfare changes as percentage changes of the mean).",
                             "'no' fits on the identity scale.")),
                 choices = c("log", "no"), selected = "log"),
               conditionalPanel(
@@ -912,11 +912,11 @@ ui <- fluidPage(
               value = 200, min = 50, step = 50),
             textInput("mfh_candidates_y1",
               tip_label("MFH covariates for Year 1 (comma-separated, optional)",
-                        "Forces specific covariates into the MFH model for the first analysis year. If left blank, the app selects automatically from auxiliary data."),
+                        "If LASSO is on, these variables define the candidate pool for the first analysis year. If LASSO is off, they define the fixed MFH specification. Leave blank to use the eligible auxiliary variables."),
               value = ""),
             textInput("mfh_candidates_y2",
               tip_label("MFH covariates for Year 2 (comma-separated, optional)",
-                        "Forces specific covariates into the MFH model for the second analysis year. If left blank, the app selects automatically from auxiliary data."),
+                        "If LASSO is on, these variables define the candidate pool for the second analysis year. If LASSO is off, they define the fixed MFH specification. Leave blank to use the eligible auxiliary variables."),
               value = "")
           )
         ),

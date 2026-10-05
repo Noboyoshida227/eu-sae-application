@@ -1268,6 +1268,21 @@ for (ui_file in c("app.R", "app_wizard.R")) {
               paste(readLines(ui_file, warn = FALSE), collapse = "\n"), fixed = TRUE),
         paste(ui_file, "notes an unused grouped benchmark variable under National benchmarking"))
 }
+# w5l: help text and READMEs match the app (GPT-6 Astra documentation review).
+.wiz_help <- read_all("app_wizard.R")
+check(!grepl("Forces specific covariates", .wiz_help, fixed = TRUE) &&
+        lengths(regmatches(.wiz_help, gregexpr("If LASSO is on, these variables define the candidate pool",
+                                               .wiz_help, fixed = TRUE))) == 4L,
+      "wizard covariate help describes candidate pools (LASSO on) and fixed specifications (LASSO off)")
+check(!any(grepl("stays on the EUR scale", c(.wiz_help, read_all("app.R")), fixed = TRUE)),
+      "MFH log help no longer says change analysis stays on the EUR scale")
+.rw <- read_all("docs/README_WIZARD.md")
+check(grepl("With current prices\nand no conversion they include inflation", .rw, fixed = TRUE) &&
+        grepl("This RMSE is an approximation", .rw, fixed = TRUE) &&
+        !grepl("estimated-change distribution", .rw, fixed = TRUE),
+      "README_WIZARD: inflation only for unconverted current prices; approximate benchmarked RMSE; no removed figure")
+check(!grepl("compare estimated changes in percentage points", read_all("tools/build_instruction_pdf.py"), fixed = TRUE),
+      "download-instructions generator distinguishes poverty and mean-welfare change units")
 
 if (length(failures) > 0L) {
   stop("Tests failed: ", paste(failures, collapse = "; "), call. = FALSE)

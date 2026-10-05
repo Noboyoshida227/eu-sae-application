@@ -211,14 +211,22 @@ third-party material.
 
 ## Reading the change figures
 
-The estimated-change plots show later year minus earlier year in percentage
-points for poverty, using the same finite matched domains and unbenchmarked
-UFH/MFH estimates. Negative values indicate a decrease. Their spread across
-domains is not the MSE of a domain estimate. A tighter MFH distribution is
-consistent with temporal borrowing and shrinkage, but does not prove greater
-accuracy or a statistically significant variance reduction. Use the separate
-CI-width figures, MSE/MCPE diagnostics, and model sensitivity checks to assess
-uncertainty. See Section 11.9 of the guidance note.
+Changes are later year minus earlier year. Poverty changes are in percentage
+points. Mean-welfare changes in the maps, significance plots and paired UFH-MFH
+figures are percentage changes of the mean, 100 x (later mean / earlier mean -
+1); the differences in currency units are kept in the Excel columns ending in
+`_eur`. The change-and-RMSE box plots
+(`outputs/figures/change_comparisons/change_rmse_boxplots.png`) show, for each
+method (Direct, UFH, the selected MFH model and, with benchmarking, UFH
+benchmarked and MFH benchmarked), the change across domains next to the RMSE of
+that change; for mean welfare both are on the log scale (ln of the later mean
+minus ln of the earlier mean). Negative values indicate a decrease. The spread
+of changes across domains is not the MSE of a domain estimate: a tighter MFH
+distribution is consistent with temporal borrowing and shrinkage, but does not
+prove greater accuracy or a statistically significant variance reduction. Use
+the RMSE panel, the paired confidence-interval-width figure, the MSE/MCPE
+diagnostics and model sensitivity checks to assess uncertainty. See Section
+11.9 of the guidance note.
 
 ### Short release packages
 

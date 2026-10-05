@@ -1288,7 +1288,7 @@ ui <- fluidPage(
           tip_label("Transformation (MFH)",
                     paste(
                       "Transformation applied to the MFH model. Independent of the UFH choice above.",
-                      "'log' fits MFH on log(welfare) per year, then back-transforms each (domain, year) cell with a per-domain-year smearing factor anchored to the population-weighted arithmetic mean of welfare. MCPE is back-transformed to currency units via a delta-method approximation, so cross-year change analysis stays on the EUR scale.",
+                      "'log' fits MFH on log(welfare) per year, then back-transforms each (domain, year) cell with a per-domain-year smearing factor anchored to the population-weighted arithmetic mean of welfare. MCPE is back-transformed to currency units via a delta-method approximation, so the variance of the change between the years is computed in currency units (the report shows mean-welfare changes as percentage changes of the mean).",
                       "'no' fits on the identity scale.")),
           choices = c("log", "no"), selected = "log"),
         conditionalPanel(

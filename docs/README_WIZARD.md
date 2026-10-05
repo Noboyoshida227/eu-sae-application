@@ -147,7 +147,10 @@ in logs, the benchmarking is done in currency after the back-transform: each
 domain estimate is multiplied by its group's target divided by the
 population-weighted average of the domain estimates in the group, so the
 domain estimates average exactly to the target. Their RMSE keeps the relative
-precision (CV) of the log-scale bootstrap.
+precision (CV) of the log-scale bootstrap. This RMSE is an approximation: the
+final currency-scale adjustment is not repeated inside the bootstrap, and
+uploaded targets are treated as fixed, so their own sampling error is not
+included. Matching the targets exactly does not show that the RMSE is right.
 
 In **Models**, the AIC/BIC *Model selection criterion* is used only for
 stepwise covariate selection. If LASSO is off and covariates are entered for
@@ -259,8 +262,9 @@ significance table and the change and interval-width comparisons use these
 percentage changes; the difference in currency units is kept in
 `statistical_significance_comparison.xlsx` (columns ending in `_eur`). The UFH
 and MFH step figures in `outputs/figures/` still show currency differences.
-With a price index (see **Indicator** above) these are real changes; without
-one they include inflation, and Data Readiness says so.
+When welfare is converted with a price index, or is already in constant
+prices (see **Indicator** above), these are real changes. With current prices
+and no conversion they include inflation, and Data Readiness says so.
 
 ### Maps
 
@@ -318,8 +322,8 @@ interpretation blocks with their corresponding statistical sections and records
 their statuses and provider/model metadata. Failed sections are shown
 explicitly. The statistical results remain authoritative, and every AI block
 requires human review before dissemination. The change-significance section
-includes the complete pointwise/BH/Bonferroni table, UFH-MFH confidence-interval
-width figures, estimated-change distribution and paired-domain figures, and links to the consolidated Excel result tables in
+includes the complete pointwise/BH/Bonferroni table, the change-and-RMSE box
+plots, the paired UFH-MFH figures of changes and interval widths, and links to the consolidated Excel result tables in
 `outputs/data/`.
 
 ### Loading a saved setup

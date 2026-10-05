@@ -365,6 +365,66 @@ display: none;
 
 <div id="changelog" class="section level1">
 <h1>Changelog</h1>
+<div id="unreleased-w5l" class="section level2">
+<h2>Unreleased (w5l)</h2>
+<ul>
+<li>Documentation and help text brought in line with w5k (after the
+ChatGPT (GPT-6 Astra) review of the w5k documentation, 5 Oct). No change
+to estimates.
+<ul>
+<li><strong>MSE technical note</strong>
+(<code>docs/guidance/Technical notes/Note on MSE Estimation - Levels and Changes.docx</code>):
+the principal <code>significant</code> flag is the unadjusted test (BH
+and Bonferroni are sensitivity flags), not the BH test; the
+covariance-adjusted variance of a change is used whenever it is positive
+(the 1% floor is gone), and the independence fallback for zero or
+negative values is flagged in <code>mse_fallback_used</code> and
+<code>mse_rule</code> and is not described as always conservative;
+mean-welfare changes are reported as percentage changes of the mean;
+uploaded benchmark targets are treated as fixed; and, for mean welfare
+fitted in logs, the final currency-scale benchmarking step is not
+repeated inside the bootstrap, so its RMSE (which keeps the log-scale
+CV) is an approximation.</li>
+<li><strong>Guidelines note:</strong> Annex H.2 step 5 and the
+comparison table no longer call the independence fallback conservative
+or mention “implausibly small” values; Figure 10 shows the new front
+page, and the text says <strong>Start an analysis</strong> instead of
+“Get Started”.</li>
+<li><strong>User guide</strong>
+(<code>EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_11.pptx</code>): slides 14
+and 16 show the new front page and <strong>Start an analysis</strong>;
+slide 22 says that welfare, poverty lines and targets must share one
+price basis and that only calendar-year income periods are handled;
+slides 23 and 24 add the mean-welfare <strong>log</strong>
+transformation and the <strong>bc_sm</strong> (Duan smearing) bias
+correction, and slide 24 describes <strong>Also fit MFH3</strong> as a
+comparison fit; slide 25 says uploaded targets are taken as fixed and
+the benchmarked RMSE is approximate for mean welfare in logs; slide 28
+shows the checks the Preflight tab actually runs (project root,
+rmarkdown, analysis years, spatial dependency, input data files) instead
+of a relative poverty line and other checks it does not run.</li>
+<li><strong>Download instructions PDF</strong>
+(<code>tools/build_instruction_pdf.py</code>): the wizard walkthrough
+mentions the mean-welfare price settings and the common price basis; the
+benchmarking section says targets are fixed and the log-fit benchmarked
+RMSE is approximate; the report section distinguishes poverty changes
+(percentage points), mean-welfare percentage changes and the ln changes
+in the box plots.</li>
+<li><strong>READMEs:</strong> <code>docs/README_WIZARD.md</code> says
+that changes include inflation only for current prices with no
+conversion (not for welfare already in constant prices), repeats the
+benchmarked-RMSE qualification, and no longer lists the removed
+change-distribution figure; the root <code>README.md</code> describes
+the change-and-RMSE box plots and mean-welfare units.</li>
+<li><strong>In-app help:</strong> the wizard’s UFH and MFH covariate
+fields now say that the lists are candidate pools when LASSO is on and
+fixed specifications when it is off (they said the covariates were
+“forced” into the model), as in the dashboard; the MFH
+log-transformation help no longer says that change analysis “stays on
+the EUR scale”.</li>
+</ul></li>
+</ul>
+</div>
 <div id="rc.6-wizard.5.11---2026-10-05" class="section level2">
 <h2>5.2.0-rc.6-wizard.5.11 - 2026-10-05</h2>
 <ul>
