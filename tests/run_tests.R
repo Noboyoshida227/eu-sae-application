@@ -17,7 +17,7 @@ parse_ok <- vapply(r_files, function(path) {
 check(all(parse_ok), "all R sources parse")
 check(identical(trimws(readLines("VERSION", warn = FALSE)[1]), "5.2.0-rc.6"), "VERSION is the candidate version")
 check(identical(trimws(readLines("WIZARD_VERSION", warn = FALSE)[1]),
-                "5.2.0-rc.6-wizard.5.10"),
+                "5.2.0-rc.6-wizard.5.11"),
       "WIZARD_VERSION identifies the rc.6 wizard overlay")
 wizard_version <- trimws(readLines("WIZARD_VERSION", warn = FALSE)[1])
 changelog_text <- read_all("docs/CHANGELOG.md")
@@ -119,8 +119,8 @@ check(grepl("sae_write_release_manifest", wizard_manifest_text, fixed = TRUE),
 wizard_resources <- c(
   "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx",
   "docs/MCPE_VALIDATION_STATUS.md",
-  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_10.pdf",
-  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_10.pptx"
+  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_11.pdf",
+  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_11.pptx"
 )
 check(all(vapply(wizard_resources, file.exists, logical(1))) &&
         all(vapply(wizard_resources, grepl, logical(1), x = wizard_text,
@@ -1141,12 +1141,87 @@ check(isTRUE(all.equal(.pc$pct_change[1:2], c(10, -10))) &&
         all(.pc$pct_lb[1:2] < .pc$pct_change[1:2] & .pc$pct_change[1:2] < .pc$pct_ub[1:2]) &&
         is.na(.pc$pct_change[3]),
       "percentage change of the mean: log-ratio variance with the implied covariance")
+# Incomes refer to the calendar year before the survey (owner, 4 Oct 2026):
+# the index of t - 1 is used for survey year t; the default is the survey year.
+.pi_prev <- list(enabled = TRUE, index_type = "fixed", income_period = "previous_calendar_year",
+                 values = list("2012" = 100.8, "2013" = 101.7))
+.pi_prev_missing <- list(enabled = TRUE, index_type = "fixed", income_period = "previous_calendar_year",
+                         values = list("2013" = 101.7, "2014" = 101.7))
+.pi_prev_pct <- list(enabled = TRUE, index_type = "percent_change", income_period = "previous_calendar_year",
+                     values = list("2012" = 3.7, "2013" = 0.9))
+check(identical(sae_price_income_period(list(enabled = TRUE)), "survey_year") &&
+        identical(sae_price_income_years(list(), c(2013L, 2014L)), c(2013L, 2014L)) &&
+        identical(sae_price_base_year(.pi_prev, c(2013L, 2014L)), 2012L) &&
+        length(sae_price_index_problems(.pi_prev, c(2013L, 2014L))) == 0L &&
+        isTRUE(all.equal(sae_price_factors(.pi_prev, c(2013L, 2014L)),
+                         c(`2013` = 1, `2014` = 100.8 / 101.7))) &&
+        isTRUE(all.equal(sae_apply_price_index(data.frame(year = 2014L, welfare = 1000), .pi_prev,
+                                               c(2013L, 2014L))$welfare, 1000 * 100.8 / 101.7)) &&
+        grepl("constant 2012 prices (incomes refer to the calendar year before the survey;",
+              sae_price_basis_label(.pi_prev, c(2013L, 2014L)), fixed = TRUE) &&
+        grepl("price index missing for year(s) 2012",
+              sae_price_index_problems(.pi_prev_missing, c(2013L, 2014L))[1], fixed = TRUE) &&
+        identical(sae_price_chain_years(.pi_prev_pct, c(2012L, 2014L)), 2012:2013) &&
+        isTRUE(all.equal(unname(sae_price_factors(.pi_prev_pct, c(2012L, 2014L))), c(1, 1 / (1.037 * 1.009)))) &&
+        grepl("incomes refer to", sae_price_index_problems(list(enabled = TRUE, income_period = "x",
+                                                                values = list("2012" = 100)), 2012L)[1]),
+      "incomes refer to the calendar year before the survey: index of t - 1 for survey year t")
+# Welfare already in constant (real) prices (owner, 4 Oct 2026): no price
+# index, no conversion, and the labels say so.
+.pi_real <- list(enabled = FALSE, welfare_prices = "real", base_year = 2017L)
+check(is.null(sae_price_factors(.pi_real, c(2012L, 2013L))) &&
+        length(sae_price_index_problems(.pi_real, c(2012L, 2013L))) == 0L &&
+        identical(sae_apply_price_index(data.frame(year = 2013L, welfare = 1000), .pi_real,
+                                        c(2012L, 2013L))$welfare, 1000) &&
+        identical(sae_price_basis_label(.pi_real, c(2012L, 2013L)),
+                  "constant 2017 prices as provided in the survey data (no price index applied)") &&
+        identical(sae_price_basis_label(list(enabled = FALSE, welfare_prices = "real"), c(2012L, 2013L)),
+                  "constant prices as provided in the survey data (no price index applied)") &&
+        identical(sae_price_basis_label(list(enabled = FALSE), c(2012L, 2013L)),
+                  "current prices (not deflated)") &&
+        isTRUE(validate_app_config(list(years_keep = c(2012L, 2013L), analysis_seed = 123L,
+                                        indicator_type = "mean_welfare", price_index = .pi_real))$valid),
+      "welfare already in constant prices: no price index, no conversion, labelled as such")
+# GPT-6 Astra review (5 Oct 2026): an old setup with the constant-prices box
+# ticked must restore as "convert" (read before defaults are merged), and the
+# percentage-change flags must say what was actually used.
+check(identical(sae_setup_welfare_prices(list(deflate_welfare = TRUE)), "convert") &&
+        identical(sae_setup_welfare_prices(list(deflate_welfare = "TRUE")), "convert") &&
+        identical(sae_setup_welfare_prices(list(deflate_welfare = FALSE)), "current") &&
+        identical(sae_setup_welfare_prices(list()), "current") &&
+        identical(sae_setup_welfare_prices(NULL), "current") &&
+        identical(sae_setup_welfare_prices(list(welfare_prices = "real", deflate_welfare = FALSE)), "real") &&
+        identical(sae_setup_welfare_prices(list(welfare_prices = "convert", deflate_welfare = TRUE)), "convert"),
+      "saved setups: prices choice read from the saved inputs (old ticked box = convert)")
+.pc_flags <- sae_percent_change(m1 = c(100, 100, 100), m2 = c(105, 105, 105), mse1 = 4, mse2 = 4,
+                                mse_diff = c(NA, 2, -0.2))
+check(identical(.pc_flags$log_ratio_covariance_used, c(FALSE, TRUE, FALSE)) &&
+        identical(.pc_flags$mse_fallback_used, c(FALSE, FALSE, TRUE)) &&
+        isTRUE(all.equal(.pc_flags$log_ratio_var[1], 4 / 100^2 + 4 / 105^2)),
+      "percentage change: covariance flag only when a change MSE is given; fallback flagged")
+# No 1% rule (owner, 4 Oct 2026): a small positive covariance-adjusted variance
+# (here 0.5% of the independence variance) is used; only a negative one falls
+# back to the independence variance.
+.pc_small <- sae_percent_change(m1 = c(100, 100), m2 = c(100, 100), mse1 = 4, mse2 = 4,
+                                mse_diff = c(0.04, -0.2))
+check(isTRUE(all.equal(.pc_small$log_ratio_var[1], 0.0008 * 0.005)) &&
+        isTRUE(.pc_small$log_ratio_covariance_used[1]) &&
+        isTRUE(all.equal(.pc_small$log_ratio_var[2], 0.0008)) &&
+        identical(.pc_small$log_ratio_covariance_used[2], FALSE),
+      "percentage change: no 1% rule; independence variance only when the adjusted one is not positive")
+.mfh_rule_txt <- paste(readLines("scripts/02_mfh.R", warn = FALSE), collapse = "\n")
+check(!grepl("0.01 * mse_indep", .mfh_rule_txt, fixed = TRUE) &&
+        lengths(regmatches(.mfh_rule_txt, gregexpr("is\\.finite\\(mse_with_cov[a-z_]*\\) & mse_with_cov[a-z_]* > 0",
+                                                    .mfh_rule_txt))) == 5L,
+      "MFH change tests: no 1% rule in any of the five change-variance blocks")
 .app_txt <- paste(readLines("app.R", warn = FALSE), collapse = "\n")
 .wiz_txt <- paste(readLines("app_wizard.R", warn = FALSE), collapse = "\n")
 .ufh_txt <- paste(readLines("scripts/01_ufh.R", warn = FALSE), collapse = "\n")
 .mfh_txt <- paste(readLines("scripts/02_mfh.R", warn = FALSE), collapse = "\n")
-check(grepl('checkboxInput("deflate_welfare"', .app_txt, fixed = TRUE) &&
-        grepl('checkboxInput("deflate_welfare"', .wiz_txt, fixed = TRUE) &&
+check(grepl('radioButtons("welfare_prices"', .app_txt, fixed = TRUE) &&
+        grepl('radioButtons("welfare_prices"', .wiz_txt, fixed = TRUE) &&
+        grepl("condition = \"input.welfare_prices == 'convert' && input.indicator_type == 'mean_welfare'\"",
+              .wiz_txt, fixed = TRUE) &&
         grepl('uiOutput("price_index_by_year_ui")', .wiz_txt, fixed = TRUE) &&
         grepl("price_index_inputs(),", .app_txt, fixed = TRUE) &&
         grepl("price_index_inputs(),", .wiz_txt, fixed = TRUE) &&
@@ -1163,6 +1238,31 @@ check(grepl('checkboxInput("deflate_welfare"', .app_txt, fixed = TRUE) &&
         grepl("sae_deflate_year_matrix(regional_benchmark_mat", .mfh_txt, fixed = TRUE) &&
         grepl('sig_mfh       <- .to_percent_change(sig_mfh, "MFH")', cmp_text, fixed = TRUE),
       "price index reaches the config, both steps and external targets; mean-welfare changes become percentages")
+check(grepl('radioButtons("price_income_period"', .app_txt, fixed = TRUE) &&
+        grepl('"the survey year" = "survey_year"', .app_txt, fixed = TRUE) &&
+        grepl('"the calendar year before the survey" = "previous_calendar_year"', .app_txt, fixed = TRUE) &&
+        grepl('price_income_period = "survey_year"', .app_txt, fixed = TRUE),
+      "'Incomes refer to' setting in the shared price inputs, saved with the setup (default: the survey year)")
+check({
+  .p_saved <- regexpr(".welfare_prices_saved <- sae_setup_welfare_prices(setup$inputs)", .app_txt, fixed = TRUE)
+  .p_merge <- regexpr("setup$inputs <- modifyList(defaults$inputs, setup$inputs %||% list())", .app_txt, fixed = TRUE)
+  .p_saved > 0 && .p_merge > 0 && .p_saved < .p_merge &&
+    grepl('updateRadioButtons(session, "welfare_prices", selected = .welfare_prices_saved)', .app_txt, fixed = TRUE)
+}, "apply_dashboard_setup reads the prices choice before merging defaults")
+check(grepl("sig$mse_fallback_used <- pc$mse_fallback_used", cmp_text, fixed = TRUE) &&
+        lengths(regmatches(.mfh_txt, gregexpr("mse_rule <- ifelse(use_cov", .mfh_txt, fixed = TRUE))) == 4L,
+      "fallback flags refreshed for the final change variances (Comparison and MFH)")
+# Mean welfare in logs with a Benchmark Target Database: the log-scale step
+# must not compare currency targets with log estimates; the targets are
+# applied on the currency scale after the back-transform.
+check(grepl("log_step_benchmarks <- if (log_mean_run) direct_region_benchmarks else region_benchmarks",
+            .ufh_txt, fixed = TRUE) &&
+        grepl("left_join(log_step_benchmarks |> select(region, B_r)", .ufh_txt, fixed = TRUE) &&
+        grepl("B_eur  = as.numeric(external_benchmark_mat[, as.character(yr)])", .ufh_txt, fixed = TRUE) &&
+        grepl("regional_benchmark_mat = if (.log_mean_run) NULL else regional_benchmark_mat",
+              .mfh_txt, fixed = TRUE) &&
+        grepl('names(region_targets) <- c("region", "year", "B_eur")', .mfh_txt, fixed = TRUE),
+      "mean welfare in logs: uploaded benchmark targets are applied on the currency scale (UFH and MFH)")
 for (ui_file in c("app.R", "app_wizard.R")) {
   check(grepl("A grouped benchmark variable is still selected but is not used",
               paste(readLines(ui_file, warn = FALSE), collapse = "\n"), fixed = TRUE),

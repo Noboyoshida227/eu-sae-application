@@ -287,7 +287,7 @@ if (!identical(indicator_type, "poverty") && !"povline" %in% names(survey_all)) 
   survey_all$povline <- NA_real_
 }
 # Mean-welfare runs: express welfare in constant prices of the base year (by
-# default the first analysis year) when a price index was entered
+# default the first income year) when a price index was entered
 # (R/pipeline_helpers.R). Poverty runs are never deflated.
 .price_years <- as.integer(unlist(cfg_or_default(ufh_cfg$years_keep, c(2012L, 2013L))))
 price_index_cfg <- .app_cfg$price_index
@@ -1115,6 +1115,10 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
 
   fh_bench <- NULL
   pop_dt <- NULL
+  external_benchmark_mat <- NULL
+  # Mean welfare fitted in logs: the model works with ln(welfare), while
+  # uploaded benchmark targets are in currency. See the benchmarking block.
+  log_mean_run <- identical(indicator_type, "mean_welfare") && isTRUE(log_transform)
   fh_dt <- fh_dt |> rename(domain = Domain)
   if (do_benchmark) {
     # ---- Regional/national benchmarking ----
@@ -1144,7 +1148,8 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
       years_keep = years_keep,
       level_col = benchmark_level_variable
     )
-    # External mean-welfare targets are in current prices like the survey.
+    # External mean-welfare targets are in the same prices as the survey's welfare
+    # (current prices unless the welfare is already real), so they get the same factors.
     external_benchmark_mat <- sae_deflate_year_matrix(external_benchmark_mat, price_factors)
 
     # Benchmark-level targets: uploaded targets if provided; otherwise the
@@ -1174,8 +1179,22 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
     cat("\nUFH benchmark targets (yr =", yr, "):\n")
     print(region_benchmarks)
 
+    # In a log run the estimates below are ln(welfare), so a currency target
+    # cannot be used here: dividing, say, 12,500 by an average log of 9.4
+    # would multiply the log estimates by about 1,300. The log-scale step
+    # therefore always uses the survey's own regional figures (also in logs);
+    # it only supplies the relative precision of the benchmarked estimates.
+    # The point estimates are benchmarked to the uploaded targets on the
+    # currency scale after the back-transform (see "Re-benchmark on the
+    # currency scale" below).
+    log_step_benchmarks <- if (log_mean_run) direct_region_benchmarks else region_benchmarks
+    if (log_mean_run && !is.null(external_benchmark_mat)) {
+      cat("Mean welfare in logs: the uploaded targets are applied on the currency",
+          "scale after the back-transform.\n")
+    }
+
     region_df <- fh_dt |>
-      left_join(region_benchmarks |> select(region, B_r), by = "region") |>
+      left_join(log_step_benchmarks |> select(region, B_r), by = "region") |>
       mutate(direct_povrate = if_else(is.finite(B_r), B_r, direct_povrate)) |>
       select(domain, region, Nd, direct_povrate)
     fh_bench  <- bench_regional(
@@ -1276,18 +1295,20 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
         pov_fh[[cv_col]] <- .safe_cv_from_mse(pov_fh[[mse_col]], pov_fh[[col]])
       }
     }
-    # ---- Re-benchmark on the EUR scale ---------------------------------
+    # ---- Re-benchmark on the currency scale ----------------------------
     # The FH_Bench column we just back-transformed was produced by a ratio
     # benchmark applied on the log scale. After exponentiation the result
     # is no longer guaranteed to satisfy the regional aggregation
-    # constraint on the original currency scale (population-weighted
-    # regional mean of FH_Bench should equal the regional weighted mean
-    # of arithmetic-mean direct welfare). Override FH_Bench by computing
-    # a fresh ratio adjustment on the EUR scale using the back-transformed
-    # FH and Direct columns. The corresponding MSE is left as the
-    # delta-method propagated value from the log-scale bootstrap -- that
-    # is an approximation; redoing the bootstrap on the EUR scale is on
-    # the future-work list.
+    # constraint on the original currency scale. Override FH_Bench with a
+    # fresh ratio adjustment on the currency scale:
+    #   factor_r = target_r / population-weighted mean of FH in region r,
+    #   FH_Bench = factor_r * FH.
+    # The target is the uploaded regional figure when a Benchmark Target
+    # Database is used (already converted to the run's prices); otherwise
+    # it is the population-weighted mean of the survey's arithmetic means.
+    # The MSE keeps the relative precision (CV) of the log-scale bootstrap
+    # of the benchmarked estimates -- an approximation; redoing the
+    # bootstrap on the currency scale is on the future-work list.
     if (do_benchmark && !is.null(region_map) &&
         "FH" %in% names(pov_fh) && "FH_Bench" %in% names(pov_fh)) {
       reg_lookup <- .direct_norm |>
@@ -1298,18 +1319,64 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
           by = "domain"
         )
       if ("Nd" %in% names(reg_lookup)) {
-        region_lambda <- reg_lookup |>
-          dplyr::filter(!is.na(direct_arith), !is.na(FH_eur), !is.na(Nd)) |>
-          dplyr::group_by(region) |>
-          dplyr::summarise(
-            B_eur     = stats::weighted.mean(direct_arith, Nd, na.rm = TRUE),
-            FH_bar    = stats::weighted.mean(FH_eur,       Nd, na.rm = TRUE),
-            lambda_eur = ifelse(abs(FH_bar) > 1e-8, B_eur / FH_bar, 1),
-            .groups   = "drop"
+        if (!is.null(external_benchmark_mat)) {
+          # Uploaded targets cover the whole region, so the regional average
+          # of FH uses every domain of the region.
+          ext_targets <- tibble::tibble(
+            region = rownames(external_benchmark_mat),
+            B_eur  = as.numeric(external_benchmark_mat[, as.character(yr)])
           )
+          bench_basis <- tibble::tibble(
+            domain = as.character(pov_fh$domain),
+            FH_eur = pov_fh$FH
+          ) |>
+            dplyr::left_join(
+              region_map |> dplyr::transmute(domain = as.character(domain),
+                                             region = as.character(region)),
+              by = "domain"
+            ) |>
+            dplyr::left_join(
+              pop_dt |> dplyr::transmute(domain = as.character(domain), Nd),
+              by = "domain"
+            ) |>
+            dplyr::filter(!is.na(region), is.finite(FH_eur), is.finite(Nd))
+          # The uploaded targets describe whole groups; say so when some
+          # domains of a group have no estimate this year.
+          .no_estimate <- setdiff(unique(as.character(region_map$domain)), bench_basis$domain)
+          if (length(.no_estimate)) {
+            cat(sprintf(paste("WARNING: UFH benchmarking (year %s): %d domain(s) of the benchmark",
+                              "groups have no estimate (%s%s); the uploaded targets are matched",
+                              "by the other domains only. Check that the targets cover the same domains.\n"),
+                        yr, length(.no_estimate), paste(utils::head(.no_estimate, 10), collapse = ", "),
+                        if (length(.no_estimate) > 10) ", ..." else ""))
+          }
+          region_lambda <- bench_basis |>
+            dplyr::group_by(region) |>
+            dplyr::summarise(
+              FH_bar = stats::weighted.mean(FH_eur, Nd),
+              .groups = "drop"
+            ) |>
+            dplyr::left_join(ext_targets, by = "region") |>
+            dplyr::mutate(lambda_eur = ifelse(is.finite(B_eur) & abs(FH_bar) > 1e-8,
+                                              B_eur / FH_bar, 1))
+          cat(sprintf("UFH benchmarking (year %s): currency-scale factors to the uploaded targets: %s\n",
+                      yr, paste(sprintf("%s %.4f", region_lambda$region, region_lambda$lambda_eur),
+                                collapse = ", ")))
+        } else {
+          region_lambda <- reg_lookup |>
+            dplyr::filter(!is.na(direct_arith), !is.na(FH_eur), !is.na(Nd)) |>
+            dplyr::group_by(region) |>
+            dplyr::summarise(
+              B_eur     = stats::weighted.mean(direct_arith, Nd, na.rm = TRUE),
+              FH_bar    = stats::weighted.mean(FH_eur,       Nd, na.rm = TRUE),
+              lambda_eur = ifelse(abs(FH_bar) > 1e-8, B_eur / FH_bar, 1),
+              .groups   = "drop"
+            )
+        }
         lambda_for_pov_fh <- region_lambda$lambda_eur[match(
-          reg_lookup$region[match(pov_fh$domain, reg_lookup$domain)],
-          region_lambda$region
+          as.character(region_map$region[match(as.character(pov_fh$domain),
+                                               as.character(region_map$domain))]),
+          as.character(region_lambda$region)
         )]
         lambda_for_pov_fh[!is.finite(lambda_for_pov_fh)] <- 1
         # Cache the OLD FH_Bench (log-scale-derived bench in EUR) before

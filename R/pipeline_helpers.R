@@ -840,11 +840,27 @@ sae_ic_none_problem <- function(model, lasso_enabled, vars_y1, vars_y2,
 # columns in source_file, year_column and value_column, and any problem
 # reading them in source_problem.
 #
+# Incomes refer to (income_period; owner's decision of 4 Oct 2026):
+#   survey_year             the incomes of survey year t are in t's prices
+#                           (the default, and the behaviour before w5k);
+#   previous_calendar_year  they refer to the calendar year before the survey
+#                           (as in EU-SILC: survey 2013 asks about 2012
+#                           incomes), so the index of t - 1 is used for t.
+# Index values, the base year and "constant <year> prices" are always about
+# the year of the prices ("income year"); results stay labelled by survey year.
+#
+# When the survey's welfare is already in constant (real) prices, nothing is
+# converted and the config records it for the labels (owner's request of
+# 4 Oct 2026):
+#   price_index: {enabled: no, welfare_prices: real, base_year: 2017}
+# (base_year optional: the year of those prices).
+#
 # Config shape (app_config.yml):
 #   price_index:
 #     enabled: yes
 #     index_type: fixed          # optional; default fixed
-#     base_year: 2017            # optional; default: first analysis year
+#     income_period: survey_year # optional; default survey_year
+#     base_year: 2017            # optional; default: first income year
 #     values: {"2012": 100, "2013": 101.4, "2017": 104.9}
 #     source_file: cpi.xlsx      # optional (CPI file)
 #     year_column: year
@@ -878,6 +894,26 @@ sae_price_index_type <- function(price_index) {
   if (type %in% c("fixed", "previous_year", "percent_change")) type else NA_character_
 }
 
+# "survey_year" (the default) or "previous_calendar_year": which year's prices
+# the incomes of a survey year are in. NA for any other value.
+sae_price_income_period <- function(price_index) {
+  raw <- if (is.list(price_index)) price_index$income_period else NULL
+  if (is.null(raw) || length(raw) == 0L || is.na(raw[[1]]) ||
+      !nzchar(trimws(as.character(raw[[1]])))) {
+    return("survey_year")
+  }
+  p <- trimws(as.character(raw[[1]]))
+  if (p %in% c("survey_year", "previous_calendar_year")) p else NA_character_
+}
+
+# The years whose prices the incomes of the analysis years are in: the
+# analysis years themselves, or one year earlier when incomes refer to the
+# calendar year before the survey.
+sae_price_income_years <- function(price_index, years_keep) {
+  yrs <- as.integer(years_keep)
+  if (identical(sae_price_income_period(price_index), "previous_calendar_year")) yrs - 1L else yrs
+}
+
 # Years whose value is an annual change (previous_year, percent_change) rather
 # than an index level.
 sae_price_index_is_chain <- function(price_index) {
@@ -885,10 +921,10 @@ sae_price_index_is_chain <- function(price_index) {
 }
 
 # The price base year as a whole number: price_index$base_year, or the first
-# analysis year when it is not set. NA when it is set but is not a calendar
-# year (1900-2100).
+# income year (normally the first analysis year) when it is not set. NA when it
+# is set but is not a calendar year (1900-2100).
 sae_price_base_year <- function(price_index, years_keep) {
-  years_int <- sort(as.integer(years_keep))
+  years_int <- sort(sae_price_income_years(price_index, years_keep))
   raw <- if (is.list(price_index)) price_index$base_year else NULL
   if (is.null(raw) || length(raw) == 0L ||
       (length(raw) == 1L && is.character(raw) && !nzchar(trimws(raw)))) {
@@ -900,9 +936,9 @@ sae_price_base_year <- function(price_index, years_keep) {
 }
 
 # Years that need an annual index (previous year = 100): every year after the
-# earliest and up to the latest of the analysis years and the base year.
+# earliest and up to the latest of the income years and the base year.
 sae_price_chain_years <- function(price_index, years_keep) {
-  yrs <- as.integer(years_keep)
+  yrs <- sae_price_income_years(price_index, years_keep)
   base <- sae_price_base_year(price_index, years_keep)
   if (!is.na(base)) yrs <- c(yrs, base)
   yrs <- yrs[!is.na(yrs)]
@@ -915,7 +951,11 @@ sae_price_chain_years <- function(price_index, years_keep) {
 sae_price_index_problems <- function(price_index, years_keep,
                                      indicator_type = "mean_welfare") {
   if (!sae_price_index_enabled(price_index, indicator_type)) return(character(0))
-  years_chr <- as.character(sort(as.integer(years_keep)))
+  if (is.na(sae_price_income_period(price_index))) {
+    return(sprintf("'incomes refer to' must be 'survey_year' or 'previous_calendar_year' (got '%s')",
+                   as.character(price_index$income_period[[1]])))
+  }
+  years_chr <- as.character(sort(sae_price_income_years(price_index, years_keep)))
   vals <- sae_price_index_values(price_index$values)
   type <- sae_price_index_type(price_index)
   probs <- character(0)
@@ -977,13 +1017,13 @@ sae_price_index_problems <- function(price_index, years_keep,
   probs
 }
 
-# Price levels by year for the analysis years and the base year: the entered
+# Price levels by year for the income years and the base year: the entered
 # values for a fixed-reference index, or the chained annual indices (earliest
 # year = 100) for previous-year indices. Assumes the settings have no problems.
 sae_price_levels <- function(price_index, years_keep) {
   vals <- sae_price_index_values(price_index$values)
   base <- sae_price_base_year(price_index, years_keep)
-  years <- sort(unique(c(as.integer(years_keep), base)))
+  years <- sort(unique(c(sae_price_income_years(price_index, years_keep), base)))
   if (!sae_price_index_is_chain(price_index)) {
     return(stats::setNames(as.numeric(vals[as.character(years)]), as.character(years)))
   }
@@ -997,7 +1037,8 @@ sae_price_levels <- function(price_index, years_keep) {
   lev[as.character(years)]
 }
 
-# Named factors P(base) / P(year), or NULL when deflation is off.
+# Factors P(base) / P(income year), named by analysis (survey) year, or NULL
+# when deflation is off.
 sae_price_factors <- function(price_index, years_keep,
                               indicator_type = "mean_welfare") {
   if (!sae_price_index_enabled(price_index, indicator_type)) return(NULL)
@@ -1005,10 +1046,11 @@ sae_price_factors <- function(price_index, years_keep,
   if (length(probs)) {
     stop("Price index: ", paste(probs, collapse = "; "), call. = FALSE)
   }
-  years_chr <- as.character(sort(as.integer(years_keep)))
+  years_int <- sort(as.integer(years_keep))
+  income_chr <- as.character(sae_price_income_years(price_index, years_int))
   lev <- sae_price_levels(price_index, years_keep)
   base <- as.character(sae_price_base_year(price_index, years_keep))
-  stats::setNames(as.numeric(lev[[base]]) / as.numeric(lev[years_chr]), years_chr)
+  stats::setNames(as.numeric(lev[[base]]) / as.numeric(lev[income_chr]), as.character(years_int))
 }
 
 # Multiply welfare by the year's factor. Rows of other years are unchanged.
@@ -1036,6 +1078,25 @@ sae_deflate_year_matrix <- function(mat, factors) {
   mat
 }
 
+# The prices choice of a saved setup ("convert", "current" or "real"), read
+# from its own inputs before defaults are filled in. Setups saved before w5k
+# have only deflate_welfare (ticked = "convert", unticked = "current").
+sae_setup_welfare_prices <- function(inputs) {
+  if (!is.list(inputs)) return("current")
+  v <- inputs$welfare_prices
+  v <- if (length(v)) as.character(v[[1]]) else NA_character_
+  if (!is.na(v) && v %in% c("convert", "current", "real")) return(v)
+  if (isTRUE(as.logical(inputs$deflate_welfare %||% FALSE)[1])) "convert" else "current"
+}
+
+# TRUE when the survey's welfare is already in constant (real) prices
+# (price_index$welfare_prices = "real"): no price index is needed or applied.
+sae_price_welfare_is_real <- function(price_index) {
+  if (!is.list(price_index)) return(FALSE)
+  v <- price_index$welfare_prices
+  length(v) >= 1L && !is.na(v[[1]]) && identical(trimws(as.character(v[[1]])), "real")
+}
+
 # Short description for logs and the report.
 sae_price_basis_label <- function(price_index, years_keep,
                                   indicator_type = "mean_welfare") {
@@ -1043,21 +1104,32 @@ sae_price_basis_label <- function(price_index, years_keep,
     return("not applicable (poverty indicator)")
   }
   if (!sae_price_index_enabled(price_index, indicator_type)) {
+    if (sae_price_welfare_is_real(price_index)) {
+      yr <- suppressWarnings(as.numeric(price_index$base_year %||% NA)[1])
+      yr_txt <- if (length(yr) == 1L && is.finite(yr) && yr == round(yr) &&
+                    yr >= 1900 && yr <= 2100) paste0(" ", as.integer(yr)) else ""
+      return(sprintf("constant%s prices as provided in the survey data (no price index applied)", yr_txt))
+    }
     return("current prices (not deflated)")
   }
-  years_chr <- as.character(sort(as.integer(years_keep)))
+  years_chr <- as.character(sort(sae_price_income_years(price_index, years_keep)))
   vals <- sae_price_index_values(price_index$values)
   base_int <- sae_price_base_year(price_index, years_keep)
   base <- if (is.na(base_int)) "(base year not set)" else as.character(base_int)
   fmt <- function(y) as.character(signif(as.numeric(vals[y]), 8))
   src <- sae_price_source_text(price_index)
   src_txt <- if (nzchar(src)) paste0("; from the ", src) else ""
+  # Only said when incomes refer to the calendar year before the survey, so
+  # labels of the default setting read as before.
+  period_txt <- if (identical(sae_price_income_period(price_index), "previous_calendar_year")) {
+    "incomes refer to the calendar year before the survey; "
+  } else ""
   type <- sae_price_index_type(price_index)
   if (sae_price_index_is_chain(price_index)) {
     chain <- as.character(sae_price_chain_years(price_index, years_keep))
     what <- if (identical(type, "percent_change")) "annual price change in %" else
       "annual price index, previous year = 100"
-    return(sprintf("constant %s prices (%s: %s%s)", base, what,
+    return(sprintf("constant %s prices (%s%s: %s%s)", base, period_txt, what,
                    if (length(chain)) paste(sprintf("%s = %s", chain, fmt(chain)), collapse = ", ")
                    else "none needed", src_txt))
   }
@@ -1065,7 +1137,7 @@ sae_price_basis_label <- function(price_index, years_keep,
   if (!is.na(base_int) && !base %in% years_chr) {
     index_txt <- sprintf("%s; base year %s = %s", index_txt, base, fmt(base))
   }
-  sprintf("constant %s prices (price index: %s%s)", base, index_txt, src_txt)
+  sprintf("constant %s prices (%sprice index: %s%s)", base, period_txt, index_txt, src_txt)
 }
 
 # "CPI file cpi.xlsx, column CPI" when the values came from a CPI file, else "".
@@ -1181,10 +1253,14 @@ sae_cpi_series <- function(df, year_col, value_col) {
 #   v = MSE1 / m1^2 + MSE2 / m2^2 - 2 * C / (m1 * m2),
 # where C is the covariance of the two estimates. C is implied by the MSE of the
 # difference that the UFH and MFH steps report: Var(m2 - m1) = MSE1 + MSE2 - 2C.
-# (UFH assumes independent years, so C = 0 there.) As in the MFH step, when the
-# covariance-adjusted variance is not above 1% of the independence variance the
-# independence variance is used. The 95% interval 100 * (exp(r +/- z se) - 1) is
-# asymmetric and never below -100%.
+# (UFH assumes independent years, so C = 0 there.) The covariance-adjusted
+# variance is used whenever it is positive, however small (owner's decision of
+# 4 Oct 2026: no 1% rule). Only when it is zero, negative or not a number (a
+# zero-width interval or an impossible negative variance) is the independence
+# variance used instead, as in the MFH step; mse_fallback_used marks those
+# rows, and log_ratio_covariance_used is TRUE only when a change MSE was given
+# and its implied covariance was used. The 95% interval
+# 100 * (exp(r +/- z se) - 1) is asymmetric and never below -100%.
 sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05) {
   n <- max(length(m1), length(m2))
   m1 <- rep_len(as.numeric(m1), n); m2 <- rep_len(as.numeric(m2), n)
@@ -1195,9 +1271,10 @@ sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05) {
   ok <- is.finite(m1) & is.finite(m2) & m1 > 0 & m2 > 0
   r <- ifelse(ok, log(m2 / m1), NA_real_)
   v_indep <- mse1 / m1^2 + mse2 / m2^2
-  cov12 <- ifelse(is.finite(mse_diff), (mse1 + mse2 - mse_diff) / 2, 0)
+  has_cov <- is.finite(mse_diff)
+  cov12 <- ifelse(has_cov, (mse1 + mse2 - mse_diff) / 2, 0)
   v_cov <- v_indep - 2 * cov12 / (m1 * m2)
-  use_cov <- is.finite(v_cov) & is.finite(v_indep) & v_cov > 0.01 * v_indep
+  use_cov <- is.finite(v_cov) & is.finite(v_indep) & v_cov > 0
   v <- ifelse(use_cov, v_cov, v_indep)
   v[!ok | !is.finite(v) | v <= 0] <- NA_real_
   se <- sqrt(v)
@@ -1210,7 +1287,8 @@ sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05) {
     pct_mse = (100 * exp(r))^2 * v,
     log_ratio = r,
     log_ratio_var = v,
-    log_ratio_covariance_used = use_cov & ok,
+    log_ratio_covariance_used = ok & has_cov & use_cov,
+    mse_fallback_used = ok & has_cov & !use_cov,
     p_value = p,
     stringsAsFactors = FALSE
   )

@@ -730,12 +730,27 @@ ui <- fluidPage(
                 tip_label("Currency symbol",
                           "Short label appended to axis titles and table headers for mean welfare estimates."),
                 value = "EUR"),
-              checkboxInput("deflate_welfare",
-                tip_label("Express welfare in constant prices",
-                          "Household-survey incomes are usually in current (nominal) prices, so a change in mean welfare would include inflation. Tick this and enter a consumer price index (for example the CPI or HICP), either as index levels with a fixed reference year or as annual indices with the previous year = 100: welfare is multiplied by the price level of the base year / the price level of its own year, so all mean-welfare levels are in prices of the base year and changes between years are real changes. The base year is the first analysis year unless you choose another one. Leave it unticked if welfare is already in constant prices."),
-                value = FALSE),
+              # Prices of welfare (mean welfare only): convert current prices to
+              # constant prices of a base year with a price index
+              # (sae_apply_price_index(), R/pipeline_helpers.R), leave them as they
+              # are, or record that the survey's welfare is already in constant (real)
+              # prices, in which case no price index is needed or applied.
+              radioButtons("welfare_prices",
+                tip_label("Welfare in the survey data is in",
+                          "Household-survey incomes and expenditures are usually in current (nominal) prices, so a change in mean welfare would include inflation. 'Current prices: convert with a price index' expresses welfare in constant prices: enter a consumer price index (for example the CPI or HICP) below, typed in or from the CPI file; welfare is multiplied by the price level of the base year / the price level of the year its incomes refer to (the survey year, or the calendar year before it), so all mean-welfare levels are in prices of the base year and changes between years are real changes. 'Current prices: no conversion' leaves welfare as it is, so changes include inflation. Choose 'Constant (real) prices already' when the survey's income or expenditure has already been adjusted for inflation: no price index is needed or applied, and you can give the year of those prices for the labels."),
+                choices = c("current prices: convert with a price index" = "convert",
+                            "current prices: no conversion (changes include inflation)" = "current",
+                            "constant (real) prices already: no price index needed" = "real"),
+                selected = "current"),
               conditionalPanel(
-                condition = "input.deflate_welfare && input.indicator_type == 'mean_welfare'",
+                condition = "input.welfare_prices == 'real' && input.indicator_type == 'mean_welfare'",
+                numericInput("real_price_year",
+                  tip_label("Year of those prices (optional)",
+                            "Year whose prices the survey's welfare is in, for example 2017. Used only in labels (for example 'constant 2017 prices'); leave it empty if it is not known."),
+                  value = NA, min = 1900, max = 2100, step = 1)
+              ),
+              conditionalPanel(
+                condition = "input.welfare_prices == 'convert' && input.indicator_type == 'mean_welfare'",
                 price_index_inputs(),
                 uiOutput("price_index_by_year_ui"),
                 uiOutput("price_base_index_ui")
@@ -1079,8 +1094,8 @@ ui <- fluidPage(
         style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
         tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
         tags$li(tags$code("docs/MCPE_VALIDATION_STATUS.md")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_10.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_10.pptx")),
+        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_11.pdf")),
+        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_11.pptx")),
         tags$li(tags$code("outputs/final_report.html"), " after a completed run")
       )
     )
@@ -1189,7 +1204,7 @@ wizard_server <- function(input, output, session) {
           }
         }
       }
-    } else if (isTRUE(input$deflate_welfare)) {
+    } else if (identical(input$welfare_prices, "convert")) {
       # Mean welfare in constant prices: every needed index value present.
       cfg <- session$userData$get_price_index_config()
       probs <- sae_price_index_problems(cfg, parse_years(input$years))

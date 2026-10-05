@@ -445,7 +445,9 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
       sae_price_index_enabled(price_index, indicator_type)) {
     survey_data <- sae_apply_price_index(
       survey_data, price_index,
-      years_keep %||% names(sae_price_index_values(price_index$values)),
+      years_keep %||% (as.integer(names(sae_price_index_values(price_index$values))) +
+                         if (identical(sae_price_income_period(price_index),
+                                       "previous_calendar_year")) 1L else 0L),
       indicator_type
     )
   }

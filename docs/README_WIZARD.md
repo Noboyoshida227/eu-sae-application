@@ -1,6 +1,6 @@
 # EU SAE Dashboard — Wizard edition
 
-Wizard version: **5.2.0-rc.6-wizard.5.10**
+Wizard version: **5.2.0-rc.6-wizard.5.11**
 Underlying EU SAE package: **5.2.0-rc.6**
 
 This is the clean 5.2.0-rc.6 application package with an additional guided
@@ -71,36 +71,62 @@ step 1.
    holds one country's CPI by year (see the Indicator step).
 2. **Mapping** — survey columns and the auxiliary/geometry join keys.
 3. **Indicator** — poverty (FGT) or mean welfare and its required settings.
-   For mean welfare, tick **Express welfare in constant prices** when the
-   survey welfare is in current prices, and give a consumer price index (for
-   example the CPI or HICP). **Price index values** says where it comes from:
+   For mean welfare, **Welfare in the survey data is in** says which prices
+   the survey's income or expenditure is in:
+   - **current prices: convert with a price index**: give a consumer price
+     index (for example the CPI or HICP), and the app expresses welfare in
+     constant prices of a base year (below);
+   - **current prices: no conversion** (the default): welfare is used as it
+     is, so changes between years include inflation;
+   - **constant (real) prices already**: the survey's welfare has already been
+     adjusted for inflation, so no price index is needed or applied;
+     optionally give the year of those prices (for example 2017), used only
+     in labels such as "constant 2017 prices as provided in the survey data".
+     All years must then be in the prices of the same year (and, if spatial
+     price adjustments were made, on the same basis); the app cannot check
+     this.
+
+   For poverty indicators welfare is never converted: the welfare variable
+   and the poverty line must already be in the same prices in each year.
+
+   With the first choice, **Price index values** says where the index comes from:
    typed in by year, or read from the CPI file chosen in the Data step. The
    CPI file has one row per year, with a year column (for example 2013, or
    text such as 2013A00) and one or more CPI columns; you choose the **Year
    column** and the **CPI column**, and the app takes the years it needs and
    shows them, or the years that are missing. CSV files separated by commas or
    semicolons and numbers with a decimal comma (101,4) are accepted.
+   **Incomes refer to** says which year's prices the incomes are in: **the
+   survey year** (the default, for surveys of current income or consumption)
+   or **the calendar year before the survey** (for example EU-SILC, whose 2013
+   survey asks about incomes of 2012). With the second choice the app uses the
+   index of 2012 for the 2013 survey; index values, the base year and
+   "constant 2012 prices" then refer to the year of the incomes (the income
+   year), while results keep the survey years as labels.
    **How the CPI is organised** says how the values are reported:
    - **Index, fixed reference year** (for example 2015 = 100): the index level
-     for each analysis year;
+     for each income year;
    - **Index, previous year = 100**: annual-average indices against the year
      before (for example 103.6 for 3.6% inflation, as in Statistics Poland's
      annual table);
    - **Annual change in %**: the same as a rate (for example 3.6).
 
    Annual changes are needed for every year after the earliest and up to the
-   latest analysis or base year; the app chains them into price levels.
+   latest income or base year; the app chains them into price levels.
    Welfare is multiplied by the price level of the base year / the price level
-   of its own year, so all mean-welfare levels are in prices of the base year
-   and changes are real changes. **Price base year** is the first analysis
+   of its income year, so all mean-welfare levels are in prices of the base
+   year and changes are real changes. **Price base year** is the first income
    year by default; choose **Another year** to use, for example, 2017 prices
-   or the prices of the last analysis year. With a fixed-reference index, the
+   or the prices of the last income year. With a fixed-reference index, the
    base year needs its own index level, from the same series (typed in, or
    found in the CPI file). Percentage changes between years are the same
    whatever the base year; only the levels change. Use annual averages for
-   annual incomes, not December-on-December or monthly indices, and if incomes
-   refer to an earlier period than the survey year (in EU-SILC, the previous
-   calendar year), use the index of that period. The run log, the readiness
+   annual incomes, not December-on-December or monthly indices. The two
+   **Incomes refer to** choices cover calendar years only: for a fiscal year,
+   a rolling 12-month period before the interview, or reference periods that
+   differ between households, deflate welfare before uploading the survey
+   (for example household by household with the index of its own period) and
+   choose **constant (real) prices already**. The run log, the readiness
    messages, the review page and the report name the CPI file and column.
 4. **Models** — UFH and MFH choices, MCPE bootstrap replicates, benchmarking,
    covariate selection, and PSU consistency.
@@ -113,7 +139,15 @@ only when it is missing/non-finite or strictly below 0.001. A direct variance
 equal to 0.001 is retained. Under benchmarking, choose **National** to make the
 population-weighted average of the domain estimates equal the direct national
 estimate, or choose **Grouped** and map a higher-level survey variable to apply
-the constraint separately within each group.
+the constraint separately within each group. A **Benchmark Target Database**
+replaces the survey's figures as targets; its figures must be in the same
+prices as the survey's welfare, and when the app converts welfare with a price
+index they are converted in the same way. For mean welfare fitted
+in logs, the benchmarking is done in currency after the back-transform: each
+domain estimate is multiplied by its group's target divided by the
+population-weighted average of the domain estimates in the group, so the
+domain estimates average exactly to the target. Their RMSE keeps the relative
+precision (CV) of the log-scale bootstrap.
 
 In **Models**, the AIC/BIC *Model selection criterion* is used only for
 stepwise covariate selection. If LASSO is off and covariates are entered for

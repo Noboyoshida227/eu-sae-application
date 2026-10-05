@@ -216,11 +216,14 @@ dashboard_setup_defaults <- function() {
       fgt_alpha = "0",
       currency_symbol = "EUR",
       deflate_welfare = FALSE,
+      welfare_prices = "current",
+      real_price_year = NA_integer_,
       price_index_by_year = list(),
       price_index_source = "manual",
       cpi_year_col = "",
       cpi_value_col = "",
       price_index_type = "fixed",
+      price_income_period = "survey_year",
       price_change_by_year = list(),
       price_pct_by_year = list(),
       price_base_mode = "first",
@@ -427,7 +430,9 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
       sae_price_index_enabled(price_index, indicator_type)) {
     survey_data <- sae_apply_price_index(
       survey_data, price_index,
-      years_keep %||% names(sae_price_index_values(price_index$values)),
+      years_keep %||% (as.integer(names(sae_price_index_values(price_index$values))) +
+                         if (identical(sae_price_income_period(price_index),
+                                       "previous_calendar_year")) 1L else 0L),
       indicator_type
     )
   }
@@ -707,10 +712,11 @@ ic_criterion_input <- function(prefix, selected, tip_text) {
 
 # Price-index settings for mean welfare in constant prices, used by the
 # dashboard and the wizard: where the values come from (typed in by year, or
-# the CPI file chosen in the Data step, with its year and CPI columns), how
-# the CPI is organised (index with a fixed reference year, index with the
-# previous year = 100, or annual change in %) and the price base year (the
-# first analysis year by default, or another calendar year such as 2017).
+# the CPI file chosen in the Data step, with its year and CPI columns), which
+# year the incomes refer to (the survey year, or the calendar year before the
+# survey), how the CPI is organised (index with a fixed reference year, index
+# with the previous year = 100, or annual change in %) and the price base year
+# (the first income year by default, or another calendar year such as 2017).
 # The server renders the per-year boxes (output$price_index_by_year_ui,
 # output$price_base_index_ui) and the CPI file check (output$cpi_file_status)
 # and records the choices in price_index (get_price_index_config()).
@@ -734,15 +740,26 @@ price_index_inputs <- function() {
         choices = character(0)),
       uiOutput("cpi_file_status")
     ),
+    radioButtons("price_income_period",
+      tip_label("Incomes refer to",
+                paste("The year whose prices the survey's incomes are in. Most surveys ask about",
+                      "current income or consumption: choose 'the survey year'. Some ask about",
+                      "the previous calendar year (EU-SILC, for example: the 2013 survey asks",
+                      "about incomes of 2012): choose 'the calendar year before the survey', and",
+                      "the app uses the price index of 2012 for the 2013 survey. Results keep",
+                      "the survey years as labels.")),
+      choices = c("the survey year" = "survey_year",
+                  "the calendar year before the survey" = "previous_calendar_year"),
+      selected = "survey_year"),
     radioButtons("price_index_type",
       tip_label("How the CPI is organised",
                 paste("How the values are reported. 'Index, fixed reference year': index levels",
                       "against one reference year (for example HICP 2015 = 100), needed for each",
-                      "analysis year. 'Index, previous year = 100': annual-average indices against",
+                      "income year. 'Index, previous year = 100': annual-average indices against",
                       "the year before (for example 103.6 for 3.6% inflation, as in Statistics",
                       "Poland's annual table). 'Annual change in %': the same as a rate (3.6).",
                       "Annual changes are needed for every year after the earliest and up to the",
-                      "latest analysis or base year, and the app chains them. Use annual averages",
+                      "latest income or base year, and the app chains them. Use annual averages",
                       "for annual incomes, not December-on-December or monthly figures.")),
       choices = c("Index, fixed reference year (e.g. 2015 = 100)" = "fixed",
                   "Index, previous year = 100 (e.g. 103.6)" = "previous_year",
@@ -750,12 +767,14 @@ price_index_inputs <- function() {
       selected = "fixed"),
     radioButtons("price_base_mode",
       tip_label("Price base year",
-                paste("Year whose prices mean welfare is expressed in. Choose 'Another year'",
-                      "for, say, 2017 prices or the prices of the last analysis year. With a",
-                      "fixed-reference index typed in by year, a base year outside the analysis",
+                paste("Year whose prices mean welfare is expressed in. By default the first",
+                      "income year: the first analysis year, or the year before it when incomes",
+                      "refer to the calendar year before the survey. Choose 'Another year'",
+                      "for, say, 2017 prices or the prices of the last income year. With a",
+                      "fixed-reference index typed in by year, a base year outside the income",
                       "years needs its own index value, from the same series. Percentage changes",
                       "between years do not depend on the base year; only the levels do.")),
-      choices = c("First analysis year" = "first", "Another year" = "other"),
+      choices = c("First income year" = "first", "Another year" = "other"),
       selected = "first", inline = TRUE),
     conditionalPanel(
       condition = "input.price_base_mode == 'other'",
@@ -980,8 +999,8 @@ ui <- fluidPage(
       tags$ul(
         style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
         tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_10.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_10.pptx")),
+        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_11.pdf")),
+        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_11.pptx")),
         tags$li(tags$code("outputs/final_report.html"), " after a completed run")
       ),
       tags$hr(),
@@ -1158,15 +1177,27 @@ ui <- fluidPage(
           tip_label("Currency symbol",
                     "Short label appended to axis titles and table headers for mean welfare estimates."),
           value = "EUR"),
-        # Price deflation (mean welfare only): welfare in constant prices of
-        # a base year, by default the first analysis year
-        # (sae_apply_price_index(), R/pipeline_helpers.R).
-        checkboxInput("deflate_welfare",
-          tip_label("Express welfare in constant prices",
-                    "Household-survey incomes are usually in current (nominal) prices, so a change in mean welfare would include inflation. Tick this and enter a consumer price index (for example the CPI or HICP), either as index levels with a fixed reference year or as annual indices with the previous year = 100: welfare is multiplied by the price level of the base year / the price level of its own year, so all mean-welfare levels are in prices of the base year and changes between years are real changes. The base year is the first analysis year unless you choose another one. Leave it unticked if welfare is already in constant prices."),
-          value = FALSE),
+        # Prices of welfare (mean welfare only): convert current prices to
+        # constant prices of a base year with a price index
+        # (sae_apply_price_index(), R/pipeline_helpers.R), leave them as they
+        # are, or record that the survey's welfare is already in constant (real)
+        # prices, in which case no price index is needed or applied.
+        radioButtons("welfare_prices",
+          tip_label("Welfare in the survey data is in",
+                    "Household-survey incomes and expenditures are usually in current (nominal) prices, so a change in mean welfare would include inflation. 'Current prices: convert with a price index' expresses welfare in constant prices: enter a consumer price index (for example the CPI or HICP) below, typed in or from the CPI file; welfare is multiplied by the price level of the base year / the price level of the year its incomes refer to (the survey year, or the calendar year before it), so all mean-welfare levels are in prices of the base year and changes between years are real changes. 'Current prices: no conversion' leaves welfare as it is, so changes include inflation. Choose 'Constant (real) prices already' when the survey's income or expenditure has already been adjusted for inflation: no price index is needed or applied, and you can give the year of those prices for the labels."),
+          choices = c("current prices: convert with a price index" = "convert",
+                      "current prices: no conversion (changes include inflation)" = "current",
+                      "constant (real) prices already: no price index needed" = "real"),
+          selected = "current"),
         conditionalPanel(
-          condition = "input.deflate_welfare && input.indicator_type == 'mean_welfare'",
+          condition = "input.welfare_prices == 'real' && input.indicator_type == 'mean_welfare'",
+          numericInput("real_price_year",
+            tip_label("Year of those prices (optional)",
+                      "Year whose prices the survey's welfare is in, for example 2017. Used only in labels (for example 'constant 2017 prices'); leave it empty if it is not known."),
+            value = NA, min = 1900, max = 2100, step = 1)
+        ),
+        conditionalPanel(
+          condition = "input.welfare_prices == 'convert' && input.indicator_type == 'mean_welfare'",
           price_index_inputs(),
           uiOutput("price_index_by_year_ui"),
           uiOutput("price_base_index_ui")
@@ -1931,6 +1962,19 @@ server <- function(input, output, session) {
 
   price_from_file <- function() identical(input$price_index_source, "file")
 
+  # Incomes refer to the survey year (default) or the calendar year before
+  # the survey; the price index is needed for the income years.
+  get_price_income_period <- function() {
+    if (identical(input$price_income_period, "previous_calendar_year")) {
+      "previous_calendar_year"
+    } else {
+      "survey_year"
+    }
+  }
+  price_income_years <- function(years_vec) {
+    sort(sae_price_income_years(list(income_period = get_price_income_period()), years_vec))
+  }
+
   # Values typed in by year: input <prefix><year>, else the restored value,
   # else the default (100 for an index, 0 for a change in %).
   typed_values <- function(prefix, years, restored, default) {
@@ -1944,25 +1988,26 @@ server <- function(input, output, session) {
     vals
   }
 
-  # Fixed-reference index: one value per analysis year (inputs price_index_<year>).
+  # Fixed-reference index: one value per income year (inputs price_index_<year>).
   get_price_index_by_year <- function(years_vec = parse_years(input$years)) {
-    typed_values("price_index_", years_vec, price_index_restored(), 100)
+    typed_values("price_index_", price_income_years(years_vec), price_index_restored(), 100)
   }
 
-  # Price base year: the first analysis year, or the year entered under
+  # Price base year: the first income year, or the year entered under
   # "Another year" (NA when that field is empty or not a calendar year).
   get_price_base_year <- function(years_vec = parse_years(input$years)) {
-    years_vec <- sort(as.integer(years_vec))
+    income_years <- price_income_years(years_vec)
     if (!identical(input$price_base_mode %||% "first", "other")) {
-      return(if (length(years_vec)) years_vec[1] else NA_integer_)
+      return(if (length(income_years)) income_years[1] else NA_integer_)
     }
-    sae_price_base_year(list(base_year = input$price_base_year %||% NA), years_vec)
+    sae_price_base_year(list(base_year = input$price_base_year %||% NA), income_years)
   }
 
   # Annual changes (previous year = 100, or in %): the years that need one,
   # and the values typed in (inputs price_change_<year> and price_pct_<year>).
   get_price_chain_years <- function(years_vec = parse_years(input$years)) {
-    sae_price_chain_years(list(base_year = get_price_base_year(years_vec)), years_vec)
+    sae_price_chain_years(list(base_year = get_price_base_year(years_vec),
+                               income_period = get_price_income_period()), years_vec)
   }
 
   get_price_change_by_year <- function(years_vec = parse_years(input$years)) {
@@ -2022,7 +2067,8 @@ server <- function(input, output, session) {
 
   # Price-index values from the CPI file for the years this run needs.
   price_index_from_file <- function(years_vec, type, base) {
-    cfg <- list(enabled = TRUE, index_type = type, base_year = base, values = list(),
+    cfg <- list(enabled = TRUE, index_type = type,
+                income_period = get_price_income_period(), base_year = base, values = list(),
                 source = "file", source_file = cpi_file_name(),
                 year_column = input$cpi_year_col %||% "",
                 value_column = input$cpi_value_col %||% "")
@@ -2051,38 +2097,65 @@ server <- function(input, output, session) {
       cfg$source_problem <- paste(ser$problems, collapse = "; ")
       return(cfg)
     }
+    income_years <- price_income_years(years_vec)
     need <- if (type %in% c("previous_year", "percent_change")) {
-      sae_price_chain_years(list(base_year = base), years_vec)
+      sae_price_chain_years(list(base_year = base, income_period = cfg$income_period), years_vec)
     } else {
-      c(years_vec, if (!is.na(base) && !base %in% years_vec) base)
+      c(income_years, if (!is.na(base) && !base %in% income_years) base)
     }
     have <- intersect(as.character(need), names(ser$values))
     cfg$values <- as.list(ser$values[have])
     cfg
   }
 
-  # list(enabled = FALSE) unless mean welfare is selected and the box ticked.
+  # Prices of the survey's welfare: "convert" (current prices converted with a
+  # price index), "current" (left as they are; the default) or "real" (already
+  # in constant prices, no price index).
+  get_welfare_prices <- function() {
+    v <- input$welfare_prices %||% "current"
+    if (length(v) == 1L && v %in% c("convert", "real")) v else "current"
+  }
+  # Optional year of the prices of welfare that is already in constant prices.
+  get_real_price_year <- function() {
+    y <- suppressWarnings(as.numeric(input$real_price_year %||% NA))
+    if (length(y) == 1L && is.finite(y) && y == round(y) && y >= 1900 && y <= 2100) {
+      as.integer(y)
+    } else {
+      NA_integer_
+    }
+  }
+
+  # list(enabled = FALSE) unless mean welfare is converted with a price index;
+  # list(enabled = FALSE, welfare_prices = "real", ...) when it is already in
+  # constant prices.
   get_price_index_config <- function(years_vec = parse_years(input$years)) {
     years_vec <- sort(as.integer(years_vec))
-    enabled <- identical(input$indicator_type %||% "poverty", "mean_welfare") &&
-      isTRUE(input$deflate_welfare) && length(years_vec) > 0L
+    is_mean <- identical(input$indicator_type %||% "poverty", "mean_welfare")
+    if (is_mean && identical(get_welfare_prices(), "real")) {
+      cfg <- list(enabled = FALSE, welfare_prices = "real")
+      if (!is.na(get_real_price_year())) cfg$base_year <- get_real_price_year()
+      return(cfg)
+    }
+    enabled <- is_mean && identical(get_welfare_prices(), "convert") && length(years_vec) > 0L
     if (!enabled) return(list(enabled = FALSE))
     base <- get_price_base_year(years_vec)
     type <- get_price_index_type()
+    period <- get_price_income_period()
     if (price_from_file()) return(price_index_from_file(years_vec, type, base))
     if (identical(type, "previous_year")) {
-      return(list(enabled = TRUE, index_type = type, base_year = base,
+      return(list(enabled = TRUE, index_type = type, income_period = period, base_year = base,
                   values = get_price_change_by_year(years_vec)))
     }
     if (identical(type, "percent_change")) {
-      return(list(enabled = TRUE, index_type = type, base_year = base,
+      return(list(enabled = TRUE, index_type = type, income_period = period, base_year = base,
                   values = get_price_pct_by_year(years_vec)))
     }
     values <- get_price_index_by_year(years_vec)
-    if (!is.na(base) && !base %in% years_vec) {
+    if (!is.na(base) && !base %in% price_income_years(years_vec)) {
       values[[as.character(base)]] <- get_price_base_index()
     }
-    list(enabled = TRUE, index_type = type, base_year = base, values = values)
+    list(enabled = TRUE, index_type = type, income_period = period, base_year = base,
+         values = values)
   }
   # Shared with the wizard (app_wizard.R), whose server runs this one.
   session$userData$get_price_index_config <- get_price_index_config
@@ -2091,20 +2164,31 @@ server <- function(input, output, session) {
   price_readiness_note <- function(years_vec) {
     if (!identical(input$indicator_type %||% "poverty", "mean_welfare")) return(character(0))
     cfg <- get_price_index_config(years_vec)
-    if (isTRUE(cfg$enabled)) {
+    if (isTRUE(cfg$enabled) || sae_price_welfare_is_real(cfg)) {
       sprintf("NOTE: Mean welfare is expressed in %s.",
               sae_price_basis_label(cfg, years_vec, "mean_welfare"))
     } else {
       paste("NOTE: Mean welfare is in current (nominal) prices, so changes between years",
-            "include inflation. To report real changes, tick 'Express welfare in constant",
-            "prices' and enter a price index for each year.")
+            "include inflation. To report real changes, choose 'current prices: convert",
+            "with a price index' and enter a price index, or 'constant (real) prices",
+            "already' if the survey's welfare is already adjusted for inflation.")
     }
   }
 
   price_period_tip <- paste(
-    "If incomes refer to an earlier period than the survey year (in EU-SILC, the",
-    "calendar year before the survey), use the value of that period."
+    "Values are for the year the incomes refer to (see 'Incomes refer to')."
   )
+
+  # "Price index 2012", or "Price index 2012 (incomes of the 2013 survey)"
+  # when incomes refer to the calendar year before the survey.
+  price_year_label <- function(label, yr, years_vec) {
+    if (identical(get_price_income_period(), "previous_calendar_year") &&
+        (yr + 1L) %in% as.integer(years_vec)) {
+      sprintf("%s (incomes of the %s survey)", label, yr + 1L)
+    } else {
+      label
+    }
+  }
 
   output$price_index_by_year_ui <- renderUI({
     if (price_from_file()) return(NULL)
@@ -2127,8 +2211,10 @@ server <- function(input, output, session) {
           numericInput(
             id,
             tip_label(
-              if (pct) sprintf("Annual price change %s (%%)", yr)
-              else sprintf("Annual price index %s (%s = 100)", yr, yr - 1L),
+              price_year_label(
+                if (pct) sprintf("Annual price change %s (%%)", yr)
+                else sprintf("Annual price index %s (%s = 100)", yr, yr - 1L),
+                yr, years_vec),
               if (pct) paste("Change in average prices from", yr - 1L, "to", yr,
                              "in %, for example 3.6.", price_period_tip)
               else paste("Average prices in", yr, "against the average of", yr - 1L,
@@ -2141,12 +2227,12 @@ server <- function(input, output, session) {
     }
     restored <- isolate(price_index_restored())
     tagList(
-      lapply(years_vec, function(yr) {
+      lapply(price_income_years(years_vec), function(yr) {
         id <- paste0("price_index_", yr)
         numericInput(
           id,
           tip_label(
-            paste("Price index", yr),
+            price_year_label(paste("Price index", yr), yr, years_vec),
             paste("Index level for this year, for example the consumer price index with",
                   "2015 = 100. Any reference year works: only the ratios between years are",
                   "used.", price_period_tip)
@@ -2169,12 +2255,12 @@ server <- function(input, output, session) {
     }
     typed_fixed <- identical(get_price_index_type(), "fixed") && !price_from_file()
     tagList(
-      if (typed_fixed && !base %in% years_vec) {
+      if (typed_fixed && !base %in% price_income_years(years_vec)) {
         numericInput(
           "price_index_base",
           tip_label(
             sprintf("Price index %s (base year)", base),
-            "Index level of the base year, from the same series as the analysis years."
+            "Index level of the base year, from the same series as the income years."
           ),
           value = isolate(input$price_index_base %||% price_base_index_restored() %||% 100),
           min = 0
@@ -2322,8 +2408,12 @@ server <- function(input, output, session) {
       inputs$povline_numeric <- as.numeric(inputs$povline_numeric_by_year[[1]])
     }
     inputs$price_index_by_year <- get_price_index_by_year(parse_years(inputs$years))
-    inputs$deflate_welfare <- isTRUE(input$deflate_welfare)
+    inputs$welfare_prices <- get_welfare_prices()
+    inputs$real_price_year <- get_real_price_year()
+    # Kept for setups read by versions before w5k (convert = ticked box).
+    inputs$deflate_welfare <- identical(inputs$welfare_prices, "convert")
     inputs$price_index_type <- get_price_index_type()
+    inputs$price_income_period <- get_price_income_period()
     inputs$price_index_source <- if (price_from_file()) "file" else "manual"
     inputs$price_change_by_year <- get_price_change_by_year(parse_years(inputs$years))
     inputs$price_pct_by_year <- get_price_pct_by_year(parse_years(inputs$years))
@@ -2358,6 +2448,10 @@ server <- function(input, output, session) {
   apply_dashboard_setup <- function(setup, label = "saved setup") {
     defaults <- dashboard_setup_defaults()
     setup <- setup %||% defaults
+    # Read the prices choice before the defaults are filled in: setups saved
+    # before w5k have only deflate_welfare, and the default welfare_prices
+    # ("current") would otherwise switch their inflation adjustment off.
+    .welfare_prices_saved <- sae_setup_welfare_prices(setup$inputs)
     setup$inputs <- modifyList(defaults$inputs, setup$inputs %||% list())
     setup$data_files <- modifyList(defaults$data_files, setup$data_files %||% list())
 
@@ -2433,8 +2527,13 @@ server <- function(input, output, session) {
                       selected = as.character(x$fgt_alpha %||% "0"))
     updateTextInput(session, "currency_symbol",
                     value = x$currency_symbol %||% "EUR")
-    updateCheckboxInput(session, "deflate_welfare",
-                        value = isTRUE(x$deflate_welfare))
+    # Setups saved before w5k have only deflate_welfare (ticked = convert);
+    # read before the defaults were merged (see above).
+    updateRadioButtons(session, "welfare_prices", selected = .welfare_prices_saved)
+    .real_price_year <- suppressWarnings(as.numeric(x$real_price_year %||% NA))
+    updateNumericInput(session, "real_price_year",
+                       value = if (length(.real_price_year) == 1L && is.finite(.real_price_year))
+                         .real_price_year else NA)
     price_index_restored(as.list(x$price_index_by_year %||% list()))
     for (.yr in names(x$price_index_by_year %||% list())) {
       updateNumericInput(session, paste0("price_index_", .yr),
@@ -2445,6 +2544,11 @@ server <- function(input, output, session) {
                          x$price_index_type else "fixed")
     updateRadioButtons(session, "price_index_source",
                        selected = if (identical(x$price_index_source, "file")) "file" else "manual")
+    # Setups saved before w5k have no price_income_period: the survey year,
+    # as those runs used.
+    updateRadioButtons(session, "price_income_period",
+                       selected = if (identical(x$price_income_period, "previous_calendar_year"))
+                         "previous_calendar_year" else "survey_year")
     cpi_cols_restored(list(year = as.character(x$cpi_year_col %||% ""),
                            value = as.character(x$cpi_value_col %||% "")))
     price_pct_restored(as.list(x$price_pct_by_year %||% list()))

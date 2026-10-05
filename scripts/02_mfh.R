@@ -376,7 +376,7 @@ if (!identical(indicator_type, "poverty") && !"povline" %in% names(survey_dt)) {
   survey_dt$povline <- NA_real_
 }
 # Mean-welfare runs: express welfare in constant prices of the base year (by
-# default the first analysis year) when a price index was entered
+# default the first income year) when a price index was entered
 # (R/pipeline_helpers.R).
 .price_years <- as.integer(unlist(cfg_or_default(mfh_cfg$years_keep, c(2012L, 2013L))))
 price_index_cfg <- cfg$price_index
@@ -2325,7 +2325,8 @@ if (do_benchmark && !is.null(region_map)) {
     years_keep = years_keep,
     level_col = var_map$benchmark_level
   )
-  # External mean-welfare targets are in current prices like the survey.
+  # External mean-welfare targets are in the same prices as the survey's welfare
+  # (current prices unless the welfare is already real), so they get the same factors.
   regional_benchmark_mat <- sae_deflate_year_matrix(regional_benchmark_mat, price_factors)
   if (!is.null(regional_benchmark_mat)) {
     cat("Using Benchmark Target Database for MFH benchmarking:", benchmark_target_path, "\n")
@@ -2407,6 +2408,20 @@ if (do_benchmark && !is.null(region_map)) {
 
     tictoc::tic("MFH grouped benchmarking")
 
+    # Mean welfare fitted in logs: eblup_sel is ln(welfare), while uploaded
+    # targets are in currency. Comparing the two would multiply the log
+    # estimates by about 1,300 (12,500 / 9.4, say), so the log-scale step
+    # uses the survey's own regional figures (also in logs) and only
+    # supplies the relative precision of the benchmarked estimates. The
+    # point estimates are benchmarked to the uploaded targets on the
+    # currency scale after the back-transform ("Re-benchmark on the
+    # currency scale" below).
+    .log_mean_run <- identical(indicator_type, "mean_welfare") && isTRUE(log_transform)
+    if (.log_mean_run && !is.null(regional_benchmark_mat)) {
+      cat("Mean welfare in logs: the uploaded targets are applied on the currency",
+          "scale after the back-transform.\n")
+    }
+
     bench_result <- bench_regional_mfh(
       eblup_mat  = eblup_sel,
       domain_vec = bench_domains,
@@ -2414,7 +2429,7 @@ if (do_benchmark && !is.null(region_map)) {
       Nd_vec     = bench_Nd,
       Nd_mat     = bench_Nd_mat,
       direct_mat = direct_bench_mat,
-      regional_benchmark_mat = regional_benchmark_mat,
+      regional_benchmark_mat = if (.log_mean_run) NULL else regional_benchmark_mat,
       model_obj  = selected_model,
       model_type = diag_model,   # dispatch DGP + refit by MFH1/MFH2/MFH3
       formula    = mfh_formula,
@@ -2576,14 +2591,17 @@ if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform)) {
     ))
   }
 
-  # ---- Re-benchmark on the EUR scale ----------------------------------
+  # ---- Re-benchmark on the currency scale -----------------------------
   # rate_Bench currently holds smear_d * exp(Î»_log_r * eblup_log) -- a
-  # ratio benchmark applied on the log scale and then exponentiated. That
-  # does not satisfy the regional aggregation constraint on the EUR scale.
-  # Override rate_Bench with a fresh ratio benchmark computed on the
-  # back-transformed estimates and rescale mse_Bench / cv_Bench / rmse_Bench
-  # by (lambda_eur / lambda_log_implicit)Â² so the precision columns stay
-  # consistent with the new point estimate.
+  # ratio benchmark applied on the log scale (to the survey's own regional
+  # figures) and then exponentiated. That does not satisfy the regional
+  # aggregation constraint on the currency scale. Override rate_Bench with
+  # a fresh ratio benchmark computed on the back-transformed estimates:
+  # the target is the uploaded regional figure when a Benchmark Target
+  # Database is used (already in the run's prices), otherwise the
+  # population-weighted mean of the survey's arithmetic means. Rescale
+  # mse_Bench / cv_Bench / rmse_Bench by (new / old)Â² so the precision
+  # columns keep the relative precision of the log-scale bootstrap.
   if ("rate_Bench" %in% names(db_wide_all) &&
       !is.null(region_map) && exists("bench_Nd_mat")) {
     eblup_eur_col   <- rate_col            # rate_MFH1/2/3 already back-transformed
@@ -2618,6 +2636,24 @@ if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform)) {
         left_join(region_targets, by = c("region", "year")) %>%
         mutate(lambda_eur = ifelse(is.finite(B_eur) & abs(eblup_bar) > 1e-8,
                                    B_eur / eblup_bar, 1))
+      cat("MFH benchmarking: currency-scale factors to the uploaded targets:\n")
+      print(as.data.frame(region_lambda_eur))
+      # The uploaded targets describe whole groups; say so when some domains
+      # of a group have no estimate in a year.
+      .bench_ok <- bench_inputs %>%
+        filter(!is.na(region), is.finite(eblup_eur), is.finite(Nd))
+      .no_estimate <- unlist(lapply(unique(.bench_ok$year), function(yy) {
+        miss <- setdiff(unique(as.character(region_map$domain)),
+                        as.character(.bench_ok$domain[.bench_ok$year == yy]))
+        if (length(miss)) paste0(miss, " (", yy, ")") else character(0)
+      }))
+      if (length(.no_estimate)) {
+        cat(sprintf(paste("WARNING: MFH benchmarking: %d domain-year(s) of the benchmark groups",
+                          "have no estimate (%s%s); the uploaded targets are matched by the",
+                          "other domains only. Check that the targets cover the same domains.\n"),
+                    length(.no_estimate), paste(utils::head(.no_estimate, 10), collapse = ", "),
+                    if (length(.no_estimate) > 10) ", ..." else ""))
+      }
     } else {
       region_lambda_eur <- bench_inputs %>%
         filter(is.finite(direct_eur), is.finite(eblup_eur), is.finite(Nd)) %>%
@@ -3283,22 +3319,22 @@ compare_mfh <- function(period_list = c(1, 2),
   # noise (especially with small nB) can make the covariance term large
   # enough to push the result negative; previously this was silently
   # passed through, producing NaN sqrt() / zero-width CIs / spurious
-  # significance flags. Fall back to the independence-assumption MSE
-  # whenever the covariance-adjusted value is non-positive or smaller
-  # than 1% of the independence MSE. Conservative (overestimates
-  # variance for those rows) but cannot manufacture false certainty.
+  # significance flags. The covariance-adjusted value is used whenever it
+  # is positive, however small (owner's decision of 4 Oct 2026: no 1%
+  # rule); only when it is zero, negative or not a number (a zero-width
+  # interval or an impossible negative variance) is the independence-
+  # assumption MSE used instead, and mse_fallback_used marks the row.
   # The guard lives here in compare_mfh() so it applies uniformly to
   # every caller (unbenchmarked comp12_obj, benchmarked comp12_bench_obj,
   # poverty / mean-welfare / log-mean-welfare runs alike).
   mse_indep    <- mse_mat[, period_list[1]] + mse_mat[, period_list[2]]
   mse_with_cov <- mse_indep - 2 * mcpe_mat[, col_chr]
-  mse_floor    <- 0.01 * mse_indep
-  use_cov      <- is.finite(mse_with_cov) & mse_with_cov >= mse_floor
+  use_cov      <- is.finite(mse_with_cov) & mse_with_cov > 0
   mse          <- ifelse(use_cov, mse_with_cov, mse_indep)
   n_fallback   <- sum(!use_cov, na.rm = TRUE)
   if (n_fallback > 0) {
     message(sprintf(
-      "compare_mfh(): %d of %d domain(s) had non-positive or near-zero covariance-adjusted MSE; falling back to the independence-assumption MSE for those rows. Consider raising the bootstrap nB.",
+      "compare_mfh(): %d of %d domain(s) had a zero or negative covariance-adjusted MSE; falling back to the independence-assumption MSE for those rows. Consider raising the bootstrap nB.",
       n_fallback, length(use_cov)
     ))
   }
@@ -3405,9 +3441,10 @@ if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform)) {
   comp12_obj$df$diff <- est_y2_e - est_y1_e
   mse_indep_e    <- est_y1_e^2 * mse_y1_log + est_y2_e^2 * mse_y2_log
   mse_with_cov_e <- mse_indep_e - 2 * est_y1_e * est_y2_e * mcpe_log
-  use_cov_e      <- is.finite(mse_with_cov_e) & mse_with_cov_e >= 0.01 * mse_indep_e
+  use_cov_e      <- is.finite(mse_with_cov_e) & mse_with_cov_e > 0
   comp12_obj$df$mse <- ifelse(use_cov_e, mse_with_cov_e, mse_indep_e)
   comp12_obj$df$mse_fallback_used <- !use_cov_e
+  comp12_obj$df$mse_rule <- ifelse(use_cov_e, "covariance_adjusted", "independence_fallback")
   zq_vec <- comp12_obj$df$zq
   se_e   <- sqrt(comp12_obj$df$mse)
   comp12_obj$df$lb <- comp12_obj$df$diff - zq_vec * se_e
@@ -3500,9 +3537,10 @@ if (do_benchmark && !is.null(bench_result) && !is.null(bench_result$mcpe_bench))
     comp12_bench_obj$df$diff <- est_y2_b - est_y1_b
     mse_indep_b    <- est_y1_b^2 * mse_y1_b_log + est_y2_b^2 * mse_y2_b_log
     mse_with_cov_b <- mse_indep_b - 2 * est_y1_b * est_y2_b * mcpe_b_log
-    use_cov_b      <- is.finite(mse_with_cov_b) & mse_with_cov_b >= 0.01 * mse_indep_b
+    use_cov_b      <- is.finite(mse_with_cov_b) & mse_with_cov_b > 0
     comp12_bench_obj$df$mse <- ifelse(use_cov_b, mse_with_cov_b, mse_indep_b)
     comp12_bench_obj$df$mse_fallback_used <- !use_cov_b
+    comp12_bench_obj$df$mse_rule <- ifelse(use_cov_b, "covariance_adjusted", "independence_fallback")
     zq_b <- comp12_bench_obj$df$zq
     se_b <- sqrt(comp12_bench_obj$df$mse)
     comp12_bench_obj$df$lb <- comp12_bench_obj$df$diff - zq_b * se_b
@@ -3998,19 +4036,20 @@ if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform) &&
     # nB) the formula can return a negative or implausibly small value.
     # Previously we clamped to 0, which produced zero-width CIs and
     # spurious "significant" flags whenever diff was non-zero. Instead
-    # we fall back to the independence-assumption MSE (cov = 0)
-    # whenever the covariance-adjusted value is non-positive or smaller
-    # than 1% of the independence MSE. This is conservative
-    # (overestimates variance) but cannot manufacture false certainty.
+    # we fall back to the independence-assumption MSE (cov = 0) only
+    # when the covariance-adjusted value is zero, negative or not a
+    # number; any positive value is used, however small (owner's
+    # decision of 4 Oct 2026: no 1% rule).
     mse_indep    <- est_y1^2 * mse_y1_log + est_y2^2 * mse_y2_log
     mse_with_cov <- mse_indep - 2 * est_y1 * est_y2 * mcpe_y1y2_log
-    mse_floor    <- 0.01 * mse_indep
-    use_cov      <- is.finite(mse_with_cov) & mse_with_cov >= mse_floor
+    use_cov      <- is.finite(mse_with_cov) & mse_with_cov > 0
     comparison_final$mse <- ifelse(use_cov, mse_with_cov, mse_indep)
+    comparison_final$mse_fallback_used <- !use_cov
+    comparison_final$mse_rule <- ifelse(use_cov, "covariance_adjusted", "independence_fallback")
     n_fallback <- sum(!use_cov, na.rm = TRUE)
     if (n_fallback > 0) {
       cat(sprintf(
-        "Note: %d of %d domain(s) had a non-positive or near-zero ",
+        "Note: %d of %d domain(s) had a zero or negative ",
         n_fallback, length(use_cov)
       ))
       cat("delta-method MSE for the change (likely bootstrap MCPE noise); ")
@@ -4095,19 +4134,20 @@ if (exists("comp12_bench_obj") && !is.null(comp12_bench_obj) &&
   } else 0
   comp12_bench_obj$df$diff <- est_y2_eur - est_y1_eur
   # Same negative-variance guard as the unbenchmarked path: fall back to
-  # the independence MSE when the covariance-adjusted value is non-
-  # positive or smaller than 1% of the independence MSE, rather than
-  # clamping to 0 (which would create zero-width CIs and false
-  # significance).
+  # the independence MSE only when the covariance-adjusted value is zero,
+  # negative or not a number, rather than clamping to 0 (which would
+  # create zero-width CIs and false significance). Any positive value is
+  # used, however small (owner's decision of 4 Oct 2026: no 1% rule).
   mse_indep_b    <- est_y1_eur^2 * mse_y1_log + est_y2_eur^2 * mse_y2_log
   mse_with_cov_b <- mse_indep_b - 2 * est_y1_eur * est_y2_eur * mcpe_log
-  mse_floor_b    <- 0.01 * mse_indep_b
-  use_cov_b      <- is.finite(mse_with_cov_b) & mse_with_cov_b >= mse_floor_b
+  use_cov_b      <- is.finite(mse_with_cov_b) & mse_with_cov_b > 0
   comp12_bench_obj$df$mse <- ifelse(use_cov_b, mse_with_cov_b, mse_indep_b)
+  comp12_bench_obj$df$mse_fallback_used <- !use_cov_b
+  comp12_bench_obj$df$mse_rule <- ifelse(use_cov_b, "covariance_adjusted", "independence_fallback")
   n_fb_bench <- sum(!use_cov_b, na.rm = TRUE)
   if (n_fb_bench > 0) {
     cat(sprintf(
-      "Note: %d of %d benchmarked-change row(s) fell back to the independence-MSE (negative or near-zero covariance-adjusted variance).\n",
+      "Note: %d of %d benchmarked-change row(s) fell back to the independence-MSE (zero or negative covariance-adjusted variance).\n",
       n_fb_bench, length(use_cov_b)
     ))
   }

@@ -596,6 +596,9 @@ comparison_dt <- sae_enrich_result_table(
   sig$significant_bonferroni <- NULL
   sig$change_measure <- "percent change of the mean"
   sig$covariance_used <- pc$log_ratio_covariance_used
+  # The step's flag was about the currency difference; record the fallback
+  # actually used for the percentage change.
+  sig$mse_fallback_used <- pc$mse_fallback_used
   sig
 }
 sig_fh        <- .to_percent_change(sig_fh, "FH")
@@ -900,7 +903,7 @@ prepare_sig_tbl <- function(df, method_label, signif_true = c("TRUE", "Significa
     ) -> out
   # Mean welfare: keep the currency-unit difference next to the % change.
   extra <- intersect(c("change_measure", "diff_eur", "mse_eur", "lb_eur", "ub_eur",
-                       "p_value_eur", "covariance_used"), names(df))
+                       "p_value_eur", "covariance_used", "mse_fallback_used"), names(df))
   if (length(extra)) out <- dplyr::bind_cols(out, as.data.frame(df)[, extra, drop = FALSE])
   out
 }
