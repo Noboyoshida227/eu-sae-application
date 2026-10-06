@@ -41,8 +41,8 @@ Ports advance if occupied. There is no supplied wizard shell launcher; manual
 launch through R remains possible from the package root using
 `source("app_wizard.R")` after installing dependencies.
 
-- [Download and verification instructions](docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_11.pdf)
-- [Wizard reference](docs/README_WIZARD.md) and [slide guide](docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_11.pptx)
+- [Download and verification instructions](docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_12.pdf)
+- [Wizard reference](docs/README_WIZARD.md) and [slide guide](docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_12.pptx)
 - [Methodological guidance](docs/guidance/guidelines_v5_2_0_rc6_wizard.docx)
 - [Examples and your own input folders](Data/README.md)
 
@@ -155,8 +155,9 @@ consolidated workbook containing domain/year estimates, the complete pointwise,
 BH, and Bonferroni significance table, significance counts, and UFH-MFH
 confidence-interval width tables. `outputs/data/ci_width_comparison.xlsx`
 contains the interval-width domain table and distribution/paired summaries.
-The corresponding distribution and paired-domain figures are integrated into
-both `final_report.html` and `final_report.docx`.
+The paired UFH-MFH interval-width figure, the paired change figure and the
+change-and-RMSE box plots are integrated into both `final_report.html` and
+`final_report.docx`.
 
 ## Optional AI
 

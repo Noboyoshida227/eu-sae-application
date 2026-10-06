@@ -365,8 +365,8 @@ display: none;
 
 <div id="changelog" class="section level1">
 <h1>Changelog</h1>
-<div id="unreleased-w5l" class="section level2">
-<h2>Unreleased (w5l)</h2>
+<div id="rc.6-wizard.5.12---2026-10-06" class="section level2">
+<h2>5.2.0-rc.6-wizard.5.12 - 2026-10-06</h2>
 <ul>
 <li>Documentation and help text brought in line with w5k (after the
 ChatGPT (GPT-6 Astra) review of the w5k documentation, 5 Oct). No change
@@ -383,26 +383,34 @@ negative values is flagged in <code>mse_fallback_used</code> and
 mean-welfare changes are reported as percentage changes of the mean;
 uploaded benchmark targets are treated as fixed; and, for mean welfare
 fitted in logs, the final currency-scale benchmarking step is not
-repeated inside the bootstrap, so its RMSE (which keeps the log-scale
-CV) is an approximation.</li>
+repeated inside the bootstrap, so its RMSE (which keeps the
+currency-scale CV obtained from the log-scale bootstrap) is an
+approximation.</li>
 <li><strong>Guidelines note:</strong> Annex H.2 step 5 and the
 comparison table no longer call the independence fallback conservative
 or mention “implausibly small” values; Figure 10 shows the new front
 page, and the text says <strong>Start an analysis</strong> instead of
 “Get Started”.</li>
 <li><strong>User guide</strong>
-(<code>EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_11.pptx</code>): slides 14
-and 16 show the new front page and <strong>Start an analysis</strong>;
-slide 22 says that welfare, poverty lines and targets must share one
-price basis and that only calendar-year income periods are handled;
-slides 23 and 24 add the mean-welfare <strong>log</strong>
-transformation and the <strong>bc_sm</strong> (Duan smearing) bias
-correction, and slide 24 describes <strong>Also fit MFH3</strong> as a
-comparison fit; slide 25 says uploaded targets are taken as fixed and
-the benchmarked RMSE is approximate for mean welfare in logs; slide 28
-shows the checks the Preflight tab actually runs (project root,
-rmarkdown, analysis years, spatial dependency, input data files) instead
-of a relative poverty line and other checks it does not run.</li>
+(<code>EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_12.pptx</code>, now 40
+slides; numbers below are the new ones): slides 14 and 16 show the new
+front page and <strong>Start an analysis</strong>; slide 22 says that
+welfare, poverty lines and targets must share one price basis and that
+only calendar-year income periods are handled; two new slides follow it:
+slide 23, “Estimating mean welfare — step by step” (the wizard steps for
+a mean-welfare run and what the outputs contain), and slide 24,
+“Inflation adjustment — a worked example” (a 2012–2013 survey whose
+incomes refer to the previous calendar year, converted to 2011 prices:
+the settings to choose, the factors 1.000 and 0.976, and the price-basis
+label to check); slides 25 and 26 add the mean-welfare
+<strong>log</strong> transformation and the <strong>bc_sm</strong> (Duan
+smearing) bias correction, and slide 26 describes <strong>Also fit
+MFH3</strong> as a comparison fit; slide 27 says uploaded targets are
+taken as fixed and the benchmarked RMSE is approximate for mean welfare
+in logs; slide 30 shows the checks the Preflight tab actually runs
+(project root, rmarkdown, analysis years, spatial dependency, input data
+files) instead of a relative poverty line and other checks it does not
+run.</li>
 <li><strong>Download instructions PDF</strong>
 (<code>tools/build_instruction_pdf.py</code>): the wizard walkthrough
 mentions the mean-welfare price settings and the common price basis; the
@@ -422,7 +430,73 @@ fixed specifications when it is off (they said the covariates were
 “forced” into the model), as in the dashboard; the MFH
 log-transformation help no longer says that change analysis “stays on
 the EUR scale”.</li>
+<li><strong>Second review</strong> (GPT-6 Astra, 6 Oct, of the fixes
+above): the MSE technical note now says that UFH holds the regional
+benchmark targets fixed across bootstrap replicates (only the ratio
+denominator is recomputed) while MFH recomputes survey-based targets and
+holds uploaded ones fixed; that the significance flag colours the
+significance plots, while the change maps are coloured by the size of
+the change; that percentage changes take the covariance implied by the
+step’s change MSE (so it is zero after an independence fallback), have
+their own guard, and that the formula given is the variance of the log
+ratio; and, like guidelines §7.12, README_WIZARD.md, the download
+instructions and the benchmarking slide, that the benchmarked RMSE in
+log runs keeps the currency-scale CV obtained by delta-transforming the
+log-scale bootstrap MSE. The guidelines no longer say they override an
+older “BH is primary” sentence in the MSE note (the note now agrees),
+the Annex H table says “zero, negative or not finite”, the root README
+no longer mentions an interval-width distribution figure, and the MFH
+help says the change variance is computed on the currency scale.</li>
+<li><strong>Third review</strong> (GPT-6 Astra, 6 Oct): the MSE note and
+Annex G.7 say that rows with an MFH fallback use independence for the
+percentage change and that the implied covariance is an approximation of
+the MCPE when the level MSEs and the change MSE come from different
+calculations; “not positive or not finite” is used consistently (MSE
+note, Annex H.2); the MFH help says the MCPE is back-transformed to the
+currency scale (squared currency units); slide 23 adds the auxiliary
+data and boundaries to Step 1 and the optional Step 5; slide 24 follows
+the order of the settings in the app, says the example uses typed-in
+index values and that with a CPI file the label also names the file and
+column, and describes the data as current-price welfare converted to
+2011 prices.</li>
+<li><strong>Fourth review</strong> (GPT-6 Astra, 6 Oct): the
+change-and-RMSE box plots now apply the same fallback rule as the
+significance table (see the Fix below), and the Fix entry describes all
+its effects.</li>
+<li><strong>Final check</strong> (GPT-6 Astra, 6 Oct): no blocking
+issue. A row where the step fell back but a level MSE is missing is no
+longer flagged as a fallback (it has no inference), and the Fix entry
+separates the BH and Bonferroni effects.</li>
 </ul></li>
+<li>Fix: in mean-welfare runs, a row where the MFH step fell back to the
+independence variance now also uses independence for its percentage
+change, and is flagged (<code>scripts/03_comparison.R</code>,
+<code>.to_percent_change()</code>). Before, the percentage change took a
+covariance implied by the step’s change MSE; for these rows that MSE
+comes from the bootstrap MSEs, which need not equal the level MSEs, so a
+spurious covariance could be implied, and the final table showed no
+fallback and “covariance used”. Now the change MSE passed on for these
+rows is the sum of the two level MSEs (zero covariance),
+<code>mse_fallback_used</code> is TRUE and <code>covariance_used</code>
+is FALSE; a fallback of the percentage-change guard alone is also
+flagged. The change-and-RMSE box plots,
+<code>change_rmse_by_method.csv</code> and the “Change and RMSE”
+workbook sheets use the same rule
+(<code>sae_change_rmse_by_method()</code> in
+<code>R/change_comparison.R</code>), so their RMSEs match the
+percentage-change inference. A row with a missing level MSE gets no
+inference and no fallback flag, even where the step fell back
+(<code>sae_percent_change()</code>, <code>.to_percent_change()</code>).
+Estimates are unchanged. For rows with a fallback, the percentage-change
+variance, interval, p-value and significance flags can change; because
+the BH adjustment works across domains, the BH p-values and flags of
+other domains can change too (their Bonferroni p-values do not, as the
+number of tested domains is unchanged), and so can the significance
+counts in the report and the Excel files. New behavioural checks in
+<code>tests/run_tests.R</code> (mismatched MSEs, guard-only fallback,
+missing level MSE with and without a step fallback, benchmarked columns,
+tables without the flag, and the box-plot RMSEs, plain and
+benchmarked).</li>
 </ul>
 </div>
 <div id="rc.6-wizard.5.11---2026-10-05" class="section level2">

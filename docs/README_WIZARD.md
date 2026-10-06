@@ -1,6 +1,6 @@
 # EU SAE Dashboard — Wizard edition
 
-Wizard version: **5.2.0-rc.6-wizard.5.11**
+Wizard version: **5.2.0-rc.6-wizard.5.12**
 Underlying EU SAE package: **5.2.0-rc.6**
 
 This is the clean 5.2.0-rc.6 application package with an additional guided
@@ -146,8 +146,9 @@ index they are converted in the same way. For mean welfare fitted
 in logs, the benchmarking is done in currency after the back-transform: each
 domain estimate is multiplied by its group's target divided by the
 population-weighted average of the domain estimates in the group, so the
-domain estimates average exactly to the target. Their RMSE keeps the relative
-precision (CV) of the log-scale bootstrap. This RMSE is an approximation: the
+domain estimates average exactly to the target. Their RMSE keeps the
+currency-scale CV obtained by delta-transforming the log-scale bootstrap MSE.
+This RMSE is an approximation: the
 final currency-scale adjustment is not repeated inside the bootstrap, and
 uploaded targets are treated as fixed, so their own sampling error is not
 included. Matching the targets exactly does not show that the RMSE is right.

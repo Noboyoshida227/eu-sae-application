@@ -1288,7 +1288,9 @@ sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05) {
     log_ratio = r,
     log_ratio_var = v,
     log_ratio_covariance_used = ok & has_cov & use_cov,
-    mse_fallback_used = ok & has_cov & !use_cov,
+    # A fallback only where the independence variance itself is usable
+    # (missing level MSEs give no inference, not a fallback).
+    mse_fallback_used = ok & has_cov & !use_cov & is.finite(v_indep) & v_indep > 0,
     p_value = p,
     stringsAsFactors = FALSE
   )

@@ -575,7 +575,18 @@ comparison_dt <- sae_enrich_result_table(
     message(sprintf("NOTE: %s changes in the step output differ from the level estimates for %d domain(s); the percentage change uses the level estimates.",
                     level_col, sum(is.finite(gap) & gap > 1e-6 * pmax(1, abs(m2 - m1)))))
   }
-  pc <- sae_percent_change(m1, m2, s1, s2, mse_eur, alpha)
+  # If the step already fell back to the independence variance for a row, use
+  # independence here too: pass MSE1 + MSE2 of the level estimates as the
+  # change MSE, so the implied covariance is exactly zero. (The step's
+  # fallback MSE comes from its own bootstrap MSEs, which need not equal the
+  # level MSEs used here, so passing it on would imply a spurious covariance.)
+  upstream_fb <- if ("mse_fallback_used" %in% names(sig)) {
+    as.logical(sig$mse_fallback_used) %in% TRUE
+  } else {
+    rep(FALSE, nrow(sig))
+  }
+  mse_for_pc <- ifelse(upstream_fb, s1 + s2, mse_eur)
+  pc <- sae_percent_change(m1, m2, s1, s2, mse_for_pc, alpha)
   sig$diff_eur <- diff_eur
   sig$mse_eur <- mse_eur
   sig$lb_eur <- if ("lb" %in% names(sig)) suppressWarnings(as.numeric(sig$lb)) else NA_real_
@@ -595,10 +606,12 @@ comparison_dt <- sae_enrich_result_table(
   sig$significant_bh <- NULL
   sig$significant_bonferroni <- NULL
   sig$change_measure <- "percent change of the mean"
-  sig$covariance_used <- pc$log_ratio_covariance_used
-  # The step's flag was about the currency difference; record the fallback
-  # actually used for the percentage change.
-  sig$mse_fallback_used <- pc$mse_fallback_used
+  # Rows where the step fell back to independence use independence here too
+  # (see above); flag them where an inference is made, and add any fallback of
+  # the log-ratio guard. A row without inference (for example, a missing level
+  # MSE) carries no fallback flag.
+  sig$covariance_used <- pc$log_ratio_covariance_used & !upstream_fb
+  sig$mse_fallback_used <- (upstream_fb & is.finite(pc$log_ratio_var)) | pc$mse_fallback_used
   sig
 }
 sig_fh        <- .to_percent_change(sig_fh, "FH")

@@ -17,7 +17,7 @@ parse_ok <- vapply(r_files, function(path) {
 check(all(parse_ok), "all R sources parse")
 check(identical(trimws(readLines("VERSION", warn = FALSE)[1]), "5.2.0-rc.6"), "VERSION is the candidate version")
 check(identical(trimws(readLines("WIZARD_VERSION", warn = FALSE)[1]),
-                "5.2.0-rc.6-wizard.5.11"),
+                "5.2.0-rc.6-wizard.5.12"),
       "WIZARD_VERSION identifies the rc.6 wizard overlay")
 wizard_version <- trimws(readLines("WIZARD_VERSION", warn = FALSE)[1])
 changelog_text <- read_all("docs/CHANGELOG.md")
@@ -119,8 +119,8 @@ check(grepl("sae_write_release_manifest", wizard_manifest_text, fixed = TRUE),
 wizard_resources <- c(
   "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx",
   "docs/MCPE_VALIDATION_STATUS.md",
-  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_11.pdf",
-  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_11.pptx"
+  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_12.pdf",
+  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_12.pptx"
 )
 check(all(vapply(wizard_resources, file.exists, logical(1))) &&
         all(vapply(wizard_resources, grepl, logical(1), x = wizard_text,
@@ -1249,9 +1249,70 @@ check({
   .p_saved > 0 && .p_merge > 0 && .p_saved < .p_merge &&
     grepl('updateRadioButtons(session, "welfare_prices", selected = .welfare_prices_saved)', .app_txt, fixed = TRUE)
 }, "apply_dashboard_setup reads the prices choice before merging defaults")
-check(grepl("sig$mse_fallback_used <- pc$mse_fallback_used", cmp_text, fixed = TRUE) &&
+check(grepl("sig$mse_fallback_used <- (upstream_fb & is.finite(pc$log_ratio_var)) | pc$mse_fallback_used", cmp_text, fixed = TRUE) &&
+        grepl("sig$covariance_used <- pc$log_ratio_covariance_used & !upstream_fb", cmp_text, fixed = TRUE) &&
+        grepl("mse_for_pc <- ifelse(upstream_fb, s1 + s2, mse_eur)", cmp_text, fixed = TRUE) &&
         lengths(regmatches(.mfh_txt, gregexpr("mse_rule <- ifelse(use_cov", .mfh_txt, fixed = TRUE))) == 4L,
       "fallback flags refreshed for the final change variances (Comparison and MFH)")
+# Behaviour of .to_percent_change() (mean welfare) and of the change-and-RMSE
+# box plots (sae_change_rmse_by_method()): an independence fallback in the MFH
+# step makes the percentage change use independence too (zero covariance on the
+# level MSEs, even when the step's bootstrap MSEs differ from the level MSEs),
+# is flagged, and is not reported as "covariance used"; a fallback of the
+# log-ratio guard alone is flagged too; a missing level MSE gives no inference
+# and no fallback flag, even after an upstream fallback; a table without the
+# flag column works; benchmarked columns behave the same; and the box-plot
+# RMSE (plain and benchmarked) equals the standard error behind the
+# percentage-change inference.
+local({
+  exprs <- parse("scripts/03_comparison.R", keep.source = FALSE)
+  def <- Filter(function(e) is.call(e) && identical(as.character(e[[1]]), "<-") &&
+                  identical(as.character(e[[2]]), ".to_percent_change"), as.list(exprs))
+  env <- new.env(parent = globalenv())
+  env$.change_is_percent <- TRUE
+  env$years_keep <- c(2012L, 2013L)
+  m1 <- c(1000, 1000, 1000, 1000, 1000); m2 <- c(1050, 1100, 2000, 1080, 1060)
+  s1 <- c(400, 400, 400, 400, 400);      s2 <- c(420, 450, 1600, NA, NA)
+  env$comparison_dt <- data.frame(domain = rep(c("1", "2", "3", "4", "5"), 2),
+                                  year = rep(c(2012L, 2013L), each = 5),
+                                  MFH = c(m1, m2), MFH_MSE = c(s1, s2),
+                                  MFH_Bench = c(m1, m2), MFH_Bench_MSE = c(s1, s2))
+  eval(def[[1]], env)
+  sig <- data.frame(domain = c("1", "2", "3", "4", "5"), diff = m2 - m1,
+                    mse = c(1000,                 # 1: step fell back; its bootstrap MSEs sum to 1000, not 820
+                            400 + 450 - 2 * 300,  # 2: covariance-adjusted
+                            100,                  # 3: implies C = 950, log-ratio variance < 0
+                            700,                  # 4: level MSE of the second year missing
+                            900),                 # 5: step fell back, level MSE of the second year missing
+                    mse_fallback_used = c(TRUE, FALSE, FALSE, FALSE, TRUE), p_value = 0.5)
+  out <- env$.to_percent_change(sig, "MFH")
+  v_ind <- s1 / m1^2 + s2 / m2^2
+  v2 <- v_ind[2] - 2 * ((s1[2] + s2[2] - 250) / 2) / (m1[2] * m2[2])
+  v_exp <- c(v_ind[1], v2, v_ind[3], NA, NA)
+  ok1 <- length(def) == 1L &&
+    identical(as.logical(out$mse_fallback_used), c(TRUE, FALSE, TRUE, FALSE, FALSE)) &&
+    identical(as.logical(out$covariance_used), c(FALSE, TRUE, FALSE, FALSE, FALSE)) &&
+    isTRUE(all.equal(as.numeric(out$mse), (100 * m2 / m1)^2 * v_exp, tolerance = 1e-10)) &&
+    all(is.na(out$p_value[4:5])) &&
+    isTRUE(all.equal(as.numeric(out$mse_eur), c(1000, 250, 100, 700, 900)))
+  out_ufh <- env$.to_percent_change(sig[, c("domain", "diff", "mse", "p_value")], "MFH")
+  ok2 <- identical(as.logical(out_ufh$mse_fallback_used), c(FALSE, FALSE, TRUE, FALSE, FALSE))
+  out_b <- env$.to_percent_change(sig, "MFH_Bench")
+  ok3 <- isTRUE(all.equal(as.numeric(out_b$mse), as.numeric(out$mse))) &&
+    identical(as.logical(out_b$mse_fallback_used), as.logical(out$mse_fallback_used))
+  cr <- sae_change_rmse_by_method(env$comparison_dt, list(MFH = out, MFH_Bench = out_b),
+                                  years = c(2012L, 2013L), indicator_type = "mean_welfare")
+  rmse_sq <- function(key) {
+    r <- cr$long[cr$long$method_key == key, ]
+    r <- r[match(c("1", "2", "3", "4", "5"), r$domain), ]
+    r$rmse^2
+  }
+  ok4 <- isTRUE(all.equal(rmse_sq("MFH")[1:3], v_exp[1:3], tolerance = 1e-10)) &&
+    isTRUE(all.equal(rmse_sq("MFH_Bench")[1:3], v_exp[1:3], tolerance = 1e-10)) &&
+    !any(is.finite(c(rmse_sq("MFH")[4:5], rmse_sq("MFH_Bench")[4:5])))
+  check(ok1 && ok2 && ok3 && ok4,
+        "percentage changes: an upstream MFH fallback means independence (C = 0 on the level MSEs), is flagged, and the box-plot RMSE matches the inference")
+})
 # Mean welfare in logs with a Benchmark Target Database: the log-scale step
 # must not compare currency targets with log estimates; the targets are
 # applied on the currency scale after the back-transform.

@@ -999,8 +999,8 @@ ui <- fluidPage(
       tags$ul(
         style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
         tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_11.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_11.pptx")),
+        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_12.pdf")),
+        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_12.pptx")),
         tags$li(tags$code("outputs/final_report.html"), " after a completed run")
       ),
       tags$hr(),
@@ -1288,7 +1288,7 @@ ui <- fluidPage(
           tip_label("Transformation (MFH)",
                     paste(
                       "Transformation applied to the MFH model. Independent of the UFH choice above.",
-                      "'log' fits MFH on log(welfare) per year, then back-transforms each (domain, year) cell with a per-domain-year smearing factor anchored to the population-weighted arithmetic mean of welfare. MCPE is back-transformed to currency units via a delta-method approximation, so the variance of the change between the years is computed in currency units (the report shows mean-welfare changes as percentage changes of the mean).",
+                      "'log' fits MFH on log(welfare) per year, then back-transforms each (domain, year) cell with a per-domain-year smearing factor anchored to the population-weighted arithmetic mean of welfare. MCPE is back-transformed to the currency scale (squared currency units) via a delta-method approximation, so the variance of the change between the years is also on the currency scale (the report shows mean-welfare changes as percentage changes of the mean).",
                       "'no' fits on the identity scale.")),
           choices = c("log", "no"), selected = "log"),
         conditionalPanel(

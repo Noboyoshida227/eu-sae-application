@@ -140,6 +140,16 @@ sae_change_rmse_by_method <- function(levels, sig, years, indicator_type = "pove
       if (is.null(pr)) return(NULL)
       mse_eur <- if ("mse_eur" %in% names(d)) d$mse_eur else d$mse
       mse_diff <- suppressWarnings(as.numeric(mse_eur))[match(pr$domain, d$domain)]
+      # Rows flagged mse_fallback_used use independence, as in the
+      # significance table (.to_percent_change() in 03_comparison.R): the
+      # change MSE is the sum of the two level MSEs, so the RMSE here equals
+      # the standard error behind the percentage-change inference.
+      fb <- if ("mse_fallback_used" %in% names(d)) {
+        as.logical(d$mse_fallback_used)[match(pr$domain, d$domain)] %in% TRUE
+      } else {
+        rep(FALSE, nrow(pr))
+      }
+      mse_diff <- ifelse(fb, pr$s1 + pr$s2, mse_diff)
       keep <- pr$domain %in% d$domain
       pr <- pr[keep, , drop = FALSE]; mse_diff <- mse_diff[keep]
       pc <- sae_percent_change(pr$m1, pr$m2, pr$s1, pr$s2, mse_diff)
