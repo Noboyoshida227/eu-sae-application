@@ -1,0 +1,5 @@
+Generation method: built-in image-generation tool.
+Asset: futuristic-data-network.png
+
+Final prompt:
+Use case: productivity-visual. Create a polished futuristic background for a professional PowerPoint presentation about statistical estimation and data analysis. Wide 16:9 landscape. Deep midnight navy blue (#0F1E3F) and restrained cyan/steel-blue lighting. The LEFT 58 percent must be almost empty dark navy with a very subtle smooth gradient, to support white slide headings. On the RIGHT 40 percent, a refined abstract three-dimensional constellation of luminous cyan data nodes, fine connecting lines and translucent glass geometric structures floating above a soft light grid. Sophisticated institutional research aesthetic, crisp and elegant, restrained glow, depth, no clutter. Keep the central abstract data sculpture completely within the right side and leave a quiet dark margin around it. No maps, no country outlines, no globe, no flags, no humans, no text, no letters, no numbers, no logos, no watermark. Full bleed background with naturally fading edges, no frame or card.
