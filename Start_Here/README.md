@@ -62,8 +62,9 @@ a device policy may still block the launcher or the Pandoc download below;
 `startup_setup.log` in the package folder records what happened.
 
 **2. Double-clicking does nothing at all.**
-The ZIP was built on Windows, which does not record the Unix "executable"
-permission, so the launcher may arrive without it. Fix it once, either way:
+The release ZIP marks the launchers as executable, but some unzip tools (and
+GitHub's automatic "Source code" archives) drop that permission, so the
+launcher may arrive without it. Fix it once, either way:
 
 - Open **Terminal**, type `chmod +x ` (with a trailing space), drag the
   `Start_Here` folder onto the Terminal window, type `/*.command`, and press

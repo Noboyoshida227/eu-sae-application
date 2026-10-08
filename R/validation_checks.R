@@ -131,8 +131,11 @@ validate_inputs <- function(survey_data, aux_data) {
       summary$welfare_sd     <- round(sd(welfare_clean), 2)
       summary$welfare_min    <- round(min(welfare_clean), 2)
       summary$welfare_max    <- round(max(welfare_clean), 2)
-      if (any(welfare_clean < 0)) {
-        flags <- c(flags, "INFO: Negative welfare values detected")
+      n_nonpositive <- sum(welfare_clean <= 0)
+      if (n_nonpositive > 0L) {
+        flags <- c(flags, sprintf(paste0(
+          "INFO: %d zero or negative welfare value(s) detected. A log mean-welfare model ",
+          "leaves them out of the model; the Direct estimates keep them."), n_nonpositive))
       }
     }
   }
@@ -435,6 +438,13 @@ assess_data_readiness <- function(survey_data,
     # NA-out non-positive welfare before log to avoid -Inf/NaN
     w <- as.numeric(survey_data$welfare)
     if (isTRUE(log_transform)) {
+      n_nonpositive <- sum(!is.na(w) & w <= 0)
+      if (n_nonpositive > 0L) {
+        msgs <- c(msgs, sprintf(paste0(
+          "Test 0e: WARNING -- %d survey row(s) have zero or negative welfare. ",
+          "The log model leaves them out; the Direct estimates keep them. ",
+          "Review them before running."), n_nonpositive))
+      }
       w[!is.na(w) & w <= 0] <- NA_real_
       survey_data$poor <- log(w)
     } else {

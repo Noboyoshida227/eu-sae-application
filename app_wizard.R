@@ -793,7 +793,7 @@ ui <- fluidPage(
                         paste(
                           "Transformation of the direct estimates before model fitting.",
                           "For poverty rates: 'arcsin' constrains estimates to [0,1] and stabilizes variances.",
-                          "For mean welfare: 'log' addresses the right-skewness of welfare; the back-transform to currency units is bias-corrected via Duan's smearing (see Bias Correction below).",
+                          "For mean welfare: 'log' addresses the right-skewness of welfare; the back-transform to currency units is bias-corrected with a domain-level smearing factor (see Bias Correction below).",
                           "'no' fits on the original scale.")),
               choices = c("arcsin", "no"), selected = "arcsin"),
             # Bias correction is meaningful under arcsin AND log. For arcsin, it
@@ -807,7 +807,7 @@ ui <- fluidPage(
                           paste(
                             "How the model estimates are bias-corrected when back-transforming to the original scale.",
                             "For arcsin: 'bc' integrates sin^2(.) against the predictive density (correct under Gaussianity); 'none' returns the naive sin^2(eta_hat).",
-                            "For log: 'bc_sm' applies Duan's smearing estimator -- multiplies exp(eta_hat) by the empirical mean of exp(residuals), which is non-parametric and robust to non-Gaussian residuals; 'none' returns the naive exp(eta_hat) (downward-biased for the mean).")),
+                            "For log: 'bc_sm' multiplies exp(eta_hat) by the domain's direct arithmetic mean divided by its direct geometric mean (exp of the direct mean of log welfare), so the estimate is an arithmetic mean in currency units; it is not set equal to the direct estimate. 'none' returns the naive exp(eta_hat), which estimates the geometric mean (downward-biased for the arithmetic mean).")),
                 choices = c("bc", "none"), selected = "bc")
             ),
             # Variance smoothing menu is only meaningful when no transformation
@@ -815,7 +815,7 @@ ui <- fluidPage(
             conditionalPanel(
               condition = "input.ufh_transformation == 'no'",
             selectInput("ufh_var_choice",
-              tip_label("Variance option (UFH)", "Sampling variance input for UFH when no transformation is used. 'sm_out' replaces a direct variance with its smoothed (GVF-based) variance only when the direct variance is missing/non-finite or below 0.001; 'sm_all' replaces all variances; 'direct' retains raw survey variances except safety backfills. When arcsin or log is selected, this choice is ignored because the transformation already stabilizes variances."),
+              tip_label("Variance option (UFH)", "Sampling variance input for UFH when no transformation is used. 'sm_out' replaces a direct variance with its smoothed (GVF-based) variance only when the direct variance is missing/non-finite or below 0.001; 'sm_all' replaces all variances; 'direct' retains raw survey variances except safety backfills. This choice is shown only when no transformation is used: under arcsin the app fills only missing or zero variances, and under log it applies 'sm_out' to the log-scale variances."),
                 choices = c("sm_out", "sm_all", "direct"), selected = "sm_out")
             ),
             ic_criterion_input("ufh", selected = "BIC",
@@ -865,7 +865,7 @@ ui <- fluidPage(
                   tip_label("Bias Correction (MFH)",
                             paste(
                               "Bias correction for the log -> currency back-transform.",
-                              "'bc_sm' applies Duan's smearing estimator (multiplies exp(eta_hat) by the empirical mean of exp(residuals)); robust to non-Gaussian residuals.",
+                              "'bc_sm' multiplies exp(eta_hat) by each domain-year's direct arithmetic mean divided by its direct geometric mean (a factor of 1 where there is no direct estimate), so the estimate is an arithmetic mean in currency units.",
                               "'none' returns the naive exp(eta_hat), which is downward-biased for the mean.")),
                   choices = c("bc_sm", "none"), selected = "bc_sm")
               )
@@ -959,7 +959,7 @@ ui <- fluidPage(
             tags$ul(
               tags$li("National benchmarking: include a year column and a target column."),
               tags$li("Grouped benchmarking: also include the benchmark-level column selected below."),
-              tags$li("Target column names can be benchmark, target, value, poverty_rate, rate, or mean."),
+              tags$li("Name the target column benchmark or target (also accepted: B_r, benchmark_target, regional_benchmark, direct, direct_rate, poverty_rate)."),
               tags$li("Accepted file types: .rds, .RData/.rda, .csv, .txt, .xlsx, or .xls.")
             )
           ),
@@ -982,7 +982,7 @@ ui <- fluidPage(
         tags$hr(),
         h4("Data assessment"),
         checkboxInput("psu_consistent",
-          tip_label("PSU codes are consistent over time", "Check this if the same PSU identifiers refer to the same sampling units across years. Affects how cross-year covariance of sampling errors is estimated."),
+          tip_label("PSU codes are consistent over time", "Check this if the same PSU identifiers refer to the same sampling units across years. The answer is recorded with the run settings; it does not change the estimates (the cross-year covariance of sampling errors is computed from the PSU codes in the data)."),
           value = FALSE)
       ),
 
@@ -1053,7 +1053,7 @@ ui <- fluidPage(
           # ---- Tab: Data Readiness ----
           tabPanel("Data Readiness",
             h4("Data Readiness Assessment"),
-            p("Click '1. Check Data Readiness' in the sidebar to generate diagnostics. ",
+            p("Click '1. Check Data Readiness' on this step to generate diagnostics. ",
               "Review the results here before starting the UFH / MFH analysis."),
             verbatimTextOutput("readiness_messages"),
             h4("National Poverty Headcount Rates"),
@@ -1094,8 +1094,8 @@ ui <- fluidPage(
         style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
         tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
         tags$li(tags$code("docs/MCPE_VALIDATION_STATUS.md")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_12.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_12.pptx")),
+        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_13.pdf")),
+        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_13.pptx")),
         tags$li(tags$code("outputs/final_report.html"), " after a completed run")
       )
     )

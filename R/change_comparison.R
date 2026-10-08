@@ -188,7 +188,7 @@ sae_change_rmse_by_method <- function(levels, sig, years, indicator_type = "pove
   rownames(long) <- NULL
   noun <- if (is_mean) "ln mean welfare" else
     switch(as.character(fgt_alpha), "1" = "poverty gap", "2" = "poverty severity", "poverty rate")
-  unit <- if (is_mean) "log points (ln mean welfare)" else "percentage points"
+  unit <- if (is_mean) "ln ratio (x 100 = approx. % change)" else "percentage points"
   change_label <- if (is_mean) sprintf("Change in ln mean welfare, %s to %s", years[1], years[2]) else
     sprintf("Change in %s, %s to %s (percentage points)", noun, years[1], years[2])
   rmse_label <- if (is_mean) "RMSE of the change in ln mean welfare" else

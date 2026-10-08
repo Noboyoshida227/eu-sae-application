@@ -1,4 +1,4 @@
-EU SAE candidate 5.2.0-rc.6-wizard.5.12 - reorganized layout
+EU SAE candidate 5.2.0-rc.6-wizard.5.13 - reorganized layout
 Published on GitHub Releases for review and testing. Whether to publish estimates as official statistics is for each national statistical office to decide.
 Includes only the explicit scripts/release_inventory.csv file list.
 Windows: open Start_Here and run Start_Wizard.bat or Start_Dashboard.bat. Keep Start_Here inside the package.

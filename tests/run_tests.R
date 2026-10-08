@@ -17,7 +17,7 @@ parse_ok <- vapply(r_files, function(path) {
 check(all(parse_ok), "all R sources parse")
 check(identical(trimws(readLines("VERSION", warn = FALSE)[1]), "5.2.0-rc.6"), "VERSION is the candidate version")
 check(identical(trimws(readLines("WIZARD_VERSION", warn = FALSE)[1]),
-                "5.2.0-rc.6-wizard.5.12"),
+                "5.2.0-rc.6-wizard.5.13"),
       "WIZARD_VERSION identifies the rc.6 wizard overlay")
 wizard_version <- trimws(readLines("WIZARD_VERSION", warn = FALSE)[1])
 changelog_text <- read_all("docs/CHANGELOG.md")
@@ -119,8 +119,8 @@ check(grepl("sae_write_release_manifest", wizard_manifest_text, fixed = TRUE),
 wizard_resources <- c(
   "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx",
   "docs/MCPE_VALIDATION_STATUS.md",
-  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_12.pdf",
-  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_12.pptx"
+  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_13.pdf",
+  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_13.pptx"
 )
 check(all(vapply(wizard_resources, file.exists, logical(1))) &&
         all(vapply(wizard_resources, grepl, logical(1), x = wizard_text,
@@ -1344,6 +1344,24 @@ check(grepl("With current prices\nand no conversion they include inflation", .rw
       "README_WIZARD: inflation only for unconverted current prices; approximate benchmarked RMSE; no removed figure")
 check(!grepl("compare estimated changes in percentage points", read_all("tools/build_instruction_pdf.py"), fixed = TRUE),
       "download-instructions generator distinguishes poverty and mean-welfare change units")
+
+.help_all <- paste(read_all("app.R"), read_all("app_wizard.R"))
+check(!grepl("applies Duan's smearing estimator", .help_all, fixed = TRUE) &&
+        lengths(regmatches(.help_all, gregexpr("direct arithmetic mean divided by its direct geometric mean",
+                                               .help_all, fixed = TRUE))) == 4L,
+      "bc_sm help describes the domain-level arithmetic/geometric ratio in both interfaces")
+check(!grepl("Affects how cross-year covariance of sampling errors is estimated", .help_all, fixed = TRUE),
+      "PSU-consistency help no longer claims an effect on the estimates")
+check(!grepl("this choice is ignored because the transformation", .help_all, fixed = TRUE) &&
+        lengths(regmatches(.help_all, gregexpr("under log it applies 'sm_out' to the log-scale variances",
+                                               .help_all, fixed = TRUE))) == 2L,
+      "UFH variance help states the arcsin and log behaviour in both interfaces")
+check(!grepl("value, poverty_rate, rate, or mean", .help_all, fixed = TRUE),
+      "benchmark help lists only target column names the reader accepts")
+check(grepl("Test 0e: WARNING", read_all("R/validation_checks.R"), fixed = TRUE),
+      "readiness warns about non-positive welfare in log mean-welfare runs")
+check(!grepl("log points (ln mean welfare)", read_all("R/change_comparison.R"), fixed = TRUE),
+      "box-plot unit label does not call unscaled ln ratios log points")
 
 if (length(failures) > 0L) {
   stop("Tests failed: ", paste(failures, collapse = "; "), call. = FALSE)

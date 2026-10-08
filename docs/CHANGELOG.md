@@ -1,5 +1,28 @@
 # Changelog
 
+## 5.2.0-rc.6-wizard.5.13 - 2026-10-08
+
+- Documentation release with help-text corrections. No change to estimates.
+- **Guidelines note** (`docs/guidance/guidelines_v5_2_0_rc6_wizard.docx`), revised after reviews by Claude and ChatGPT (GPT-6 Astra), 7-8 Oct:
+  - **Anchored poverty** (About, 3.1, 3.10, 4.4, 11.11, Annex C, Annex E, troubleshooting): anchored lines are supplied, using official anchored thresholds where available, either as one numeric value per survey year in Step 3 or as a survey column when lines vary across records. The two inputs give the same estimates. The planned CPI-based calculation of anchored lines is no longer described. Section 11.11 explains the survey-year boxes (enter the threshold for that survey's income year), the 5,000 default and restored values, and the Step 6 summary.
+  - **Direct estimates** (4.5, 6.2, G.1): weights are population weights (survey weight x household size); the sampling variance is estimated by Taylor linearization (survey package, PSU clusters, strata, no finite-population correction). The incorrect variance formula in G.1 is removed.
+  - **bc_sm** (G.4, 7.7, 8.8, 11.12.4, glossary): defined as the domain's direct arithmetic mean divided by its direct geometric mean, no longer called Duan smearing. With none, unbenchmarked model estimates are geometric means. Zero or negative welfare is left out of the log model but kept in Direct and in the arithmetic mean that bc_sm uses.
+  - **New Section 11.13, Reading the change outputs:** units in each output (headcount changes in percentage points, stored as proportions in the significance tables and change maps; mean-welfare box plots in raw log ratios), the Direct and UFH change MSE (sum of the two level MSEs; box-plot RMSE 100 x sqrt(MSE1 + MSE2) for headcounts), which covariance each method omits, and the exact sheet names.
+  - **Other corrections:** the Run Analysis gate and which changes reset the readiness check (11.2, 11.8); arcsin only for FGT(0); benchmark target column names, and populations not read from the target file (Table VI); targets in CPI-converted runs (3.8); ratio-benchmarking guarantees and their limits (7.12); CVs stored as ratios (6.4); covariance wording (8.7, G.8, glossary); RStudio optional (11.1, Annex C); macOS 15 Open Anyway; five cross-references.
+  - **Rolling MFH publication** (owner's revision): two publication policies for rolling two-year MFH estimates, with Figure 17.
+- **User guide** (`docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_13.pptx`): replaced by the four-part guide (57 slides): setup, the complete six-step wizard, three worked examples (year-specific poverty lines, anchored poverty lines, real mean welfare) and the optional AI Assistant. The worked examples use survey years 2022-2023 with previous-year incomes and share their numbers with the guidelines note.
+- **Download instructions PDF** also mentions that anchored lines can be entered either way, that with none unbenchmarked log-model estimates are geometric means, and the new readiness warning for zero or negative welfare.
+- Help text, readiness messages and the download-instructions PDF corrected after the second review of the four-part user guide (7 Oct). No change to estimates.
+  - **Bias correction help** (wizard and dashboard): `bc_sm` is described as what the code does, multiplying exp(eta_hat) by the domain's (MFH: domain-year's) direct arithmetic mean divided by its direct geometric mean; it is no longer called Duan's smearing with a pooled residual factor. The mean-welfare notification and the Transformation help use the same wording.
+  - **PSU-consistency help:** the checkbox is recorded with the run settings and does not change the estimates; the help no longer says it affects the cross-year covariance.
+  - **UFH variance help:** says that the choice is offered only with no transformation, that arcsin fills only missing or zero variances, and that log applies `sm_out` to the log-scale variances (it said the choice was ignored under both).
+  - **Benchmark target help:** lists only the target column names the reader accepts (benchmark, target, B_r, benchmark_target, regional_benchmark, direct, direct_rate, poverty_rate); it listed value, rate and mean, which were rejected.
+  - **Data Readiness:** in log mean-welfare runs, a new `Test 0e` warning counts survey rows with zero or negative welfare (left out of the log model, kept in Direct). `validate_inputs()` now counts zero as well as negative values.
+  - **Change box plots:** the unit label for mean welfare reads "ln ratio (x 100 = approx. % change)" instead of "log points", since the values are not multiplied by 100.
+  - **Wizard Data Readiness tab:** says to click Check Data Readiness "on this step" (there is no sidebar in the wizard).
+  - **Start_Here/README.md:** the macOS permission note no longer says the ZIP is built without the executable bit; the release builder sets it, but some unzip tools and the "Source code" archives drop it.
+  - **Download instructions PDF** (`tools/build_instruction_pdf.py`): first-launch package installation, macOS 15 Open Anyway, the Step 3 poverty-line source, the run gate, per-person welfare and weights, which files are keyed by survey year, income year or domain ID, the UFH variance caveat, target-file columns, MFH model definitions, the bc_sm conversion, covariate and PSU controls, AI gateways and timing, and the unscaled ln-ratio box plots.
+
 ## 5.2.0-rc.6-wizard.5.12 - 2026-10-06
 
 - Documentation and help text brought in line with w5k (after the ChatGPT (GPT-6 Astra) review of the w5k documentation, 5 Oct). No change to estimates.
