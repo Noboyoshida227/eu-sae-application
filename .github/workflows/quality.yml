@@ -21,11 +21,25 @@ jobs:
           # source, which keeps this job to a couple of minutes.
           use-public-rspm: true
 
+      # emdi imports spdep, which needs sf and units. Their Linux binaries link
+      # to the GDAL, GEOS, PROJ and UDUNITS-2 system libraries, which the runner
+      # image does not include: without them the binaries install, but emdi
+      # cannot be loaded and the UFH methodology tests stop.
+      - name: Install system libraries for sf and units
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libudunits2-dev libgdal-dev libgeos-dev libproj-dev
+
       # Statistical regressions must exercise the actual production estimators.
       # Spain end-to-end data are not in the clone; synthetic method tests run
       # here, including emdi/msae, while the private-data integration skips.
       - name: Install the R packages the tests need
-        run: install.packages(c("ggplot2", "rmarkdown", "xml2", "zip", "emdi", "msae", "survey", "dplyr"))
+        run: |
+          pkgs <- c("ggplot2", "rmarkdown", "xml2", "zip", "emdi", "msae", "survey", "dplyr")
+          install.packages(pkgs)
+          # install.packages() only warns when a package fails; loading each
+          # one here stops this step with the real error message instead.
+          for (p in pkgs) loadNamespace(p)
         shell: Rscript {0}
 
       - name: Parse and run targeted tests
