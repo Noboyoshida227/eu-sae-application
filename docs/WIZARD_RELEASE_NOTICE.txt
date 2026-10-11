@@ -1,10 +1,13 @@
 EU SAE APPLICATION PACKAGE - WIZARD RELEASE NOTICE
 
-Wizard overlay version: 5.2.0-rc.6-wizard.5.13
+Wizard overlay version: 5.2.0-rc.6-wizard.5.14
 Underlying package version: 5.2.0-rc.6
 
-This candidate was assembled from the verified 5.2.0-rc.5 wizard distribution
-and adds the rc.6 AI-report integration. Statistical processing is completed
+This w5n pre-release revises UFH/MFH calculations, uncertainty,
+convergence diagnostics and English guidance. See docs/QER/QER_README.md for
+validation evidence and remaining limitations. MFH2 remains the default;
+MFH3-first is optional. Boundary-sensitive change inference is provisional.
+Statistical processing is completed
 before optional AI interpretations are generated, and final_report.html is then
 rendered exactly once, followed by its editable final_report.docx companion.
 When AI is requested, both formats interleave visibly labelled interpretation
@@ -64,9 +67,9 @@ docs/guidance/guidelines_v5_2_0_rc6_wizard.docx.
 The scope and limitations of the current MCPE checks are recorded in
 docs/MCPE_VALIDATION_STATUS.md.
 
-This remains a release candidate. It is published at
-https://github.com/Noboyoshida227/eu-sae-application/releases
-for review and testing. Whether to publish estimates as official statistics
+This is a pre-release for review by the country teams, published at
+https://github.com/Noboyoshida227/eu-sae-application/releases;
+the build script itself does not publish or upload anything. Whether to publish estimates as official statistics
 is for each national statistical office to decide. The conditions in
 docs/RELEASE_CHECKLIST.md apply before any production release.
 

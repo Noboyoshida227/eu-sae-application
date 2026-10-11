@@ -1,0 +1,6 @@
+The saved Spanish comparison CSVs were computed from the pre-test current artifact on 2026-10-10.
+The original artifact could be read for fitting, but disappeared before SHA256 provenance was recorded.
+A pre-existing background-run regression test accepted an incomplete setup and replaced the current outputs.
+The test was stopped. Its partial outputs were retained under _private_build/qer_test_incident_20261010.
+All app_runs saved histories remain intact. No exact copy of the former current outputs was located.
+The exported before/after comparison remains valid; the missing original artifact limits independent reproduction of that exact saved-fit comparison.

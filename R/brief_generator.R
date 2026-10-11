@@ -117,7 +117,7 @@ generate_data_note <- function(validation,
     ufh_trans <- ufh_options$transformation %||% "N/A"
     ln <- c(ln, sprintf("- **Transformation:** %s", ufh_trans))
     # Bias correction (back-transformation) is meaningful for both
-    # arcsin (integration-based 'bc') and log (Duan smearing 'bc_sm').
+    # arcsin (integration-based 'bc') and UFH log (Slud-Maiti 'bc_sm').
     # Variance-smoothing is only user-configurable when transformation
     # is 'no' -- arcsin and log both stabilize variances on their own
     # scale.

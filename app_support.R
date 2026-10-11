@@ -33,6 +33,10 @@ parse_years <- function(x) {
 
 validate_app_config <- function(cfg) {
   errs <- character()
+  if (!is.list(cfg) || is.null(names(cfg))) {
+    return(list(valid = FALSE, errors = "The analysis configuration must be a named mapping."))
+  }
+  if (is.null(cfg$years_keep)) errs <- c(errs, "`years_keep` must be supplied explicitly in an analysis configuration.")
 
   years <- parse_years(cfg$years_keep %||% c(2012L, 2013L))
   if (length(years) != 2) {
@@ -43,9 +47,11 @@ validate_app_config <- function(cfg) {
   if (!is.finite(analysis_seed) || analysis_seed < 0L) {
     errs <- c(errs, "`analysis_seed` must be a non-negative integer.")
   }
-  mcpe_nB <- suppressWarnings(as.integer(cfg$mfh$mcpe_nB %||% 200L))
-  if (!is.finite(mcpe_nB) || mcpe_nB < 50L) {
-    errs <- c(errs, "`mfh.mcpe_nB` must be an integer of at least 50; 500 or more is recommended for production inference.")
+  for (setting in c("mfh.mcpe_nB", "mfh.bench_nB", "ufh.bootstrap_nB")) {
+    keys <- strsplit(setting, ".", fixed = TRUE)[[1L]]
+    problem <- tryCatch({ sae_bootstrap_count(cfg[[keys[1L]]][[keys[2L]]], label = setting); NULL },
+                        error = function(e) conditionMessage(e))
+    if (!is.null(problem)) errs <- c(errs, problem)
   }
   # `mfh.variance_lower_multiplier` is no longer read by any step (the only
   # sm_out rule is the absolute 0.001 cutoff); it is not validated, and the
@@ -132,23 +138,22 @@ validate_app_config <- function(cfg) {
   if (mfh_log && !identical(mfh_ind, "mean_welfare")) {
     errs <- c(errs, "`mfh.log_transform = TRUE` is only valid when indicator_type = 'mean_welfare'.")
   }
-  # MFH bias-correction method label. Only bc_sm or none are valid for
-  # MFH (Duan smearing or naive). bc (integration-based) is for arcsin
-  # only and arcsin is not an MFH option.
+  # MFH uses conditional lognormal correction. Accept bc_sm as a saved-setup
+  # compatibility alias; it does not select emdi's UFH correction.
   mfh_bc_method <- cfg$mfh$bias_correction_method %||% cfg$mfh$backtransformation
   if (!is.null(mfh_bc_method) && !is.na(mfh_bc_method) &&
-      !mfh_bc_method %in% c("bc_sm", "naive", "none")) {
-    errs <- c(errs, "`mfh.bias_correction_method` must be one of: bc_sm, none (or unset).")
+      !mfh_bc_method %in% c("conditional_lognormal", "bc_sm", "naive", "none")) {
+    errs <- c(errs, "`mfh.bias_correction_method` must be one of: conditional_lognormal, none (or the legacy bc_sm alias).")
   }
   if (mfh_log && identical(mfh_bc_method, "bc")) {
-    errs <- c(errs, "`bc` (integration-based) is only valid for arcsin. Use `bc_sm` (smearing) with MFH log.")
+    errs <- c(errs, "`bc` (integration-based) is only valid for arcsin. Use `conditional_lognormal` with MFH log.")
   }
 
   # The user-facing transformation can be "arcsin" (poverty), "log"
   # (mean welfare), or "no". Note: when the dropdown says "log", the
-  # config builder in app.R stores `transformation = "no"` (because the
-  # log step is applied in pre-processing, not by emdi::fh) and signals
-  # the log fit via `cfg$log_transform = TRUE`. The validator therefore
+  # config also records `log_transform = TRUE` for the log choice.
+  # emdi::fh receives the arithmetic direct mean and applies log itself.
+  # The validator therefore
   # treats "log" here as a valid value for forward-compat and for any
   # configs that record the user-facing choice directly.
   ufh_trans <- cfg$ufh$transformation %||% "arcsin"
@@ -172,7 +177,7 @@ validate_app_config <- function(cfg) {
     errs <- c(errs, "`bc_sm` is only valid for the log transformation. Use `bc` with arcsin.")
   }
   if (identical(ufh_trans, "log") && identical(ufh_bc_method, "bc")) {
-    errs <- c(errs, "`bc` (integration-based) is only valid for arcsin. Use `bc_sm` (smearing) with log.")
+    errs <- c(errs, "`bc` (integration-based) is only valid for arcsin. Use `bc_sm` (Slud-Maiti correction) with log.")
   }
 
   # Variance smoothing option for UFH (mirrors MFH menu). Only meaningful
@@ -303,18 +308,27 @@ resolve_upload <- function(file_input, fallback = NULL) {
 validate_mapped_input_columns <- function(survey_raw, rhs_raw, var_map, rhs_domain,
                                           povline_type = "column",
                                           indicator_type = "poverty") {
-  survey_required <- c(
-    year = var_map$year,
-    domain = var_map$domain,
-    psu = var_map$psu,
-    weight = var_map$weight,
-    hh_size = var_map$hh_size,
-    welfare = var_map$welfare
-  )
+  required_roles <- c("year", "domain", "psu", "weight", "hh_size", "welfare")
   if (identical(indicator_type, "poverty") && identical(povline_type, "column")) {
-    survey_required <- c(survey_required, povline = var_map$povline)
+    required_roles <- c(required_roles, "povline")
   }
-  survey_required <- survey_required[!is.na(survey_required) & nzchar(survey_required)]
+  missing_mapping <- required_roles[!vapply(required_roles, function(role) {
+    value <- var_map[[role]]
+    is.character(value) && length(value) == 1L && !is.na(value) && nzchar(trimws(value))
+  }, logical(1))]
+  if (length(missing_mapping)) {
+    stop("Input column mapping error: select a survey column for ",
+         paste(missing_mapping, collapse = ", "), ".", call. = FALSE)
+  }
+  if (!is.character(rhs_domain) || length(rhs_domain) != 1L ||
+      is.na(rhs_domain) || !nzchar(trimws(rhs_domain))) {
+    stop("Input column mapping error: select the auxiliary domain column.", call. = FALSE)
+  }
+  survey_required <- unlist(var_map[required_roles], use.names = TRUE)
+  strata <- var_map$strata
+  if (is.character(strata) && length(strata) == 1L && !is.na(strata) && nzchar(trimws(strata))) {
+    survey_required <- c(survey_required, strata = strata)
+  }
   missing_survey <- survey_required[!survey_required %in% names(survey_raw)]
 
   rhs_year <- if (!is.null(var_map$year) && var_map$year %in% names(rhs_raw)) {
@@ -370,64 +384,26 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
     strata_var <- trimws(as.character(var_map$strata %||% ""))
     length(strata_var) == 1 && !is.na(strata_var) && nzchar(strata_var)
   })
-  rename_vec <- c()
-  if (var_map$domain  != "domain")  rename_vec <- c(rename_vec, domain  = var_map$domain)
-  if (var_map$psu     != "psu")     rename_vec <- c(rename_vec, psu     = var_map$psu)
-  if (var_map$welfare != "welfare") rename_vec <- c(rename_vec, welfare = var_map$welfare)
-  if (var_map$weight  != "weight")  rename_vec <- c(rename_vec, weight  = var_map$weight)
-  if (use_strata && !is.null(var_map$strata) && nzchar(var_map$strata) &&
-      var_map$strata != "strata") {
-    rename_vec <- c(rename_vec, strata = var_map$strata)
-  }
+  rename_vec <- c(
+    year = var_map$year, domain = var_map$domain, psu = var_map$psu,
+    welfare = var_map$welfare, weight = var_map$weight, hh_size = var_map$hh_size
+  )
+  if (use_strata) rename_vec <- c(rename_vec, strata = var_map$strata)
   benchmark_level_var <- trimws(as.character(
     var_map$benchmark_level %||% var_map$region %||% ""
   ))
-  if (nzchar(benchmark_level_var) &&
-      benchmark_level_var %in% names(survey_raw) &&
-      benchmark_level_var != "region") {
+  if (nzchar(benchmark_level_var) && benchmark_level_var %in% names(survey_raw)) {
     rename_vec <- c(rename_vec, region = benchmark_level_var)
   }
-  if (!is.null(var_map$hh_size) && nzchar(var_map$hh_size) &&
-      var_map$hh_size != "hh_size") {
-    rename_vec <- c(rename_vec, hh_size = var_map$hh_size)
-  }
-  if (var_map$year    != "year")    rename_vec <- c(rename_vec, year    = var_map$year)
-  # Only rename povline column when the poverty line comes from data
-  if (identical(povline_type, "column") && !is.null(var_map$povline) &&
-      var_map$povline != "povline") {
+  if (identical(indicator_type, "poverty") && identical(povline_type, "column")) {
     rename_vec <- c(rename_vec, povline = var_map$povline)
   }
-
-  survey_data <- survey_raw
-  # A column that already carries an internal name (for example `povline`)
-  # while a different column is mapped to that role (for example
-  # `povline_2019`) would otherwise end up as a second `povline` column, and
-  # the readiness tables would silently use the first one. Rename the
-  # pre-existing column to `<name>_original`, as the UFH and MFH steps do,
-  # and report it.
   harmonize_notes <- utils::capture.output(
-    survey_data <- sae_resolve_rename_collisions(
-      survey_data, rename_vec[unname(rename_vec) %in% names(survey_data)],
-      context = "Data Readiness, survey mapping"
+    survey_data <- sae_apply_column_mapping(
+      survey_raw, rename_vec, context = "Data Readiness, survey mapping"
     )
   )
-  for (new_name in names(rename_vec)) {
-    old_name <- rename_vec[[new_name]]
-    if (old_name %in% names(survey_data)) {
-      names(survey_data)[names(survey_data) == old_name] <- new_name
-    }
-  }
-  if (!use_strata && "strata" %in% names(survey_data)) {
-    survey_data$strata <- NULL
-  }
-  if (nzchar(benchmark_level_var) &&
-      !"region" %in% names(survey_data) &&
-      benchmark_level_var %in% unname(rename_vec)) {
-    copied_from <- names(rename_vec)[match(benchmark_level_var, unname(rename_vec))]
-    if (!is.na(copied_from) && copied_from %in% names(survey_data)) {
-      survey_data$region <- survey_data[[copied_from]]
-    }
-  }
+  if (!use_strata && "strata" %in% names(survey_data)) survey_data$strata <- NULL
 
   # When the poverty line is numeric, create the column. The value may be
   # a legacy scalar or a named year-to-line map.
@@ -463,28 +439,13 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
     survey_data$region <- trimws(as.character(survey_data$region))
   }
 
-  rhs_data <- rhs_raw
-  rhs_rename <- c(
-    if (rhs_domain != "domain" && rhs_domain %in% names(rhs_data)) c(domain = rhs_domain),
-    if (!is.null(var_map$year) && var_map$year != "year" && var_map$year %in% names(rhs_data))
-      c(year = var_map$year)
-  )
+  rhs_year <- if (var_map$year %in% names(rhs_raw)) var_map$year else "year"
+  rhs_rename <- c(domain = rhs_domain, year = rhs_year)
   harmonize_notes <- c(harmonize_notes, utils::capture.output(
-    rhs_data <- sae_resolve_rename_collisions(
-      rhs_data, rhs_rename, context = "Data Readiness, auxiliary mapping"
+    rhs_data <- sae_apply_column_mapping(
+      rhs_raw, rhs_rename, context = "Data Readiness, auxiliary mapping"
     )
   ))
-  if (rhs_domain != "domain" && rhs_domain %in% names(rhs_data)) {
-    names(rhs_data)[names(rhs_data) == rhs_domain] <- "domain"
-  }
-  rhs_year <- if (!is.null(var_map$year) && var_map$year %in% names(rhs_data)) {
-    var_map$year
-  } else {
-    "year"
-  }
-  if (rhs_year != "year" && rhs_year %in% names(rhs_data)) {
-    names(rhs_data)[names(rhs_data) == rhs_year] <- "year"
-  }
   if ("domain" %in% names(rhs_data)) {
     rhs_data$domain <- trimws(as.character(rhs_data$domain))
   }
@@ -1229,6 +1190,22 @@ run_pipeline_from_config <- function(config_path, logger = message,
   v <- validate_app_config(cfg)
   if (!v$valid) {
     stop(paste(v$errors, collapse = "\n"))
+  }
+
+  # A partial/stale setup must never silently launch the bundled example or
+  # clear a user's existing outputs. Resolve all estimation inputs first.
+  if (!length(cfg$run$steps)) stop("The analysis configuration must specify `run.steps`.", call. = FALSE)
+  if (!exists("sae_resolve_input_path", mode = "function")) source(file.path("R", "input_paths.R"))
+  for (method in intersect(c("ufh", "mfh"), tolower(cfg$run$steps))) {
+    for (field in c("survey_path", "rhs_path", "shp_path")) {
+      path <- cfg[[method]][[field]]
+      valid_path <- is.character(path) && length(path) == 1L && !is.na(path) && nzchar(trimws(path))
+      resolved <- if (valid_path) sae_resolve_input_path(path, root = getwd(), allow_basename = FALSE) else NULL
+      if (!valid_path || is.null(resolved) || !file.exists(resolved) || dir.exists(resolved)) {
+        stop("Missing or unavailable analysis input: ", method, ".", field,
+             ". Reload the input files before running.", call. = FALSE)
+      }
+    }
   }
 
   steps <- cfg$run$steps %||% c("UFH", "MFH", "Comparison")

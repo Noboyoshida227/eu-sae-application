@@ -119,7 +119,7 @@ minimum_versions <- c(
   arrow = "12.0.0",
   sae = "1.3",
   msae = "0.1.5",
-  emdi = "2.0.0",
+  emdi = "2.2.3",
   survey = "4.2",
   sf = "1.0.0",
   spdep = "1.2.0",

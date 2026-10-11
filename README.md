@@ -1,5 +1,7 @@
 # EU SAE Application Package 5.2.0-rc.6
 
+w5n is a pre-release for review by the country teams. It includes statistical repairs, revised guidance (the user guide also in Polish and Greek) and validation evidence. Start with the [QER review note](docs/QER/QER_README.md) and [methodology alignment](docs/METHODOLOGY_ALIGNMENT.md). Re-run analyses made with earlier versions: estimates and uncertainty can change. MFH2 remains the default; MFH3-first remains optional.
+
 ## Start here
 
 Download the package from the [Releases page](https://github.com/Noboyoshida227/eu-sae-application/releases): under **Assets**, take
@@ -41,8 +43,8 @@ Ports advance if occupied. There is no supplied wizard shell launcher; manual
 launch through R remains possible from the package root using
 `source("app_wizard.R")` after installing dependencies.
 
-- [Download and verification instructions](docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_13.pdf)
-- [Wizard reference](docs/README_WIZARD.md) and [slide guide](docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_13.pptx)
+- [Download and verification instructions](docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_14.pdf)
+- [Wizard reference](docs/README_WIZARD.md) and [slide guide](docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_14.pptx)
 - [Methodological guidance](docs/guidance/guidelines_v5_2_0_rc6_wizard.docx)
 - [Examples and your own input folders](Data/README.md)
 
@@ -89,7 +91,7 @@ are lost; set `SAE_INPUT_ENCODING` before launch to force a specific source
 encoding. Geometry formats: sf
 RDS/RData, zipped ESRI shapefile, GeoPackage, GeoJSON, KML, and GML.
 
-The review candidate includes the documented Spain example and fully synthetic
+This pre-release includes the documented Spain example and fully synthetic
 examples under `Data/Spain/` and `Data/simulated/`. Neither provides real
 estimates. This candidate uses documented IGN/CNIG CartoBase ANE boundaries
 under CC BY 4.0; survey derivation and other release approvals remain open.
@@ -124,18 +126,20 @@ See [data limitations and map attribution](Data/Spain/README.md) and `THIRD_PART
 
 ## Reproducibility controls
 
-- `Analysis seed` controls LASSO folds and MFH bootstrap draws.
-- `MCPE bootstrap replicates` defaults to 200 for interaction; production runs
-  should use at least 500 only after a stability study.
+- `Analysis seed` controls LASSO folds and UFH/MFH bootstrap draws.
+- `Bootstrap replicates` defaults to 500 and controls UFH, MFH and benchmarking.
+  Smaller values are for quick checks. Inspect Monte Carlo precision and
+  covariance-boundary diagnostics; a larger count does not establish coverage.
 - Each run records VERSION, config, input filenames and SHA-256 hashes, package
   versions, R session information, seed, and MCPE count.
 - UFH change inference explicitly states its period-independence assumption.
-- The primary change status and red/gray figures use pointwise inference at
+- The primary change status uses pointwise inference at
   alpha = 0.05, matching whether the pointwise 95% confidence interval excludes
   zero. Change tables and the final report also show Benjamini-Hochberg- and
   Bonferroni-adjusted p-values and flags as supplementary sensitivity
   information. These domain-change adjustments are separate from the MFH3
-  reference-variance test adjustment.
+  reference-variance test adjustment. Covariance-boundary MFH fits receive
+  provisional labels; their intervals can substantially understate uncertainty.
 - When a custom covariate list is supplied, it is the LASSO candidate pool if
   LASSO is enabled and the fixed model specification if LASSO is disabled.
 - If MFH3 is requested but does not converge, the report and run artifacts say

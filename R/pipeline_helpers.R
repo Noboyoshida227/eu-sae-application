@@ -13,6 +13,16 @@ sae_as_numeric_or_na <- function(x) {
   suppressWarnings(as.numeric(as.character(x)))
 }
 
+sae_bootstrap_count <- function(x = NULL, default = 500L, label = "Bootstrap replicates") {
+  if (is.null(x) || !length(x)) x <- default
+  value <- suppressWarnings(as.numeric(x))
+  if (length(value) != 1L || !is.finite(value) || value < 50 ||
+      value != floor(value) || value > .Machine$integer.max) {
+    stop(label, " must be a whole number of at least 50.", call. = FALSE)
+  }
+  as.integer(value)
+}
+
 sae_scalar_numeric_or_na <- function(x, column = NULL) {
   if (is.null(x) || length(x) == 0L) return(NA_real_)
   if (!is.null(column) && is.data.frame(x) && column %in% names(x)) {
@@ -620,6 +630,43 @@ sae_resolve_rename_collisions <- function(df, rename_map, context = "") {
     }
   }
   df
+}
+
+# Apply all roles from the original columns, simultaneously. A single source
+# can serve several roles (e.g. a domain can also be a stratum or benchmark
+# group); sequential renaming and dplyr::rename drop one of those roles.
+sae_apply_column_mapping <- function(df, rename_map, context = "") {
+  if (!length(rename_map)) return(df)
+  targets <- names(rename_map)
+  sources <- unname(rename_map)
+  if (is.null(targets) || anyNA(targets) || any(!nzchar(targets)) ||
+      anyDuplicated(targets) || anyNA(sources) || any(!nzchar(sources))) {
+    stop("Input column mapping error: each role needs one named source column.", call. = FALSE)
+  }
+  missing <- setdiff(sources, names(df))
+  if (length(missing)) {
+    stop("Input column mapping error: source column(s) not found: ",
+         paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (anyDuplicated(names(df))) {
+    stop("Input column mapping error: the input has duplicate column names.", call. = FALSE)
+  }
+  values <- lapply(sources, function(src) df[[src]])
+  names(values) <- targets
+  out <- sae_resolve_rename_collisions(df, rename_map, context)
+  # Retire old names only after reading every source, including swaps and
+  # identity mappings where a canonical column is also used for another role.
+  for (src in setdiff(sources, targets)) out[[src]] <- NULL
+  for (target in targets) out[[target]] <- values[[target]]
+  if (all(c("strata", "hh_size") %in% targets) &&
+      identical(rename_map[["strata"]], rename_map[["hh_size"]])) {
+    cat(sprintf(paste0("WARNING%s: strata and household size both use '%s'. ",
+      "Both columns have been retained. Check the strata mapping against the ",
+      "survey design; household size is not usually a stratum identifier.\n"),
+      if (nzchar(context)) paste0(" [", context, "]") else "",
+      rename_map[["hh_size"]]))
+  }
+  out
 }
 
 # ---- Covariate type guard ---------------------------------------------------
@@ -1253,15 +1300,24 @@ sae_cpi_series <- function(df, year_col, value_col) {
 #   v = MSE1 / m1^2 + MSE2 / m2^2 - 2 * C / (m1 * m2),
 # where C is the covariance of the two estimates. C is implied by the MSE of the
 # difference that the UFH and MFH steps report: Var(m2 - m1) = MSE1 + MSE2 - 2C.
-# (UFH assumes independent years, so C = 0 there.) The covariance-adjusted
-# variance is used whenever it is positive, however small (owner's decision of
-# 4 Oct 2026: no 1% rule). Only when it is zero, negative or not a number (a
-# zero-width interval or an impossible negative variance) is the independence
-# variance used instead, as in the MFH step; mse_fallback_used marks those
-# rows, and log_ratio_covariance_used is TRUE only when a change MSE was given
-# and its implied covariance was used. The 95% interval
-# 100 * (exp(r +/- z se) - 1) is asymmetric and never below -100%.
-sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05) {
+# UFH assumes independent prediction errors between years (C = 0).
+# MFH supplies a coherent joint bootstrap error matrix. Invalid moments or
+# nonpositive variances yield unavailable inference, never invented independence.
+# The interval 100 * (exp(r +/- z se) - 1) is asymmetric and bounded below by -100%.
+sae_joint_error_moments <- function(mse1, mse2, mcpe) {
+  # A matrix of prediction-error second moments must be positive semidefinite.
+  # Never replace an impossible cross-product with independence silently.
+  bound <- sqrt(pmax(mse1, 0)) * sqrt(pmax(mse2, 0))
+  tolerance <- 1e-10 * pmax(abs(mse1), abs(mse2), bound, .Machine$double.eps)
+  valid <- is.finite(mse1) & is.finite(mse2) & is.finite(mcpe) &
+    mse1 >= 0 & mse2 >= 0 & abs(mcpe) <= bound + tolerance
+  cross <- ifelse(valid, pmin(bound, pmax(-bound, mcpe)), NA_real_)
+  difference <- ifelse(valid, pmax(mse1 + mse2 - 2 * cross, 0), NA_real_)
+  list(valid = valid, mcpe = cross, difference = difference)
+}
+
+sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05,
+                               mcpe = NULL) {
   n <- max(length(m1), length(m2))
   m1 <- rep_len(as.numeric(m1), n); m2 <- rep_len(as.numeric(m2), n)
   mse1 <- rep_len(as.numeric(mse1), n); mse2 <- rep_len(as.numeric(mse2), n)
@@ -1271,11 +1327,13 @@ sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05) {
   ok <- is.finite(m1) & is.finite(m2) & m1 > 0 & m2 > 0
   r <- ifelse(ok, log(m2 / m1), NA_real_)
   v_indep <- mse1 / m1^2 + mse2 / m2^2
-  has_cov <- is.finite(mse_diff)
-  cov12 <- ifelse(has_cov, (mse1 + mse2 - mse_diff) / 2, 0)
+  has_cov <- if (is.null(mcpe)) is.finite(mse_diff) else is.finite(rep_len(mcpe, n))
+  cov12 <- if (is.null(mcpe)) (mse1 + mse2 - mse_diff) / 2 else rep_len(mcpe, n)
+  joint <- sae_joint_error_moments(mse1, mse2, cov12)
+  cov12 <- joint$mcpe
   v_cov <- v_indep - 2 * cov12 / (m1 * m2)
-  use_cov <- is.finite(v_cov) & is.finite(v_indep) & v_cov > 0
-  v <- ifelse(use_cov, v_cov, v_indep)
+  use_cov <- joint$valid & is.finite(v_cov) & is.finite(v_indep) & v_cov > 0
+  v <- ifelse(use_cov, v_cov, NA_real_)
   v[!ok | !is.finite(v) | v <= 0] <- NA_real_
   se <- sqrt(v)
   z <- stats::qnorm(1 - alpha / 2)
@@ -1288,9 +1346,10 @@ sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05) {
     log_ratio = r,
     log_ratio_var = v,
     log_ratio_covariance_used = ok & has_cov & use_cov,
-    # A fallback only where the independence variance itself is usable
-    # (missing level MSEs give no inference, not a fallback).
-    mse_fallback_used = ok & has_cov & !use_cov & is.finite(v_indep) & v_indep > 0,
+    mse_fallback_used = rep(FALSE, n),
+    inference_status = ifelse(!ok, "nonpositive_or_missing_estimate",
+                             ifelse(!joint$valid, "invalid_joint_error_moments",
+                                    ifelse(!use_cov, "zero_or_invalid_variance", "ok"))),
     p_value = p,
     stringsAsFactors = FALSE
   )

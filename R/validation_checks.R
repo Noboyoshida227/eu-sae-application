@@ -134,8 +134,8 @@ validate_inputs <- function(survey_data, aux_data) {
       n_nonpositive <- sum(welfare_clean <= 0)
       if (n_nonpositive > 0L) {
         flags <- c(flags, sprintf(paste0(
-          "INFO: %d zero or negative welfare value(s) detected. A log mean-welfare model ",
-          "leaves them out of the model; the Direct estimates keep them."), n_nonpositive))
+          "INFO: %d zero or negative welfare value(s) detected. Mean-welfare estimates ",
+          "keep them. A log model requires positive arithmetic means in every sampled area."), n_nonpositive))
       }
     }
   }
@@ -352,6 +352,7 @@ empty_readiness_result <- function(messages = character(),
       n_obs        = integer(),
       stringsAsFactors = FALSE
     ),
+    estimates_available = FALSE,
     messages           = messages
   )
 }
@@ -387,8 +388,10 @@ assess_data_readiness <- function(survey_data,
 
   # Indicator-aware noun used in messages and table column header.
   indicator_type <- match.arg(indicator_type, c("poverty", "mean_welfare"))
-  fgt_noun <- if (identical(indicator_type, "mean_welfare")) {
-    if (isTRUE(log_transform)) "log mean welfare" else "mean welfare"
+  is_mean <- identical(indicator_type, "mean_welfare")
+  is_log_mean <- is_mean && isTRUE(log_transform)
+  fgt_noun <- if (is_mean) {
+    "mean welfare"
   } else {
     switch(as.character(fgt_alpha),
       "0" = "poverty headcount rate",
@@ -397,7 +400,8 @@ assess_data_readiness <- function(survey_data,
       "poverty rate"
     )
   }
-  cor_target_label <- sprintf("Corr. w/ %s", tools::toTitleCase(fgt_noun))
+  model_target_noun <- if (is_log_mean) "log of area arithmetic mean welfare" else fgt_noun
+  cor_target_label <- sprintf("Corr. w/ %s", tools::toTitleCase(model_target_noun))
 
   survey_key_issues <- readiness_column_issues(
     survey_data, c("domain", "year"), "survey data"
@@ -434,22 +438,26 @@ assess_data_readiness <- function(survey_data,
   # ------------------------------------------------------------------
   # 0. Derive per-observation target and domain-level target rates
   # ------------------------------------------------------------------
-  if (identical(indicator_type, "mean_welfare")) {
-    # NA-out non-positive welfare before log to avoid -Inf/NaN
+  required_target_cols <- c("welfare", if (!is_mean) "povline")
+  missing_target_cols <- setdiff(required_target_cols, names(survey_data))
+  if (length(missing_target_cols)) {
+    return(empty_readiness_result(c(msgs, sprintf(
+      "Test 0c: ERROR -- Direct %s estimation is blocked. Missing required column(s): %s. Check the variable mapping. No readiness estimates were calculated or saved.",
+      fgt_noun, paste(missing_target_cols, collapse = ", ")
+    )), cor_target_label = cor_target_label))
+  }
+  if (is_mean) {
+    # Log FH transforms the direct arithmetic area mean after aggregation.
+    # Individual zero/negative welfare remains part of that mean.
     w <- as.numeric(survey_data$welfare)
-    if (isTRUE(log_transform)) {
-      n_nonpositive <- sum(!is.na(w) & w <= 0)
-      if (n_nonpositive > 0L) {
-        msgs <- c(msgs, sprintf(paste0(
-          "Test 0e: WARNING -- %d survey row(s) have zero or negative welfare. ",
-          "The log model leaves them out; the Direct estimates keep them. ",
-          "Review them before running."), n_nonpositive))
-      }
-      w[!is.na(w) & w <= 0] <- NA_real_
-      survey_data$poor <- log(w)
-    } else {
-      survey_data$poor <- w
+    n_nonpositive <- sum(is.finite(w) & w <= 0)
+    if (is_log_mean && n_nonpositive > 0L) {
+      msgs <- c(msgs, sprintf(paste0(
+        "Test 0e: INFO -- %d survey row(s) have zero or negative welfare. ",
+        "They remain in the arithmetic Direct means. The log transformation ",
+        "is applied to each area mean after aggregation."), n_nonpositive))
     }
+    survey_data$poor <- w
   } else if (fgt_alpha == 0L) {
     survey_data$poor <- as.integer(survey_data$welfare < survey_data$povline)
   } else {
@@ -459,12 +467,11 @@ assess_data_readiness <- function(survey_data,
 
   missing_weight_cols <- setdiff(c("weight", "hh_size"), names(survey_data))
   if (length(missing_weight_cols) > 0) {
-    msgs <- c(msgs, sprintf(
-      "Test 0c: ERROR -- Direct %s estimation requires population_weight = weight * household size. Missing required column(s): %s.",
+    return(empty_readiness_result(c(msgs, sprintf(
+      "Test 0c: ERROR -- Direct %s estimation requires population_weight = weight * household size. Missing required column(s): %s. Check the weight and household size mappings. No readiness estimates were calculated or saved.",
       fgt_noun,
       paste(missing_weight_cols, collapse = ", ")
-    ))
-    survey_data$analysis_weight <- NA_real_
+    )), cor_target_label = cor_target_label))
   } else {
     survey_data$analysis_weight <- suppressWarnings(
       as.numeric(survey_data$weight) * as.numeric(survey_data$hh_size)
@@ -472,11 +479,10 @@ assess_data_readiness <- function(survey_data,
     bad_weight <- !is.finite(survey_data$analysis_weight) |
       survey_data$analysis_weight <= 0
     if (any(bad_weight)) {
-      msgs <- c(msgs, sprintf(
-        "Test 0c: ERROR -- %d row(s) have missing, non-finite, or non-positive population_weight = weight * household size.",
+      return(empty_readiness_result(c(msgs, sprintf(
+        "Test 0c: ERROR -- %d row(s) have missing, non-finite, or non-positive population_weight = weight * household size. Check the survey weights and household sizes. No readiness estimates were calculated or saved.",
         sum(bad_weight)
-      ))
-      survey_data$analysis_weight[bad_weight] <- NA_real_
+      )), cor_target_label = cor_target_label))
     } else {
       msgs <- c(msgs,
         "Test 0c: Direct estimates will use population_weight = weight * household size."
@@ -488,7 +494,7 @@ assess_data_readiness <- function(survey_data,
 
   # Domain-level target (weighted) per year. Column is named `poverty_rate`
   # for back-compat with downstream code, but for indicator_type ==
-  # "mean_welfare" it actually holds the weighted mean (or mean log)
+  # "mean_welfare" it always holds the arithmetic weighted mean
   # welfare per domain-year.
   pov_rates <- do.call(rbind, lapply(years, function(yr) {
     sv <- survey_data[survey_data$year == yr, ]
@@ -506,10 +512,33 @@ assess_data_readiness <- function(survey_data,
       out$poverty_rate[i] <- if (any(ok)) {
         stats::weighted.mean(dd$poor[ok], dd$analysis_weight[ok])
       } else NA_real_
-      out$n_obs[i] <- nrow(dd)
+      out$n_obs[i] <- sum(ok)
     }
     out
   }))
+
+  # Keep displayed/exported Direct values in original units. Only the
+  # correlation response uses the same transformed area mean as the model.
+  model_rates <- pov_rates[, c("domain", "year", "poverty_rate")]
+  if (is_log_mean) {
+    positive_area <- is.finite(pov_rates$poverty_rate) & pov_rates$poverty_rate > 0
+    model_rates$poverty_rate <- NA_real_
+    model_rates$poverty_rate[positive_area] <- log(pov_rates$poverty_rate[positive_area])
+    if (any(!positive_area)) {
+      bad <- pov_rates[!positive_area, , drop = FALSE]
+      bad_labels <- paste0(bad$domain, " (", bad$year, ")")
+      msgs <- c(msgs, sprintf(paste0(
+        "Test 0e: ERROR -- A log mean-welfare model requires a positive, finite ",
+        "arithmetic Direct mean in every sampled area-year. %d area-year(s) ",
+        "fail this check: %s%s. Check welfare and weights, or choose a model ",
+        "without the log transformation; do not remove individual zero/negative ",
+        "values merely to make the log model fit."), nrow(bad),
+        paste(utils::head(bad_labels, 10L), collapse = ", "),
+        if (nrow(bad) > 10L) ", ..." else ""))
+    } else {
+      msgs <- c(msgs, "Test 0e: All sampled area-year arithmetic Direct means are positive and finite for the log model.")
+    }
+  }
 
   # ------------------------------------------------------------------
   # Test 1. Summary statistics for auxiliary covariates
@@ -522,7 +551,7 @@ assess_data_readiness <- function(survey_data,
   if (aux_keys_ok) {
     aux_merged <- merge(
       aux_data,
-      pov_rates[, c("domain", "year", "poverty_rate")],
+      model_rates,
       by = c("domain", "year"),
       all.x = TRUE
     )
@@ -562,14 +591,14 @@ assess_data_readiness <- function(survey_data,
       !is.na(merged_year) & merged_year == as.numeric(yl)
     x   <- aux_merged[[v]][rows]
     y   <- aux_merged$poverty_rate[rows]
-    ok  <- !is.na(x)
+    ok  <- is.finite(x)
     n   <- sum(ok)
     aux_summary$n_obs[i] <- n
     if (n > 0) {
       aux_summary$mean[i] <- round(mean(x[ok]), 6)
       aux_summary$se[i]   <- if (n > 1) round(stats::sd(x[ok]) / sqrt(n), 6) else NA_real_
     }
-    both <- ok & !is.na(y)
+    both <- ok & is.finite(y)
     if (sum(both) > 2 && stats::sd(x[both]) > 0 && stats::sd(y[both]) > 0) {
       aux_summary$cor_poverty[i] <- round(stats::cor(x[both], y[both]), 4)
       # Two-sided test of H0: rho = 0 (Pearson, t distribution with n - 2 df).
@@ -592,7 +621,7 @@ assess_data_readiness <- function(survey_data,
 
   msgs <- c(msgs, sprintf(
     "Test 1: Auxiliary covariate summary computed for %d variables, separately for %d year(s) and pooled across %d domain-year observations (Pearson correlation against %s with two-sided p-values; variables listed from most to least significant pooled correlation).",
-    length(aux_vars), length(aux_years), nrow(aux_data), fgt_noun
+    length(aux_vars), length(aux_years), nrow(aux_data), model_target_noun
   ))
 
   # ------------------------------------------------------------------
@@ -706,28 +735,20 @@ assess_data_readiness <- function(survey_data,
   # Test 4. National headline statistic, indicator-aware:
   #   - poverty:               population-weighted mean of `poor` (FGT)
   #   - mean welfare:          population-weighted mean of `welfare`
-  #   - mean welfare (log fit): population-weighted mean of log(welfare) for w > 0
+  #   - mean welfare (log fit): the same arithmetic Direct mean in currency
   # Previously this always used `sv$poor` regardless of indicator,
   # which produced NA for mean_welfare runs (the `poor` column is
   # absent or empty when no poverty line is configured).
   # ------------------------------------------------------------------
-  is_mean    <- identical(indicator_type, "mean_welfare")
-  is_log_mean <- is_mean && isTRUE(log_transform)
   national_pov <- do.call(rbind, lapply(years, function(yr) {
     sv <- survey_data[survey_data$year == yr, ]
-    target <- if (is_log_mean) {
-      # Drop non-positive welfare before logging (NA-ed). Domains where
-      # all observations are non-positive contribute NA, but at the
-      # national aggregate non-positive rows just drop out.
-      w <- as.numeric(sv$welfare)
-      ifelse(!is.na(w) & w > 0, log(w), NA_real_)
-    } else if (is_mean) {
+    target <- if (is_mean) {
       as.numeric(sv$welfare)
     } else {
       sv$poor
     }
-    nat <- if (any(!is.na(target) & !is.na(sv$analysis_weight))) {
-      ok <- !is.na(target) & !is.na(sv$analysis_weight)
+    ok <- !is.na(target) & !is.na(sv$analysis_weight)
+    nat <- if (any(ok)) {
       stats::weighted.mean(target[ok], sv$analysis_weight[ok])
     } else {
       NA_real_
@@ -735,22 +756,18 @@ assess_data_readiness <- function(survey_data,
     data.frame(
       year           = yr,
       national_rate  = round(nat, 6),
-      n_households   = nrow(sv),
-      n_domains      = length(unique(sv$domain)),
+      n_households   = sum(ok),
+      n_domains      = length(unique(sv$domain[ok])),
       stringsAsFactors = FALSE
     )
   }))
 
   # Format the headline value according to the indicator. For poverty
   # (FGT) it is a rate in [0, 1] shown as a percentage; for arithmetic
-  # mean welfare it is a level in the configured currency; for log mean
-  # welfare it is a raw log value with four decimals (multiplying by 100
-  # would mislead).
+  # mean welfare (including log fits) it is a level in the configured currency.
   for (i in seq_len(nrow(national_pov))) {
     val <- national_pov$national_rate[i]
-    formatted <- if (is_log_mean) {
-      sprintf("%.4f (log)", val)
-    } else if (is_mean) {
+    formatted <- if (is_mean) {
       format(round(val, 1), big.mark = ",", nsmall = 1, trim = TRUE)
     } else {
       sprintf("%.2f%%", val * 100)
@@ -807,6 +824,7 @@ assess_data_readiness <- function(survey_data,
     missing_poverty    = missing_pov,
     national_poverty   = national_pov,
     domain_poverty     = pov_rates,
+    estimates_available = TRUE,
     messages           = msgs
   )
 }

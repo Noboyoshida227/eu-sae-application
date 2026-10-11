@@ -17,7 +17,7 @@ parse_ok <- vapply(r_files, function(path) {
 check(all(parse_ok), "all R sources parse")
 check(identical(trimws(readLines("VERSION", warn = FALSE)[1]), "5.2.0-rc.6"), "VERSION is the candidate version")
 check(identical(trimws(readLines("WIZARD_VERSION", warn = FALSE)[1]),
-                "5.2.0-rc.6-wizard.5.13"),
+                "5.2.0-rc.6-wizard.5.14"),
       "WIZARD_VERSION identifies the rc.6 wizard overlay")
 wizard_version <- trimws(readLines("WIZARD_VERSION", warn = FALSE)[1])
 changelog_text <- read_all("docs/CHANGELOG.md")
@@ -66,7 +66,7 @@ check(grepl('significance_rule = "pointwise_unadjusted"', mfh_text, fixed = TRUE
         grepl("significant = significant_unadjusted", mfh_text, fixed = TRUE) &&
         grepl("p_value_bonferroni", mfh_text, fixed = TRUE) &&
         grepl("significant_bonferroni", mfh_text, fixed = TRUE) &&
-        grepl("$significant <- comp12_obj$df$significant_unadjusted", mfh_text, fixed = TRUE),
+        grepl("sae_joint_error_moments", mfh_text, fixed = TRUE),
       "MFH keeps pointwise significance primary and reports BH/Bonferroni sensitivities")
 check(grepl("bars are pointwise 95% confidence intervals", comparison_text, fixed = TRUE),
       "comparison figures disclose the pointwise significance rule")
@@ -119,8 +119,8 @@ check(grepl("sae_write_release_manifest", wizard_manifest_text, fixed = TRUE),
 wizard_resources <- c(
   "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx",
   "docs/MCPE_VALIDATION_STATUS.md",
-  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_13.pdf",
-  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_13.pptx"
+  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_14.pdf",
+  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_14.pptx"
 )
 check(all(vapply(wizard_resources, file.exists, logical(1))) &&
         all(vapply(wizard_resources, grepl, logical(1), x = wizard_text,
@@ -499,6 +499,13 @@ check(!grepl("render_comparison_ai_note", app_text, fixed = TRUE) &&
       "dashboard produces one combined human-readable report")
 
 source("R/pipeline_helpers.R")
+check(identical(sae_bootstrap_count(), 500L) &&
+        identical(sae_bootstrap_count(200L), 200L) &&
+        identical(sae_bootstrap_count("1000"), 1000L),
+      "shared bootstrap count defaults to 500 and preserves explicit saved choices")
+check(all(vapply(list(49L, 50.5, NA_real_, Inf, c(50, 100)), function(x)
+  inherits(try(sae_bootstrap_count(x), silent = TRUE), "try-error"), logical(1))),
+  "bootstrap count rejects too-small, fractional, nonfinite and nonscalar values")
 
 # Data Readiness loader: a pre-existing column with an internal name (here
 # `povline`) must not shadow the column mapped to that role (`povline_2019`).
@@ -539,6 +546,7 @@ readiness_collision_ok <- local({
 })
 check(all(readiness_collision_ok),
       "Data Readiness uses the mapped poverty line when another column is already named povline")
+source("tests/test_readiness_mapping.R")
 
 ess_boundary <- sae_effective_sample_size(
   sample_size = c(12, 20, 30),
@@ -637,7 +645,8 @@ check(isTRUE(all.equal(.mfh3_theory[1, 1],
 .mcpe_wrapper_text <- paste(
   read_all("scripts/pbmcpeMFH1_with_existing_eblup.R"),
   read_all("scripts/pbmcpeMFH2_with_existing_eblup.R"),
-  read_all("scripts/pbmcpeMFH3_with_existing_eblup.R")
+  read_all("scripts/pbmcpeMFH3_with_existing_eblup.R"),
+  read_all("R/mfh_bootstrap_helpers.R")
 )
 check(grepl("sae_bootstrap_mcse", .mcpe_wrapper_text, fixed = TRUE) &&
         !grepl("udt_b[i] <- adt_b[i]", .mcpe_wrapper_text, fixed = TRUE),
@@ -988,7 +997,8 @@ check(grepl('ufh_msae_code  <- if (isTRUE(log_transform)) "UFH_log" else "UFH_un
       grepl("are not used because they are", mfh_text, fixed = TRUE),
       "MFH step names its UFH by scale, writes the convergence check and reports unusable covariates")
 bench_text <- paste(readLines("scripts/bench_regional_mfh.R", warn = FALSE), collapse = "\n")
-check(grepl("sae_simulate_mfh_random_effects(", bench_text, fixed = TRUE),
+check(grepl("sae_mfh_bootstrap", bench_text, fixed = TRUE) &&
+        grepl("sae_simulate_mfh_random_effects(", read_all("R/mfh_bootstrap_helpers.R"), fixed = TRUE),
       "benchmarking bootstrap uses the shared MFH random-effect generator (MFH3 includes rho * u0)")
 cmp_text <- paste(readLines("scripts/03_comparison.R", warn = FALSE), collapse = "\n")
 check(grepl("lapply(file.path(figures_root, .figure_subdirs), list.files", cmp_text, fixed = TRUE),
@@ -1196,24 +1206,16 @@ check(identical(sae_setup_welfare_prices(list(deflate_welfare = TRUE)), "convert
 .pc_flags <- sae_percent_change(m1 = c(100, 100, 100), m2 = c(105, 105, 105), mse1 = 4, mse2 = 4,
                                 mse_diff = c(NA, 2, -0.2))
 check(identical(.pc_flags$log_ratio_covariance_used, c(FALSE, TRUE, FALSE)) &&
-        identical(.pc_flags$mse_fallback_used, c(FALSE, FALSE, TRUE)) &&
-        isTRUE(all.equal(.pc_flags$log_ratio_var[1], 4 / 100^2 + 4 / 105^2)),
-      "percentage change: covariance flag only when a change MSE is given; fallback flagged")
-# No 1% rule (owner, 4 Oct 2026): a small positive covariance-adjusted variance
-# (here 0.5% of the independence variance) is used; only a negative one falls
-# back to the independence variance.
+        !any(.pc_flags$mse_fallback_used) && all(is.na(.pc_flags$p_value[c(1, 3)])),
+      "percentage change refuses missing or impossible joint moments without independence fallback")
 .pc_small <- sae_percent_change(m1 = c(100, 100), m2 = c(100, 100), mse1 = 4, mse2 = 4,
                                 mse_diff = c(0.04, -0.2))
 check(isTRUE(all.equal(.pc_small$log_ratio_var[1], 0.0008 * 0.005)) &&
-        isTRUE(.pc_small$log_ratio_covariance_used[1]) &&
-        isTRUE(all.equal(.pc_small$log_ratio_var[2], 0.0008)) &&
-        identical(.pc_small$log_ratio_covariance_used[2], FALSE),
-      "percentage change: no 1% rule; independence variance only when the adjusted one is not positive")
-.mfh_rule_txt <- paste(readLines("scripts/02_mfh.R", warn = FALSE), collapse = "\n")
-check(!grepl("0.01 * mse_indep", .mfh_rule_txt, fixed = TRUE) &&
-        lengths(regmatches(.mfh_rule_txt, gregexpr("is\\.finite\\(mse_with_cov[a-z_]*\\) & mse_with_cov[a-z_]* > 0",
-                                                    .mfh_rule_txt))) == 5L,
-      "MFH change tests: no 1% rule in any of the five change-variance blocks")
+        isTRUE(.pc_small$log_ratio_covariance_used[1]) && is.na(.pc_small$log_ratio_var[2]),
+      "percentage change retains small valid variances without a 1% floor")
+.joint <- sae_joint_error_moments(c(4, 4, 4), c(9, 9, 9), c(6, 6 + 1e-12, 6.1))
+check(identical(.joint$valid, c(TRUE, TRUE, FALSE)),
+      "joint error moments allow PSD boundaries and roundoff but reject impossible covariance")
 .app_txt <- paste(readLines("app.R", warn = FALSE), collapse = "\n")
 .wiz_txt <- paste(readLines("app_wizard.R", warn = FALSE), collapse = "\n")
 .ufh_txt <- paste(readLines("scripts/01_ufh.R", warn = FALSE), collapse = "\n")
@@ -1249,21 +1251,8 @@ check({
   .p_saved > 0 && .p_merge > 0 && .p_saved < .p_merge &&
     grepl('updateRadioButtons(session, "welfare_prices", selected = .welfare_prices_saved)', .app_txt, fixed = TRUE)
 }, "apply_dashboard_setup reads the prices choice before merging defaults")
-check(grepl("sig$mse_fallback_used <- (upstream_fb & is.finite(pc$log_ratio_var)) | pc$mse_fallback_used", cmp_text, fixed = TRUE) &&
-        grepl("sig$covariance_used <- pc$log_ratio_covariance_used & !upstream_fb", cmp_text, fixed = TRUE) &&
-        grepl("mse_for_pc <- ifelse(upstream_fb, s1 + s2, mse_eur)", cmp_text, fixed = TRUE) &&
-        lengths(regmatches(.mfh_txt, gregexpr("mse_rule <- ifelse(use_cov", .mfh_txt, fixed = TRUE))) == 4L,
-      "fallback flags refreshed for the final change variances (Comparison and MFH)")
-# Behaviour of .to_percent_change() (mean welfare) and of the change-and-RMSE
-# box plots (sae_change_rmse_by_method()): an independence fallback in the MFH
-# step makes the percentage change use independence too (zero covariance on the
-# level MSEs, even when the step's bootstrap MSEs differ from the level MSEs),
-# is flagged, and is not reported as "covariance used"; a fallback of the
-# log-ratio guard alone is flagged too; a missing level MSE gives no inference
-# and no fallback flag, even after an upstream fallback; a table without the
-# flag column works; benchmarked columns behave the same; and the box-plot
-# RMSE (plain and benchmarked) equals the standard error behind the
-# percentage-change inference.
+# Exercise the exported comparison adapter with bootstrap moments deliberately
+# different from the old analytic level MSEs; legacy MFH files cannot be mixed.
 local({
   exprs <- parse("scripts/03_comparison.R", keep.source = FALSE)
   def <- Filter(function(e) is.call(e) && identical(as.character(e[[1]]), "<-") &&
@@ -1271,59 +1260,37 @@ local({
   env <- new.env(parent = globalenv())
   env$.change_is_percent <- TRUE
   env$years_keep <- c(2012L, 2013L)
-  m1 <- c(1000, 1000, 1000, 1000, 1000); m2 <- c(1050, 1100, 2000, 1080, 1060)
-  s1 <- c(400, 400, 400, 400, 400);      s2 <- c(420, 450, 1600, NA, NA)
-  env$comparison_dt <- data.frame(domain = rep(c("1", "2", "3", "4", "5"), 2),
-                                  year = rep(c(2012L, 2013L), each = 5),
-                                  MFH = c(m1, m2), MFH_MSE = c(s1, s2),
-                                  MFH_Bench = c(m1, m2), MFH_Bench_MSE = c(s1, s2))
+  env$comparison_dt <- data.frame(domain = rep(c("1", "2", "3"), 2),
+    year = rep(c(2012L, 2013L), each = 3),
+    MFH = c(100, 100, 100, 105, 110, 120), MFH_MSE = 999,
+    MFH_Bench = c(100, 100, 100, 105, 110, 120), MFH_Bench_MSE = 999)
   eval(def[[1]], env)
-  sig <- data.frame(domain = c("1", "2", "3", "4", "5"), diff = m2 - m1,
-                    mse = c(1000,                 # 1: step fell back; its bootstrap MSEs sum to 1000, not 820
-                            400 + 450 - 2 * 300,  # 2: covariance-adjusted
-                            100,                  # 3: implies C = 950, log-ratio variance < 0
-                            700,                  # 4: level MSE of the second year missing
-                            900),                 # 5: step fell back, level MSE of the second year missing
-                    mse_fallback_used = c(TRUE, FALSE, FALSE, FALSE, TRUE), p_value = 0.5)
+  sig <- data.frame(domain = c("1", "2", "3"), diff = c(5, 10, 20),
+    mse = c(8, 2, -12), annual_mse_y1 = 4, annual_mse_y2 = 4,
+    annual_mcpe = c(0, 3, 10), p_value = 0.5)
   out <- env$.to_percent_change(sig, "MFH")
-  v_ind <- s1 / m1^2 + s2 / m2^2
-  v2 <- v_ind[2] - 2 * ((s1[2] + s2[2] - 250) / 2) / (m1[2] * m2[2])
-  v_exp <- c(v_ind[1], v2, v_ind[3], NA, NA)
-  ok1 <- length(def) == 1L &&
-    identical(as.logical(out$mse_fallback_used), c(TRUE, FALSE, TRUE, FALSE, FALSE)) &&
-    identical(as.logical(out$covariance_used), c(FALSE, TRUE, FALSE, FALSE, FALSE)) &&
-    isTRUE(all.equal(as.numeric(out$mse), (100 * m2 / m1)^2 * v_exp, tolerance = 1e-10)) &&
-    all(is.na(out$p_value[4:5])) &&
-    isTRUE(all.equal(as.numeric(out$mse_eur), c(1000, 250, 100, 700, 900)))
-  out_ufh <- env$.to_percent_change(sig[, c("domain", "diff", "mse", "p_value")], "MFH")
-  ok2 <- identical(as.logical(out_ufh$mse_fallback_used), c(FALSE, FALSE, TRUE, FALSE, FALSE))
+  expected <- c(4/100^2 + 4/105^2, 4/100^2 + 4/110^2 - 6/(100*110), NA)
+  legacy <- env$.to_percent_change(sig[, c("domain", "diff", "mse", "p_value")], "MFH")
   out_b <- env$.to_percent_change(sig, "MFH_Bench")
-  ok3 <- isTRUE(all.equal(as.numeric(out_b$mse), as.numeric(out$mse))) &&
-    identical(as.logical(out_b$mse_fallback_used), as.logical(out$mse_fallback_used))
+  check(isTRUE(all.equal(out$log_ratio_var, expected)) &&
+          is.na(out$p_value[3]) && !any(out$mse_fallback_used) &&
+          all(is.na(legacy$p_value)) && isTRUE(all.equal(out_b$mse, out$mse)),
+        "comparison uses coherent bootstrap annual moments and refuses legacy or invalid MFH covariance")
   cr <- sae_change_rmse_by_method(env$comparison_dt, list(MFH = out, MFH_Bench = out_b),
                                   years = c(2012L, 2013L), indicator_type = "mean_welfare")
-  rmse_sq <- function(key) {
-    r <- cr$long[cr$long$method_key == key, ]
-    r <- r[match(c("1", "2", "3", "4", "5"), r$domain), ]
-    r$rmse^2
-  }
-  ok4 <- isTRUE(all.equal(rmse_sq("MFH")[1:3], v_exp[1:3], tolerance = 1e-10)) &&
-    isTRUE(all.equal(rmse_sq("MFH_Bench")[1:3], v_exp[1:3], tolerance = 1e-10)) &&
-    !any(is.finite(c(rmse_sq("MFH")[4:5], rmse_sq("MFH_Bench")[4:5])))
-  check(ok1 && ok2 && ok3 && ok4,
-        "percentage changes: an upstream MFH fallback means independence (C = 0 on the level MSEs), is flagged, and the box-plot RMSE matches the inference")
+  r <- cr$long[cr$long$method_key == "MFH", ]; r <- r[match(c("1", "2", "3"), r$domain), ]
+  check(isTRUE(all.equal(r$rmse^2, expected)), "change box-plot RMSE matches joint log-ratio inference")
+  sig$inference_status <- "boundary_sensitive"
+  bounded <- env$.to_percent_change(sig, "MFH")
+  check(all(bounded$inference_status[1:2] == "boundary_sensitive") &&
+          bounded$inference_status[3] != "boundary_sensitive" &&
+          all(bounded$joint_moment_status[1:2] == "ok") && is.na(bounded$p_value[3]),
+        "percentage-change conversion preserves boundary warnings and still rejects invalid moments")
+  bounded_rmse <- sae_change_rmse_by_method(env$comparison_dt, list(MFH = bounded),
+                                            c(2012L, 2013L), indicator_type = "mean_welfare")
+  check(all(bounded_rmse$long$inference_status[1:2] == "boundary_sensitive"),
+        "change/RMSE exports retain provisional boundary inference status")
 })
-# Mean welfare in logs with a Benchmark Target Database: the log-scale step
-# must not compare currency targets with log estimates; the targets are
-# applied on the currency scale after the back-transform.
-check(grepl("log_step_benchmarks <- if (log_mean_run) direct_region_benchmarks else region_benchmarks",
-            .ufh_txt, fixed = TRUE) &&
-        grepl("left_join(log_step_benchmarks |> select(region, B_r)", .ufh_txt, fixed = TRUE) &&
-        grepl("B_eur  = as.numeric(external_benchmark_mat[, as.character(yr)])", .ufh_txt, fixed = TRUE) &&
-        grepl("regional_benchmark_mat = if (.log_mean_run) NULL else regional_benchmark_mat",
-              .mfh_txt, fixed = TRUE) &&
-        grepl('names(region_targets) <- c("region", "year", "B_eur")', .mfh_txt, fixed = TRUE),
-      "mean welfare in logs: uploaded benchmark targets are applied on the currency scale (UFH and MFH)")
 for (ui_file in c("app.R", "app_wizard.R")) {
   check(grepl("A grouped benchmark variable is still selected but is not used",
               paste(readLines(ui_file, warn = FALSE), collapse = "\n"), fixed = TRUE),
@@ -1339,17 +1306,17 @@ check(!any(grepl("stays on the EUR scale", c(.wiz_help, read_all("app.R")), fixe
       "MFH log help no longer says change analysis stays on the EUR scale")
 .rw <- read_all("docs/README_WIZARD.md")
 check(grepl("With current prices\nand no conversion they include inflation", .rw, fixed = TRUE) &&
-        grepl("This RMSE is an approximation", .rw, fixed = TRUE) &&
+        grepl("repeats fitting, back-transformation", .rw, fixed = TRUE) &&
         !grepl("estimated-change distribution", .rw, fixed = TRUE),
-      "README_WIZARD: inflation only for unconverted current prices; approximate benchmarked RMSE; no removed figure")
+      "README_WIZARD: inflation only for unconverted current prices; full-estimator benchmark bootstrap; no removed figure")
 check(!grepl("compare estimated changes in percentage points", read_all("tools/build_instruction_pdf.py"), fixed = TRUE),
       "download-instructions generator distinguishes poverty and mean-welfare change units")
 
 .help_all <- paste(read_all("app.R"), read_all("app_wizard.R"))
-check(!grepl("applies Duan's smearing estimator", .help_all, fixed = TRUE) &&
-        lengths(regmatches(.help_all, gregexpr("direct arithmetic mean divided by its direct geometric mean",
-                                               .help_all, fixed = TRUE))) == 4L,
-      "bc_sm help describes the domain-level arithmetic/geometric ratio in both interfaces")
+check(!grepl("direct arithmetic mean divided by its direct geometric mean", .help_all, fixed = TRUE) &&
+        lengths(regmatches(.help_all, gregexpr("Slud-Maiti correction", .help_all, fixed = TRUE))) >= 2L &&
+        lengths(regmatches(.help_all, gregexpr("Conditional lognormal", .help_all, fixed = TRUE))) >= 2L,
+      "both interfaces distinguish emdi Slud-Maiti UFH from conditional lognormal MFH")
 check(!grepl("Affects how cross-year covariance of sampling errors is estimated", .help_all, fixed = TRUE),
       "PSU-consistency help no longer claims an effect on the estimates")
 check(!grepl("this choice is ignored because the transformation", .help_all, fixed = TRUE) &&
@@ -1358,10 +1325,29 @@ check(!grepl("this choice is ignored because the transformation", .help_all, fix
       "UFH variance help states the arcsin and log behaviour in both interfaces")
 check(!grepl("value, poverty_rate, rate, or mean", .help_all, fixed = TRUE),
       "benchmark help lists only target column names the reader accepts")
-check(grepl("Test 0e: WARNING", read_all("R/validation_checks.R"), fixed = TRUE),
-      "readiness warns about non-positive welfare in log mean-welfare runs")
+check(grepl("Test 0e: ERROR", read_all("R/validation_checks.R"), fixed = TRUE),
+      "readiness blocks nonpositive area means rather than discarding household welfare")
 check(!grepl("log points (ln mean welfare)", read_all("R/change_comparison.R"), fixed = TRUE),
       "box-plot unit label does not call unscaled ln ratios log points")
+local({
+  .cc <- new.env()
+  sys.source("R/change_comparison.R", envir = .cc)
+  check(is.na(.cc$sae_count_flags(c(NA, NA, NA))) &&
+          identical(.cc$sae_count_flags(c(TRUE, FALSE, NA)), 1L) &&
+          identical(.cc$sae_count_flags(c(FALSE, FALSE)), 0L),
+        "significance counts are NA (unavailable), not 0, when no domain was tested")
+})
+check(sum(gregexpr("pointwise_significant = sae_count_flags(significant_unadjusted)", comparison_text, fixed = TRUE)[[1]] > 0) == 2L &&
+        grepl("tested_domains = sum(!is.na(significant_unadjusted))", comparison_text, fixed = TRUE) &&
+        grepl('"Unavailable"', read_all("report.Rmd"), fixed = TRUE) &&
+        grepl("tested_domains = sum(!is.na(significant_unadjusted))", read_all("R/comparison_report_ai.R"), fixed = TRUE),
+      "significance summary reports untested methods as Unavailable with the tested-domain count")
+
+# Statistical regression checks require and exercise the installed emdi/msae estimators.
+for (.method_test in c("test_ufh_methodology.R", "test_mfh_bootstrap_methodology.R",
+                       "test_mfh_convergence.R", "test_methodology_simulation.R")) {
+  source(file.path("tests", .method_test), local = new.env(parent = globalenv()))
+}
 
 if (length(failures) > 0L) {
   stop("Tests failed: ", paste(failures, collapse = "; "), call. = FALSE)

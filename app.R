@@ -240,7 +240,7 @@ dashboard_setup_defaults <- function() {
       ufh_candidates_y1 = "",
       ufh_candidates_y2 = "",
       mfh_transformation = "no",
-      mfh_backtrans = "bc_sm",
+      mfh_backtrans = "conditional_lognormal",
       mfh_ic_criterion = "AIC",
       mfh_lasso_enabled = FALSE,
       mfh_lasso_lambda = "lambda.1se",
@@ -249,7 +249,7 @@ dashboard_setup_defaults <- function() {
       mfh_diag_model = "MFH2",
       fit_mfh3 = FALSE,
       mfh_refvar_adjustment = "bonferroni",
-      mcpe_bootstrap_replicates = 200L,
+      mcpe_bootstrap_replicates = 500L,
       mfh_candidates_y1 = "",
       mfh_candidates_y2 = "",
       psu_consistent = FALSE,
@@ -288,18 +288,27 @@ setup_file_exists <- function(file_name) {
 validate_mapped_input_columns <- function(survey_raw, rhs_raw, var_map, rhs_domain,
                                           povline_type = "column",
                                           indicator_type = "poverty") {
-  survey_required <- c(
-    year = var_map$year,
-    domain = var_map$domain,
-    psu = var_map$psu,
-    weight = var_map$weight,
-    hh_size = var_map$hh_size,
-    welfare = var_map$welfare
-  )
+  required_roles <- c("year", "domain", "psu", "weight", "hh_size", "welfare")
   if (identical(indicator_type, "poverty") && identical(povline_type, "column")) {
-    survey_required <- c(survey_required, povline = var_map$povline)
+    required_roles <- c(required_roles, "povline")
   }
-  survey_required <- survey_required[!is.na(survey_required) & nzchar(survey_required)]
+  missing_mapping <- required_roles[!vapply(required_roles, function(role) {
+    value <- var_map[[role]]
+    is.character(value) && length(value) == 1L && !is.na(value) && nzchar(trimws(value))
+  }, logical(1))]
+  if (length(missing_mapping)) {
+    stop("Input column mapping error: select a survey column for ",
+         paste(missing_mapping, collapse = ", "), ".", call. = FALSE)
+  }
+  if (!is.character(rhs_domain) || length(rhs_domain) != 1L ||
+      is.na(rhs_domain) || !nzchar(trimws(rhs_domain))) {
+    stop("Input column mapping error: select the auxiliary domain column.", call. = FALSE)
+  }
+  survey_required <- unlist(var_map[required_roles], use.names = TRUE)
+  strata <- var_map$strata
+  if (is.character(strata) && length(strata) == 1L && !is.na(strata) && nzchar(trimws(strata))) {
+    survey_required <- c(survey_required, strata = strata)
+  }
   missing_survey <- survey_required[!survey_required %in% names(survey_raw)]
 
   rhs_year <- if (!is.null(var_map$year) && var_map$year %in% names(rhs_raw)) {
@@ -355,64 +364,26 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
     strata_var <- trimws(as.character(var_map$strata %||% ""))
     length(strata_var) == 1 && !is.na(strata_var) && nzchar(strata_var)
   })
-  rename_vec <- c()
-  if (var_map$domain  != "domain")  rename_vec <- c(rename_vec, domain  = var_map$domain)
-  if (var_map$psu     != "psu")     rename_vec <- c(rename_vec, psu     = var_map$psu)
-  if (var_map$welfare != "welfare") rename_vec <- c(rename_vec, welfare = var_map$welfare)
-  if (var_map$weight  != "weight")  rename_vec <- c(rename_vec, weight  = var_map$weight)
-  if (use_strata && !is.null(var_map$strata) && nzchar(var_map$strata) &&
-      var_map$strata != "strata") {
-    rename_vec <- c(rename_vec, strata = var_map$strata)
-  }
+  rename_vec <- c(
+    year = var_map$year, domain = var_map$domain, psu = var_map$psu,
+    welfare = var_map$welfare, weight = var_map$weight, hh_size = var_map$hh_size
+  )
+  if (use_strata) rename_vec <- c(rename_vec, strata = var_map$strata)
   benchmark_level_var <- trimws(as.character(
     var_map$benchmark_level %||% var_map$region %||% ""
   ))
-  if (nzchar(benchmark_level_var) &&
-      benchmark_level_var %in% names(survey_raw) &&
-      benchmark_level_var != "region") {
+  if (nzchar(benchmark_level_var) && benchmark_level_var %in% names(survey_raw)) {
     rename_vec <- c(rename_vec, region = benchmark_level_var)
   }
-  if (!is.null(var_map$hh_size) && nzchar(var_map$hh_size) &&
-      var_map$hh_size != "hh_size") {
-    rename_vec <- c(rename_vec, hh_size = var_map$hh_size)
-  }
-  if (var_map$year    != "year")    rename_vec <- c(rename_vec, year    = var_map$year)
-  # Only rename povline column when the poverty line comes from data
-  if (identical(povline_type, "column") && !is.null(var_map$povline) &&
-      var_map$povline != "povline") {
+  if (identical(indicator_type, "poverty") && identical(povline_type, "column")) {
     rename_vec <- c(rename_vec, povline = var_map$povline)
   }
-
-  survey_data <- survey_raw
-  # A column that already carries an internal name (for example `povline`)
-  # while a different column is mapped to that role (for example
-  # `povline_2019`) would otherwise end up as a second `povline` column, and
-  # the readiness tables would silently use the first one. Rename the
-  # pre-existing column to `<name>_original`, as the UFH and MFH steps do,
-  # and report it.
   harmonize_notes <- utils::capture.output(
-    survey_data <- sae_resolve_rename_collisions(
-      survey_data, rename_vec[unname(rename_vec) %in% names(survey_data)],
-      context = "Data Readiness, survey mapping"
+    survey_data <- sae_apply_column_mapping(
+      survey_raw, rename_vec, context = "Data Readiness, survey mapping"
     )
   )
-  for (new_name in names(rename_vec)) {
-    old_name <- rename_vec[[new_name]]
-    if (old_name %in% names(survey_data)) {
-      names(survey_data)[names(survey_data) == old_name] <- new_name
-    }
-  }
-  if (!use_strata && "strata" %in% names(survey_data)) {
-    survey_data$strata <- NULL
-  }
-  if (nzchar(benchmark_level_var) &&
-      !"region" %in% names(survey_data) &&
-      benchmark_level_var %in% unname(rename_vec)) {
-    copied_from <- names(rename_vec)[match(benchmark_level_var, unname(rename_vec))]
-    if (!is.na(copied_from) && copied_from %in% names(survey_data)) {
-      survey_data$region <- survey_data[[copied_from]]
-    }
-  }
+  if (!use_strata && "strata" %in% names(survey_data)) survey_data$strata <- NULL
 
   # When the poverty line is numeric, create the column. The value may be
   # a legacy scalar or a named year-to-line map.
@@ -448,28 +419,13 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
     survey_data$region <- trimws(as.character(survey_data$region))
   }
 
-  rhs_data <- rhs_raw
-  rhs_rename <- c(
-    if (rhs_domain != "domain" && rhs_domain %in% names(rhs_data)) c(domain = rhs_domain),
-    if (!is.null(var_map$year) && var_map$year != "year" && var_map$year %in% names(rhs_data))
-      c(year = var_map$year)
-  )
+  rhs_year <- if (var_map$year %in% names(rhs_raw)) var_map$year else "year"
+  rhs_rename <- c(domain = rhs_domain, year = rhs_year)
   harmonize_notes <- c(harmonize_notes, utils::capture.output(
-    rhs_data <- sae_resolve_rename_collisions(
-      rhs_data, rhs_rename, context = "Data Readiness, auxiliary mapping"
+    rhs_data <- sae_apply_column_mapping(
+      rhs_raw, rhs_rename, context = "Data Readiness, auxiliary mapping"
     )
   ))
-  if (rhs_domain != "domain" && rhs_domain %in% names(rhs_data)) {
-    names(rhs_data)[names(rhs_data) == rhs_domain] <- "domain"
-  }
-  rhs_year <- if (!is.null(var_map$year) && var_map$year %in% names(rhs_data)) {
-    var_map$year
-  } else {
-    "year"
-  }
-  if (rhs_year != "year" && rhs_year %in% names(rhs_data)) {
-    names(rhs_data)[names(rhs_data) == rhs_year] <- "year"
-  }
   if ("domain" %in% names(rhs_data)) {
     rhs_data$domain <- trimws(as.character(rhs_data$domain))
   }
@@ -962,7 +918,7 @@ ui <- fluidPage(
         tip_label("Country or territory", "Used only in report and brief titles; it does not affect estimation."),
         value = ""),
       numericInput("analysis_seed",
-        tip_label("Analysis seed", "Controls the LASSO folds and the MFH bootstrap draws. The UFH and benchmarking bootstraps use a fixed seed, so identical inputs and settings always reproduce the same results."),
+        tip_label("Analysis seed", "Controls LASSO folds and the UFH, MFH and benchmarking bootstrap draws. Identical inputs, settings and package versions reproduce the same results."),
         value = 123, min = 0, step = 1),
       textInput("run_label",
         tip_label("Run label", "Optional short label appended to the saved app_runs folder so outputs from different runs are easier to distinguish."),
@@ -999,8 +955,8 @@ ui <- fluidPage(
       tags$ul(
         style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
         tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_13.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_13.pptx")),
+        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_14.pdf")),
+        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_14.pptx")),
         tags$li(tags$code("outputs/final_report.html"), " after a completed run")
       ),
       tags$hr(),
@@ -1224,7 +1180,7 @@ ui <- fluidPage(
                   paste(
                     "Transformation of the direct estimates before model fitting.",
                     "For poverty rates: 'arcsin' constrains estimates to [0,1] and stabilizes variances.",
-                    "For mean welfare: 'log' addresses the right-skewness of welfare; the back-transform to currency units is bias-corrected with a domain-level smearing factor (see Bias Correction below).",
+                    "For mean welfare: 'log' models the logarithm of each area's direct arithmetic mean, with its sampling variance transformed by the delta method. Predictions return to currency units using the correction selected below.",
                     "'no' fits on the original scale.")),
         choices = c("arcsin", "no"), selected = "arcsin"),
       # Bias correction is meaningful under arcsin AND log. For arcsin, it
@@ -1237,8 +1193,8 @@ ui <- fluidPage(
           tip_label("Bias Correction",
                     paste(
                       "How the model estimates are bias-corrected when back-transforming to the original scale.",
-                      "For arcsin: 'bc' integrates sin^2(.) against the predictive density (correct under Gaussianity); 'none' returns the naive sin^2(eta_hat).",
-                      "For log: 'bc_sm' multiplies exp(eta_hat) by the domain's direct arithmetic mean divided by its direct geometric mean (exp of the direct mean of log welfare), so the estimate is an arithmetic mean in currency units; it is not set equal to the direct estimate. 'none' returns the naive exp(eta_hat), which estimates the geometric mean (downward-biased for the arithmetic mean).")),
+                      "For arcsin: 'bc' uses the correction implemented by emdi; inspect reported boundary cautions. 'none' returns the naive sin^2(eta_hat).",
+                      "For log: 'bc_sm' uses the Slud-Maiti correction implemented by emdi, with maximum-likelihood variance estimation. 'none' uses exp(eta_hat) without bias correction. Both target the area's arithmetic mean welfare; the naive prediction can be biased downwards. Corrected predictions are unavailable for areas without a direct estimate.")),
           choices = c("bc", "none"), selected = "bc")
       ),
       # Variance smoothing menu is only meaningful when no transformation
@@ -1280,7 +1236,7 @@ ui <- fluidPage(
       #   - poverty: hidden (MFH never used arcsin; identity scale only)
       #   - mean_welfare: log / no, default log
       # The bias-correction subchoice mirrors the UFH menu but only
-      # offers bc_sm (Duan smearing) for log; arcsin is not an MFH
+      # offers conditional lognormal correction for log; arcsin is not an MFH
       # option and so 'bc' (integration-based) is not exposed here.
       conditionalPanel(
         condition = "input.indicator_type == 'mean_welfare'",
@@ -1288,7 +1244,7 @@ ui <- fluidPage(
           tip_label("Transformation (MFH)",
                     paste(
                       "Transformation applied to the MFH model. Independent of the UFH choice above.",
-                      "'log' fits MFH on log(welfare) per year, then back-transforms each (domain, year) cell with a per-domain-year smearing factor anchored to the population-weighted arithmetic mean of welfare. MCPE is back-transformed to the currency scale (squared currency units) via a delta-method approximation, so the variance of the change between the years is also on the currency scale (the report shows mean-welfare changes as percentage changes of the mean).",
+                      "'log' models the logarithm of each area's direct arithmetic mean in each year. Annual MSE and cross-year prediction-error moments are estimated jointly by refitting bootstrap samples and back-transforming their predictions to currency units. The report expresses mean-welfare changes as percentages.",
                       "'no' fits on the identity scale.")),
           choices = c("log", "no"), selected = "log"),
         conditionalPanel(
@@ -1297,9 +1253,9 @@ ui <- fluidPage(
             tip_label("Bias Correction (MFH)",
                       paste(
                         "Bias correction for the log -> currency back-transform.",
-                        "'bc_sm' multiplies exp(eta_hat) by each domain-year's direct arithmetic mean divided by its direct geometric mean (a factor of 1 where there is no direct estimate), so the estimate is an arithmetic mean in currency units.",
+                        "'Conditional lognormal' uses exp(eta_hat + v/2), where v is the conditional prediction variance under the fitted MFH model. Parameter estimation is included in the bootstrap uncertainty. This is a model-based extension for MFH log predictions.",
                         "'none' returns the naive exp(eta_hat), which is downward-biased for the mean.")),
-            choices = c("bc_sm", "none"), selected = "bc_sm")
+            choices = c("Conditional lognormal" = "conditional_lognormal", "none" = "none"), selected = "conditional_lognormal")
         )
       ),
       ic_criterion_input("mfh", selected = "AIC",
@@ -1341,8 +1297,8 @@ ui <- fluidPage(
           ), selected = "bonferroni")
       ),
       numericInput("mcpe_bootstrap_replicates",
-        tip_label("MCPE bootstrap replicates", "Controls Monte Carlo precision for MFH change inference. 200 is the interactive default; use at least 500 for production after checking Monte Carlo stability."),
-        value = 200, min = 50, step = 50),
+        tip_label("Bootstrap replicates", "Controls UFH bootstrap MSE, MFH annual and change uncertainty, and benchmarking. The default is 500. Smaller counts are for quick checks; inspect Monte Carlo precision before interpreting inference. More draws reduce simulation noise but do not guarantee interval coverage."),
+        value = 500, min = 50, step = 50),
       textInput("mfh_candidates_y1",
         tip_label("MFH covariates for Year 1 (comma-separated, optional)",
                   "If LASSO is on, these variables define the candidate pool for the first analysis year. If LASSO is off, they define the fixed MFH specification. Leave blank to use the eligible auxiliary variables."),
@@ -2597,7 +2553,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "mfh_refvar_adjustment",
                       selected = x$mfh_refvar_adjustment %||% "bonferroni")
     updateNumericInput(session, "mcpe_bootstrap_replicates",
-                       value = as.integer(x$mcpe_bootstrap_replicates %||% 200L))
+                       value = as.integer(x$mcpe_bootstrap_replicates %||% 500L))
     updateTextInput(session, "mfh_candidates_y1",
                     value = x$mfh_candidates_y1 %||% "")
     updateTextInput(session, "mfh_candidates_y2",
@@ -2619,7 +2575,8 @@ server <- function(input, output, session) {
       updateSelectInput(session, "mfh_transformation",
                         selected = x$mfh_transformation %||% defaults$inputs$mfh_transformation)
       updateSelectInput(session, "mfh_backtrans",
-                        selected = x$mfh_backtrans %||% defaults$inputs$mfh_backtrans)
+                        selected = if (identical(x$mfh_backtrans, "bc_sm")) "conditional_lognormal" else
+                          x$mfh_backtrans %||% defaults$inputs$mfh_backtrans)
       session$onFlushed(function() {
         updateSelectInput(session, "mfh_cov_choice",
                           selected = x$mfh_cov_choice %||% defaults$inputs$mfh_cov_choice)
@@ -2682,7 +2639,7 @@ server <- function(input, output, session) {
                        choices  = c("log", "no"),
                        selected = "log")
       showNotification(
-        "Mean welfare selected. Transformation choices: 'log' (default, back-transformed with a domain-level smearing factor) or 'no' (identity scale).",
+        "Mean welfare selected. Transformation choices: 'log' (default, applied to area arithmetic means) or 'no' (identity scale).",
         type = "default", duration = 6
       )
     } else {
@@ -2695,7 +2652,7 @@ server <- function(input, output, session) {
 
   # ---- Update UFH bias-correction choices based on transformation ----
   # arcsin -> bc / none      (bc = integration-based correction for arcsine)
-  # log    -> bc_sm / none   (bc_sm = Duan smearing estimator)
+  # log    -> bc_sm / none   (bc_sm = emdi Slud-Maiti correction)
   # no     -> hidden by conditionalPanel; nothing to update.
   observeEvent(input$ufh_transformation, {
     if (identical(input$ufh_transformation, "arcsin")) {
@@ -3254,25 +3211,15 @@ server <- function(input, output, session) {
 
   output$readiness_national <- renderTable({
     rr <- readiness_result()
-    if (is.null(rr)) return(NULL)
+    if (is.null(rr) || identical(rr$estimates_available, FALSE)) return(NULL)
     df <- rr$national_poverty
-    # Format and label the headline statistic according to the chosen
-    # indicator. For poverty (FGT) it is a rate in [0, 1] shown as a
-    # percentage; for mean welfare it is a level in the configured
-    # currency (and on the log scale when log_transform is on, in which
-    # case formatting it as "%" would mislead).
+    # Readiness always reports the arithmetic Direct mean in currency units.
     ind <- input$indicator_type %||% "poverty"
-    use_log <- identical(input$ufh_transformation, "log") && identical(ind, "mean_welfare")
     if (identical(ind, "mean_welfare")) {
-      if (use_log) {
-        df$national_rate <- sprintf("%.4f", df$national_rate)
-        col_label <- "Mean log welfare"
-      } else {
-        cur <- input$currency_symbol %||% "EUR"
-        df$national_rate <- format(round(df$national_rate, 1),
-                                    big.mark = ",", nsmall = 1, trim = TRUE)
-        col_label <- sprintf("Mean welfare (%s)", cur)
-      }
+      cur <- input$currency_symbol %||% "EUR"
+      df$national_rate <- format(round(df$national_rate, 1),
+                                big.mark = ",", nsmall = 1, trim = TRUE)
+      col_label <- sprintf("Mean welfare (%s)", cur)
     } else {
       df$national_rate <- sprintf("%.2f%%", df$national_rate * 100)
       col_label <- "Poverty Rate"
@@ -3283,7 +3230,7 @@ server <- function(input, output, session) {
 
   output$readiness_domains <- renderTable({
     rr <- readiness_result()
-    if (is.null(rr)) return(NULL)
+    if (is.null(rr) || identical(rr$estimates_available, FALSE)) return(NULL)
     di <- rr$domain_consistency
     rows <- data.frame(
       Dataset  = c("Survey", "Auxiliary"),
@@ -3305,6 +3252,9 @@ server <- function(input, output, session) {
   output$readiness_missing <- renderTable({
     rr <- readiness_result()
     if (is.null(rr)) return(NULL)
+    if (identical(rr$estimates_available, FALSE)) {
+      return(data.frame(Result = "Not assessed: fix the blocking error above and rerun Data Readiness."))
+    }
     if (nrow(rr$missing_poverty) == 0) {
       return(data.frame(Result = "No missing poverty rates - all domains have survey-based estimates."))
     }
@@ -3314,7 +3264,7 @@ server <- function(input, output, session) {
 
   output$readiness_aux <- renderTable({
     rr <- readiness_result()
-    if (is.null(rr)) return(NULL)
+    if (is.null(rr) || identical(rr$estimates_available, FALSE)) return(NULL)
     df <- rr$aux_summary
     cor_label <- attr(df, "cor_target_label") %||% "Corr. w/ Poverty"
     if (!"year" %in% names(df)) df$year <- "All years"
@@ -3463,6 +3413,8 @@ server <- function(input, output, session) {
   # Runs only the validation + data-readiness portion. The user reviews the
   # results in the Preflight and Data Readiness tabs, then clicks Run Analysis.
   observeEvent(input$check_btn, {
+    readiness_checked(FALSE)
+    readiness_result(NULL)
     status("Checking data readiness...")
     logs("")
     append_log("Running preflight and data readiness checks...")
@@ -3517,6 +3469,7 @@ server <- function(input, output, session) {
                          years_keep    = requested_years),
       error = function(e) {
         append_log(paste("ERROR while loading data:", conditionMessage(e)))
+        readiness_result(empty_readiness_result(paste("Data readiness ERROR --", conditionMessage(e))))
         NULL
       }
     )
@@ -3870,6 +3823,7 @@ server <- function(input, output, session) {
                          years_keep    = years),
       error = function(e) {
         append_log(paste("ERROR while loading data:", conditionMessage(e)))
+        readiness_result(empty_readiness_result(paste("Data readiness ERROR --", conditionMessage(e))))
         NULL
       }
     )
@@ -4154,7 +4108,7 @@ server <- function(input, output, session) {
     #                                 capturing which corrector the user
     #                                 picked. Used for diagnostics, reports,
     #                                 and forward-compat (e.g. wiring "none"
-    #                                 through to skip the smearing step).
+    #                                 through to skip bias correction).
     #   ufh$backtransformation     -- legacy string alias ("bc"/"bc_sm"/NULL)
     #                                 kept so older configs / consumers
     #                                 continue to parse.
@@ -4230,12 +4184,11 @@ server <- function(input, output, session) {
     mfh_log_transform <- is_mean && identical(input$mfh_transformation, "log")
     # Bias-correction representations mirror the UFH layout:
     #   bias_correction        -- LOGICAL wire format read by the R script
-    #   bias_correction_method -- STRING label ("bc_sm" / "none" / NA)
+    #   bias_correction_method -- STRING label ("conditional_lognormal" / "none" / NA)
     #   backtransformation     -- legacy STRING alias (NULL == none)
-    # MFH only ever offers Duan smearing for log; "bc" (integration-based)
-    # belongs to arcsin and isn't applicable here.
+    # MFH uses conditional lognormal prediction; emdi bc_sm belongs to UFH.
     mfh_bc_method <- if (mfh_log_transform) {
-      input$mfh_backtrans %||% "bc_sm"
+      input$mfh_backtrans %||% "conditional_lognormal"
     } else {
       NA_character_
     }
@@ -4276,7 +4229,7 @@ server <- function(input, output, session) {
                                 input$mfh_diag_model %in% c("AUTO", "MFH3"),
       refvar_adjustment       = input$mfh_refvar_adjustment %||% "bonferroni",
       refvar_alpha            = 0.05,
-      mcpe_nB                 = as.integer(input$mcpe_bootstrap_replicates %||% 200L),
+      mcpe_nB                 = as.numeric(input$mcpe_bootstrap_replicates %||% 500L),
       # Per-model log/no choice. The MFH R script reads this in preference
       # to the global cfg$log_transform; the global flag remains as a
       # backward-compat shim and is set below to the OR of UFH and MFH.
@@ -4297,6 +4250,8 @@ server <- function(input, output, session) {
     # Per-UFH log_transform flag (mirror of the per-MFH one). Lets the
     # UFH R script pick up its own setting independently when both are
     # present; otherwise it falls back to the global cfg$log_transform.
+    ufh_cfg$bootstrap_nB <- as.numeric(input$mcpe_bootstrap_replicates %||% 500L)
+    mfh_cfg$bench_nB <- mfh_cfg$mcpe_nB
     ufh_cfg$log_transform <- identical(input$ufh_transformation, "log") && is_mean
 
     cfg <- list(

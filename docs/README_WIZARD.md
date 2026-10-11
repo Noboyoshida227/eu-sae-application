@@ -1,6 +1,6 @@
 # EU SAE Dashboard — Wizard edition
 
-Wizard version: **5.2.0-rc.6-wizard.5.13**
+Wizard version: **5.2.0-rc.6-wizard.5.14**
 Underlying EU SAE package: **5.2.0-rc.6**
 
 This is the clean 5.2.0-rc.6 application package with an additional guided
@@ -128,7 +128,7 @@ step 1.
    (for example household by household with the index of its own period) and
    choose **constant (real) prices already**. The run log, the readiness
    messages, the review page and the report name the CPI file and column.
-4. **Models** — UFH and MFH choices, MCPE bootstrap replicates, benchmarking,
+4. **Models** — UFH and MFH choices, Bootstrap replicates (default 500), benchmarking,
    covariate selection, and PSU consistency.
 5. **AI Assistant** — optional external-transfer consent, API key, and output
    language.
@@ -146,12 +146,11 @@ index they are converted in the same way. For mean welfare fitted
 in logs, the benchmarking is done in currency after the back-transform: each
 domain estimate is multiplied by its group's target divided by the
 population-weighted average of the domain estimates in the group, so the
-domain estimates average exactly to the target. Their RMSE keeps the
-currency-scale CV obtained by delta-transforming the log-scale bootstrap MSE.
-This RMSE is an approximation: the
-final currency-scale adjustment is not repeated inside the bootstrap, and
-uploaded targets are treated as fixed, so their own sampling error is not
-included. Matching the targets exactly does not show that the RMSE is right.
+domain estimates average exactly to the target. Annual MSE and cross-year prediction-error moments come from a joint bootstrap
+that repeats fitting, back-transformation and the final currency-scale benchmark
+adjustment. Survey-derived targets are recomputed in every replicate; uploaded
+targets are held fixed, so uncertainty in externally supplied targets is excluded.
+Matching a target alone does not validate uncertainty.
 
 In **Models**, the AIC/BIC *Model selection criterion* is used only for
 stepwise covariate selection. If LASSO is off and covariates are entered for
@@ -199,17 +198,17 @@ dependency-dependent tests, and remaining validation work.
 
 ### MFH convergence check
 
-The MFH variance parameters are msae's estimates. After fitting, the MFH step
-checks each fitted model (MFH1, MFH2 and, when fitted, MFH3) at msae's
-reported parameters: it computes the REML score and the Newton decrement,
-which are zero at a REML maximum. The result is in
-`outputs/tables/mfh_convergence_check.csv` and the report's "MFH Convergence
-Check" section, with status `ok`, `not_at_maximum` (msae reported convergence
-at a point that is not a maximum) or `not_converged` (msae stopped at its
-iteration limit). If the selected model is not `ok`, the run shows a warning
-and the report asks for review. The UFH that the MFH step fits with msae is
-labelled `UFH_untransformed` (or `UFH_log`) in `pov_mfh.xlsx` and the MFH
-figures, to distinguish it from the UFH step's model.
+The MFH step independently checks the REML score, local curvature and boundary
+conditions. A failed endpoint cannot support inference. MFH2 is refitted with
+constrained REML when needed; all bootstrap replicates use the same acceptance
+rule. A genuine zero-variance boundary is allowed. Selected-model annual MSE and
+cross-year moments come from the same joint bootstrap, including correlation
+boundary fits. Diagnostics are saved in `outputs/tables/mfh_convergence_check.csv`.
+The auxiliary msae UFH comparison is labelled `UFH_untransformed` or `UFH_log`;
+the latter is a naive log prediction and does not replace the corrected emdi UFH.
+
+See [Methodology alignment and QER notes](METHODOLOGY_ALIGNMENT.md) for the
+paper-to-code mapping, explicit extensions and remaining validation limits.
 
 ### Validation and consent
 

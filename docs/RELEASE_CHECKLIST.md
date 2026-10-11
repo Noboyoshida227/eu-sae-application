@@ -3,6 +3,10 @@
 A release manager must record evidence for every item before changing the
 candidate label to a production version.
 
+For the w5n pre-release (QER candidate), completed Windows checks and their scope are
+recorded in [the validation receipt](QER/VALIDATION_RECEIPT.md). The production
+release gates below remain separate from that candidate review.
+
 - [ ] Method owner approves the variance-smoothing policy and simulations.
 - [ ] Method owner approves UFH period-independence inference or supplies a
       validated cross-period covariance estimator.

@@ -1,6 +1,8 @@
 # Revision status against the merged issue register
 
-Baseline: EU SAE application package v5.1.0. Candidate: 5.2.0-rc.6.
+Baseline: EU SAE application package v5.1.0. Current pre-release (QER candidate): 5.2.0-rc.6-wizard.5.14 (w5n).
+
+The older issue register is retained below. The current technical disposition and evidence are in [QER review note](QER/QER_README.md) and [methodology alignment](METHODOLOGY_ALIGNMENT.md); open institutional approvals are not software defects that a local revision can close.
 
 `Implemented` means the candidate contains a code or documentation change for
 the finding; it is not a production-method approval. `Partial` identifies work
@@ -11,20 +13,20 @@ closure is claimed.
 |---|---|---|
 | B1 | Implemented | LASSO folds use and record a deterministic analysis seed. |
 | B2 | Implemented | Removed the unreachable covariance branch; UFH change inference labels period independence and exports raw and BH-adjusted p-values. |
-| B3 | Partial | Removed the absolute 0.001 cutoff. Positive lower-tail replacement is disabled by default; any multiplier still needs method-owner approval and simulation. |
+| B3 | Partial | The explicit application policy uses the absolute 0.001 cutoff for sm_out (log-scale variance for log means). It is disclosed as an implementation choice, not prescribed by Molina–Romero or EMDI; representative policy validation remains open. |
 | B4 | Implemented | AI prompts are evidence-conditional and no longer assert fixed conclusions or eight combinations. |
 | B5 | Partial | Added explicit external-transfer consent, prompt minimization, a prompt-injection guard and configurable gateway URLs. Lawful basis, provider/retention terms and institutional approval remain open. |
 | B6 | Partial—blocks production/official release | Non-inventory literature files are excluded. The candidate includes only listed Spain RDS and simulated examples; the replacement Spain map has documented IGN/CNIG CC BY 4.0 provenance; the survey derivation remains missing. The canonical repository was restarted with a fresh history on 17 Sep 2026 and the previous one deleted on 27 Sep 2026 (`docs/HISTORY_REMEDIATION.md`); older repositories still need review, and non-code rights remain unapproved. |
 | B7 | Implemented | Added targeted tests and CI; this is code QA, not statistical validation. |
 | B8 | Implemented | Removed hard-coded Greece labels and added a country/territory input. |
 | H1 | Implemented | Input-load failure is blocking. |
-| H2 | Partial | MCPE `nB` is configurable, recorded and defaults to 200; representative stability studies are still required. |
-| H3 | Partial | MFH change outputs retain independence MSE, covariance-adjusted MSE, covariance estimate and fallback rule; the estimator/fallback needs method validation. |
+| H2 | Implemented with limits | Shared Bootstrap replicates defaults to 500 for UFH, MFH and benchmarking; explicit saved counts are preserved, counts/precision exported. The larger MFH2 study compares 500/1,000 draws; it does not certify all settings. |
+| H3 | Implemented | MFH annual and change MSE/MCPE use the same joint bootstrap. Impossible covariance or unavailable moments produce unavailable inference, never an independence substitute. Boundary-sensitive intervals remain provisional. |
 | H4 | Partial | UFH/MFH results include BH adjustment and explicit variance handling; the multiplicity family and covariance policy need approval. |
-| H5 | Open | Transformation/back-transformation policy requires method-owner review and simulation. |
-| H6 | Open | Boundary behavior and resulting uncertainty require method-owner decisions and QA cases. |
-| H7 | Open | Nonsampled-domain behavior requires an approved policy and validation. |
-| H8 | Open | MSE-estimator choice and adequacy require comparative statistical validation. |
+| H5 | Implemented with limits | UFH models log arithmetic Direct means with native emdi ML/bc_sm; MFH uses conditional-lognormal prediction. Original-scale bootstrap, package agreement and oracle tests added; finite-sample coverage limits disclosed. |
+| H6 | Implemented with limits | Independent REML endpoint/curvature checks and bounded MFH2 refit retain legitimate zero-variance boundaries. Original/replicate covariance boundaries are diagnosed; boundary-sensitive inference is explicitly provisional. |
+| H7 | Partial | Native emdi corrected-log predictions remain unavailable for unsampled areas; benchmarking requires complete predictions. No invented correction is substituted. Wider nonsampled-domain validation remains open. |
+| H8 | Partial | Joint original-scale bootstrap identities and installed-model behavior pass. Larger MFH2 studies identify undercoverage at covariance boundaries and normal/delta approximation limits. Uniform inference validity is not claimed. |
 | H9 | Implemented | Run metadata and input hashes are captured before one final report render. MFH inversion, robust-refit, condition-number-method, and g3/MSE availability diagnostics are added after the MFH step and explicitly printed in the report. |
 | H10 | Implemented | UFH complete-case filtering uses required estimation fields and logs excluded domain IDs. |
 | H11 | Partial | Diagnostics are more visible, but no institutionally approved warning/action policy or thresholds exist. |
@@ -34,13 +36,13 @@ closure is claimed.
 | H15 | Implemented | Missing normality p-values are reported as unavailable rather than failed. |
 | H16 | Partial | A direct dependency snapshot/check exists; reproducible cross-platform restoration remains open. |
 | H17 | Implemented | Added clean-release tooling, manifests/checksums and complete output placeholders. |
-| H18 | Implemented | Robust MFH2 uses guarded symmetric inversions. Cholesky paths record a labeled low-cost condition-number estimate; fallback paths record an exact value when available. If Fisher information cannot be inverted, g3 and MSE are reported unavailable with a warning; zero is no longer silently substituted. Structured diagnostics are written to the run log, metadata, a CSV table and the final report. Numerical validation remains part of H5/H8. |
+| H18 | Implemented with limits | Guarded inversions, constrained marginal-variance REML refits, zero-G and correlation-limit fixtures, non-inferior likelihood checks and standardized residual diagnostics pass. Selected uncertainty uses joint bootstrap; a valid optimization endpoint alone does not guarantee nominal interval coverage. |
 | H19 | Open | Remote branches/tags and publication workflow require repository-owner action. |
 | H20 | Implemented | Added VERSION/changelog and replaced country-specific labels. |
-| H21 | Implemented | README plus DOCX/PDF/PPTX were refreshed for 5.2.0-rc.6, clean-build contents, reproducibility controls, pointwise inference and embedded AI interpretation; superseded binaries are excluded by the explicit release inventory. |
+| H21 | Implemented | English guidelines, four technical notes, 57-slide guide, download PDF and help/report prose revised for w5n. Historical figures are labeled illustrative. Older translated guides remain excluded pending revision. |
 | H22 | Partial | The canonical repository (eu-sae-application) was started with a fresh history that contains none of the prohibited binaries; the previous repository was deleted on 27 Sep 2026. Older repositories that predate the fresh start still need review (`docs/HISTORY_REMEDIATION.md`). |
-| M1 | Open | Robustness and estimator behavior still need representative numerical/statistical validation. |
-| M2 | Open | No approved change to the issue's method/default policy is claimed. |
+| M1 | Partial | Numerical/package/oracle checks and 2,100 MFH2 outer simulations completed. Complex-survey, selection, benchmarking and large MFH1/MFH3 coverage studies remain open. |
+| M2 | Implemented | User-authorized MFH2 default retained; users can explicitly choose MFH3-first, with documented selection/fallback rules. |
 | M3 | Implemented | Clean exports omit run histories and input-file copies. |
 | M4 | Implemented | Convenience setup copies are made only by the explicit **Save Current Setup** action and are excluded from clean exports. |
 | M5 | Partial | Added R-object/type, duplicate-column and ZIP-isolation checks; a full adversarial input review remains open. |

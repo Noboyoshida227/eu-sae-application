@@ -117,12 +117,6 @@ indicator_type   <- cfg_or_default(.app_cfg$indicator_type,  "poverty")
 }
 log_transform    <- isTRUE(.ufh_log_transform_raw) &&
                     identical(indicator_type, "mean_welfare")
-.safe_log_positive <- function(x) {
-  out <- rep(NA_real_, length(x))
-  ok <- is.finite(x) & x > 0
-  out[ok] <- log(x[ok])
-  out
-}
 currency_symbol  <- cfg_or_default(.app_cfg$currency_symbol, "EUR")
 fgt_alpha        <- as.integer(cfg_or_default(.app_cfg$fgt_alpha, 0L))
 povline_type     <- cfg_or_default(.app_cfg$povline_type, "column")
@@ -236,40 +230,20 @@ if (benchmark_level %in% c("custom", "region")) {
 # ---- Harmonize variable names ----
 rename_cols <- c(
   year = var_map$year, domain = var_map$domain, psu = var_map$psu,
-  weight = var_map$weight, welfare = var_map$welfare
+  weight = var_map$weight, welfare = var_map$welfare, hh_size = var_map$hh_size
 )
-if (!is.null(var_map$strata) && nzchar(var_map$strata) &&
-    var_map$strata %in% names(survey_raw) && var_map$strata != "strata") {
-  rename_cols <- c(rename_cols, strata = var_map$strata)
-}
+if (use_strata) rename_cols <- c(rename_cols, strata = var_map$strata)
 if (!is.null(var_map$benchmark_level) && nzchar(var_map$benchmark_level) &&
-    var_map$benchmark_level %in% names(survey_raw) &&
-    var_map$benchmark_level != "region" &&
-    !var_map$benchmark_level %in% unname(rename_cols)) {
+    var_map$benchmark_level %in% names(survey_raw)) {
   rename_cols <- c(rename_cols, region = var_map$benchmark_level)
 }
-# Only rename povline column when it comes from data and we are running
-# the poverty indicator. Mean-welfare runs ignore the poverty line entirely.
 if (identical(indicator_type, "poverty") &&
     povline_type == "column" && !is.null(var_map$povline)) {
   rename_cols <- c(rename_cols, povline = var_map$povline)
 }
-if (!is.null(var_map$hh_size) && nzchar(var_map$hh_size) &&
-    var_map$hh_size %in% names(survey_raw) && var_map$hh_size != "hh_size") {
-  rename_cols <- c(rename_cols, hh_size = var_map$hh_size)
-}
-survey_raw <- sae_resolve_rename_collisions(survey_raw, rename_cols, context = "UFH mapping")
-survey_all <- survey_raw %>% rename(!!!rename_cols)
+survey_all <- sae_apply_column_mapping(survey_raw, rename_cols, context = "UFH mapping")
 if (!use_strata && "strata" %in% names(survey_all)) {
   survey_all <- survey_all %>% select(-any_of("strata"))
-}
-if (!is.null(var_map$benchmark_level) && nzchar(var_map$benchmark_level) &&
-    !"region" %in% names(survey_all) &&
-    var_map$benchmark_level %in% unname(rename_cols)) {
-  copied_from <- names(rename_cols)[match(var_map$benchmark_level, unname(rename_cols))]
-  if (!is.na(copied_from) && copied_from %in% names(survey_all)) {
-    survey_all$region <- survey_all[[copied_from]]
-  }
 }
 # When the poverty line is a numeric constant, create the column (poverty only)
 if (identical(indicator_type, "poverty") && povline_type == "numeric") {
@@ -369,8 +343,8 @@ if (fgt_alpha > 0L && identical(ufh_transformation, "arcsin")) {
 }
 # Bias correction: user-facing logical option (TRUE = bias-corrected, FALSE = naive)
 # Map to emdi's backtransformation argument: TRUE -> "bc", FALSE -> "naive".
-# Bias correction is ONLY meaningful under arcsin -- when transformation = "no",
-# there is nothing to back-transform, so we pass NULL to emdi::fh().
+# This setting also selects bc_sm versus naive for log mean-welfare models
+# in run_fh_year(). Identity-scale fits have no back-transformation.
 ufh_bias_correction <- as.logical(cfg_or_default(ufh_cfg$bias_correction, TRUE))
 # Backward compatibility: support old 'backtransformation' key
 if (is.null(ufh_cfg$bias_correction) && !is.null(ufh_cfg$backtransformation)) {
@@ -387,7 +361,7 @@ if (identical(ufh_transformation, "arcsin")) {
 cat("Transformation:", ufh_transformation, "\n")
 if (isTRUE(log_transform)) {
   cat("Bias correction:", if (isTRUE(ufh_bias_correction)) {
-    "TRUE (Duan smearing, bc_sm)"
+    "TRUE (EMDI Slud-Maiti correction, bc_sm; ML fit)"
   } else {
     "FALSE (naive exponential back-transform)"
   }, "\n")
@@ -408,6 +382,7 @@ ufh_ic_criterion <- if (!is.null(ufh_cfg$ic_criterion) &&
 }
 ufh_lasso_enabled <- isTRUE(ufh_cfg$lasso_enabled)
 ufh_lasso_lambda <- cfg_or_default(ufh_cfg$lasso_lambda, "lambda.1se")
+ufh_bootstrap_nB <- sae_bootstrap_count(ufh_cfg$bootstrap_nB, label = "ufh.bootstrap_nB")
 analysis_seed <- suppressWarnings(as.integer(cfg_or_default(.app_cfg$analysis_seed, 123L)))
 if (!is.finite(analysis_seed) || analysis_seed < 0L) analysis_seed <- 123L
 if (!ufh_lasso_lambda %in% c("lambda.1se", "lambda.min")) {
@@ -424,8 +399,8 @@ cat("LASSO screening (UFH):",
 #   "sm_out"  - smooth only non-finite or below-0.001 variances (default)
 #   "sm_all"  - replace ALL sampling variances with smoothed values
 #   "direct"  - use raw direct variances as-is (NA/0 still backfilled)
-# When arcsin is selected the qmd keeps the legacy behavior (backfill NA/0
-# only) regardless of this setting; arcsin already stabilizes variances.
+# Arcsin uses the effective-sample-size working variance 1/(4*n_eff),
+# independently of this setting, and retains original direct variances.
 ufh_var_choice <- cfg_or_default(ufh_cfg$var_choice, "sm_out")
 if (!ufh_var_choice %in% c("direct", "sm_out", "sm_all")) {
   warning("Unknown ufh_cfg$var_choice '", ufh_var_choice,
@@ -521,12 +496,9 @@ cat("Model-selection criterion:",
 fh_results_list <- list()
 
 # ---- EUR-scale plot helpers for mean-welfare log-fit runs --------------
-# emdi's compare_plot() and map_plot() pull values straight off the
-# fitted model object, which for mean_welfare + log_transform stays on
-# the log scale even though the exported pov_fh data frame is in EUR.
-# To keep the rendered HTML on the same scale as the export, we use
-# these custom ggplot equivalents when log_transform is TRUE. For
-# poverty / non-log runs the original emdi helpers are used unchanged.
+# Render log-fit mean-welfare estimates and benchmarks from the exported
+# original-currency table, with the same values and labels as the export.
+# Poverty / non-log runs continue to use emdi's plotting helpers.
 .compare_plot_eur <- function(pov_fh_year, year_label) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) return(invisible(NULL))
   tidyr_ns <- asNamespace("tidyr")
@@ -834,9 +806,9 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
                         lasso_enabled = FALSE,
                         lasso_lambda = "lambda.1se") {
 
-  # Back-transformation is only meaningful under arcsin. If the caller passes
-  # "bc"/"naive" together with transformation = "no", silently drop it so we
-  # pass NULL to emdi::fh() and step_wrapper_fh() -- matches the UI semantics.
+  # This argument controls arcsin selection. Log mean-welfare selection is
+  # done on log(direct mean), and its final back-transform is set below from
+  # ufh_bias_correction. Identity-scale selection has no back-transform.
   if (!identical(transformation, "arcsin")) {
     backtransformation <- NULL
   }
@@ -862,7 +834,7 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
 
   # ---- Build the LHS the model is fitted on ----
   # For "poverty"      -- pov_indicator is FGT(Î±) computed from welfare+povline
-  # For "mean_welfare" -- pov_indicator is welfare itself (or log(welfare))
+  # For "mean_welfare" -- estimate arithmetic mean welfare before any transformation
   # The downstream `direct_povrate` column is named for back-compat: it
   # holds whichever direct estimate corresponds to the chosen indicator.
   if (identical(indicator_type, "poverty")) {
@@ -870,11 +842,7 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
       mutate(pov_indicator = compute_fgt(welfare, povline, fgt_alpha))
   } else {
     survey_dt <- survey_dt |>
-      mutate(pov_indicator = if (isTRUE(log_transform)) {
-        .safe_log_positive(welfare)
-      } else {
-        as.numeric(welfare)
-      })
+      mutate(pov_indicator = as.numeric(welfare))
   }
 
   # ---- Direct estimation ----
@@ -890,21 +858,13 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
            CV = .safe_cv(SD, direct_povrate)) |>
     merge(sampsize_dt, by = "domain")
 
-  # When fitting on the log scale we additionally compute the population-
-  # weighted arithmetic mean of welfare per domain. This is what the UI
-  # promises ("Mean welfare = population-weighted mean of welfare") and is
-  # used to anchor the per-domain smearing in the back-transform: with
-  # smear_d = direct_arith_d / exp(direct_povrate_d), the back-transformed
-  # Direct column equals svymean(welfare) exactly, and FH/FH_Bench EBLUPs
-  # are scaled by the same per-domain factor (standard assumption: within-
-  # domain variability of welfare is similar between direct and model).
-  if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform)) {
-    var_dt_arith <- survey::svyby(~welfare, by = ~domain, design = design_obj,
-                                   FUN = survey::svymean, na.rm = TRUE)
-    arith_dt <- var_dt_arith |>
-      dplyr::rename(direct_arith = "welfare", SD_arith = "se") |>
-      dplyr::select(domain, direct_arith, SD_arith)
-    direct_dt <- direct_dt |> dplyr::left_join(arith_dt, by = "domain")
+  log_mean_run <- identical(indicator_type, "mean_welfare") && isTRUE(log_transform)
+  if (log_mean_run) {
+    if (any(!is.finite(direct_dt$direct_povrate) | direct_dt$direct_povrate <= 0)) {
+      stop("Log UFH requires positive finite direct arithmetic mean welfare in every sampled domain; choose no transformation otherwise.", call. = FALSE)
+    }
+    direct_dt$direct_arith <- direct_dt$direct_povrate
+    direct_dt$SD_arith <- direct_dt$SD
   }
 
   # Design effect:
@@ -944,16 +904,24 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
     ))
   }
 
+  # EMDI log-FH models log(area arithmetic mean), not mean(log welfare).
+  # Selection and variance smoothing use its delta-method working variance.
+  if (log_mean_run) {
+    direct_dt$vardir <- direct_dt$vardir / direct_dt$direct_arith^2
+    direct_dt$direct_povrate <- log(direct_dt$direct_arith)
+    direct_dt$SD <- sqrt(direct_dt$vardir)
+    direct_dt$CV <- .safe_cv(direct_dt$SD, direct_dt$direct_povrate)
+  }
+
   # ---- Variance smoothing ----
   #   Three strategies, selected by `var_choice`:
   #     "direct"  - keep raw direct variances (still backfill NA/0 for safety).
   #     "sm_out"  - replace missing/non-finite or < 0.001 direct variances.
   #     "sm_all"  - replace ALL variances with smoothed values.
-  #   When transformation == "arcsin", variance smoothing is upstream of the
-  #   arcsin/BC pipeline anyway, so the safe default ("sm_out") is used.
+  #   Arcsin skips GVF smoothing: its working variance comes from n_eff.
   # Restrict filtering to fields required for estimation. Optional labels or
   # diagnostics must not silently remove an otherwise estimable domain.
-  required_complete <- intersect(c("domain", "direct_povrate", "vardir", "N"),
+  required_complete <- intersect(c("domain", "direct_povrate", "N"),
                                  names(direct_dt))
   keep_complete <- stats::complete.cases(direct_dt[, required_complete, drop = FALSE])
   dropped_domains <- unique(as.character(direct_dt$domain[!keep_complete]))
@@ -963,35 +931,19 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
   }
   direct_dt <- direct_dt[keep_complete, ]
 
-  var_smooth <- varsmoothie_king(domain     = direct_dt[["domain"]],
-                                 direct_var = direct_dt$vardir,
-                                 sampsize   = direct_dt$N)
-
-  direct_dt <- var_smooth |>
-    merge(direct_dt, by.x = "Domain", by.y = "domain")
-
-  # When arcsin transformation is active, variance smoothing is not
-  # user-configurable: arcsin already stabilizes variances. We preserve the
-  # legacy behavior, which only backfills NA / exactly-zero variances so that
-  # emdi::fh() does not error out.
   if (identical(transformation, "arcsin")) {
-    direct_dt <- direct_dt |>
-      dplyr::mutate(
-        vardir_new = if_else(is.na(vardir) | vardir == 0, var_smooth, vardir),
-        vardir     = vardir_new,
-        SD         = sqrt(vardir_new),
-        CV         = .safe_cv(SD, direct_povrate)
-      ) |>
-      dplyr::select(-vardir_new)
+    # emdi uses 1/(4*n_eff) and accepts zero original-scale variances.
+    # Do not fit an irrelevant GVF or overwrite the reported direct variance.
+    names(direct_dt)[names(direct_dt) == "domain"] <- "Domain"
     if (any(!is.finite(direct_dt$n_eff) | direct_dt$n_eff <= 0)) {
-      stop(sprintf(
-        "Year %s has non-finite or non-positive effective sample sizes after boundary handling.",
-        yr
-      ), call. = FALSE)
+      stop(sprintf("Year %s has invalid effective sample sizes.", yr), call. = FALSE)
     }
-    cat("  [year ", yr, "] arcsin transformation: variance smoothing ",
-        "applied only to NA / zero variances.\n", sep = "")
+    cat("  [year ", yr, "] arcsin uses effective-sample-size working variances; direct variances are retained.\n", sep = "")
   } else {
+    var_smooth <- varsmoothie_king(domain = direct_dt[["domain"]],
+                                   direct_var = direct_dt$vardir,
+                                   sampsize = direct_dt$N)
+    direct_dt <- merge(var_smooth, direct_dt, by.x = "Domain", by.y = "domain")
     direct_dt <- switch(
       var_choice,
       "direct" = direct_dt |>
@@ -1085,40 +1037,33 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
   print(fh_formula)
 
   # ---- Model estimation ----
-  # emdi::fh() requires mse_type = "analytical" when transformation = "no"
-  # (with method in {reml, ml} and no correlation structure). Bootstrap MSE
-  # is only valid under the arcsin transformation.
-  #
-  # IMPORTANT: Use bquote() to inline LITERAL values of mse_type / B into the
-  # stored fh() call. bench_regional()'s bootstrap later invokes update() on
-  # this model, and update() re-evaluates the original call in its own scope.
-  # If we passed local variable names (e.g. .mse_type_fh) into fh(), those
-  # names would be unresolvable from bench_regional's frame and every
-  # bootstrap iteration would silently fail, producing NA MSEs for FH_Bench.
-  .mse_type_fh <- if (identical(transformation, "arcsin")) "boot" else "analytical"
-  .B_fh        <- if (identical(transformation, "arcsin")) c(200, 0) else c(0, 0)
-
-  set.seed(123)
-  fh_model <- eval(bquote(
-    fh(fixed              = fh_formula,
-       vardir             = "vardir",
-       combined_data      = fh_dt,
-       domains            = "Domain",
-       method             = "reml",
-       transformation     = transformation,
-       backtransformation = backtransformation,
-       eff_smpsize        = "n_eff",
-       MSE                = TRUE,
-       mse_type           = .(.mse_type_fh),
-       B                  = .(.B_fh))
-  ))
+  # emdi performs its own log/delta transformation: restore arithmetic-scale
+  # inputs after selecting/smoothing on the model scale, avoiding a double log.
+  model_data <- fh_dt
+  fit_transformation <- if (log_mean_run) "log" else transformation
+  fit_backtransformation <- if (log_mean_run) {
+    if (isTRUE(ufh_bias_correction)) "bc_sm" else "naive"
+  } else backtransformation
+  if (log_mean_run) {
+    model_data$direct_povrate <- model_data$direct_arith
+    model_data$vardir <- model_data$vardir * model_data$direct_arith^2
+  }
+  model_seed <- as.integer((as.numeric(analysis_seed) + as.numeric(yr)) %% .Machine$integer.max)
+  fh_model <- sae_ufh_fit(
+    fixed = fh_formula, vardir = "vardir", combined_data = model_data,
+    domains = "Domain", transformation = fit_transformation,
+    backtransformation = fit_backtransformation, eff_smpsize = "n_eff",
+    B = ufh_bootstrap_nB, seed = model_seed, bootstrap_mse = !do_benchmark)
+  if (log_mean_run) {
+    fh_model$MSE$Direct <- model_data$SD_arith^2
+    if (any(fh_model$ind$Out == 1L) && isTRUE(ufh_bias_correction)) {
+      cat("EMDI Slud-Maiti log-FH returns estimates only for sampled domains; unsampled domains have missing estimates.\n")
+    }
+  }
 
   fh_bench <- NULL
   pop_dt <- NULL
   external_benchmark_mat <- NULL
-  # Mean welfare fitted in logs: the model works with ln(welfare), while
-  # uploaded benchmark targets are in currency. See the benchmarking block.
-  log_mean_run <- identical(indicator_type, "mean_welfare") && isTRUE(log_transform)
   fh_dt <- fh_dt |> rename(domain = Domain)
   if (do_benchmark) {
     # ---- Regional/national benchmarking ----
@@ -1159,7 +1104,7 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
       group_by(region) |>
       summarize(
         n_provs = n(),
-        B_r     = weighted.mean(direct_povrate, Nd, na.rm = TRUE),
+        B_r     = weighted.mean(if (log_mean_run) direct_arith else direct_povrate, Nd, na.rm = TRUE),
         source  = "survey direct",
         .groups = "drop"
       )
@@ -1179,31 +1124,20 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
     cat("\nUFH benchmark targets (yr =", yr, "):\n")
     print(region_benchmarks)
 
-    # In a log run the estimates below are ln(welfare), so a currency target
-    # cannot be used here: dividing, say, 12,500 by an average log of 9.4
-    # would multiply the log estimates by about 1,300. The log-scale step
-    # therefore always uses the survey's own regional figures (also in logs);
-    # it only supplies the relative precision of the benchmarked estimates.
-    # The point estimates are benchmarked to the uploaded targets on the
-    # currency scale after the back-transform (see "Re-benchmark on the
-    # currency scale" below).
-    log_step_benchmarks <- if (log_mean_run) direct_region_benchmarks else region_benchmarks
-    if (log_mean_run && !is.null(external_benchmark_mat)) {
-      cat("Mean welfare in logs: the uploaded targets are applied on the currency",
-          "scale after the back-transform.\n")
-    }
-
+    # Final point estimates and all benchmark operations are on the original
+    # indicator scale, including currency for log mean-welfare models.
     region_df <- fh_dt |>
-      left_join(log_step_benchmarks |> select(region, B_r), by = "region") |>
+      left_join(region_benchmarks |> select(region, B_r), by = "region") |>
       mutate(direct_povrate = if_else(is.finite(B_r), B_r, direct_povrate)) |>
       select(domain, region, Nd, direct_povrate)
-    fh_bench  <- bench_regional(
-      model = fh_model,
-      region_df = region_df,
-      MSE = TRUE,
-      B = 200,
-      seed = 123
-    )
+    fh_bench <- bench_regional(
+      model = fh_model, region_df = region_df, MSE = TRUE,
+      B = ufh_bootstrap_nB, seed = model_seed,
+      target_source = if (is.null(external_benchmark_mat)) "survey" else "fixed")
+    if (isTRUE(fh_model$sae_bootstrap_mse)) {
+      fh_model$MSE$FH <- fh_bench$MSE$FH
+      fh_model$successful_bootstraps <- fh_bench$successful_bootstraps
+    }
 
     pov_fh <- as.data.frame(estimators(fh_bench, MSE = TRUE, CV = TRUE))
   } else {
@@ -1211,6 +1145,14 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
   }
 
   # ---- Prepare results ----
+  uncertainty_model <- if (do_benchmark) fh_bench else fh_model
+  if (!is.null(uncertainty_model$sae_mse_mcse)) {
+    precision <- uncertainty_model$sae_mse_mcse
+    precision$year <- yr
+    precision$requested_replicates <- uncertainty_model$successful_bootstraps$requested
+    precision$successful_replicates <- uncertainty_model$successful_bootstraps$successful
+    write.csv(precision, here::here("outputs", "tables", paste0("ufh_bootstrap_precision_", yr, ".csv")), row.names = FALSE)
+  }
   pov_fh <- pov_fh |>
     rename(domain := "Domain") |>
     mutate(year := yr)
@@ -1223,183 +1165,10 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
     attr(pov_fh, "benchmarking_applied") <- TRUE
   }
 
-  # ---- Back-transform from log to original scale (mean welfare only) ----
-  # When bias correction is ON (bc_sm, the default), we use a per-domain
-  # smearing factor anchored to the population-weighted arithmetic mean welfare:
-  #   smear_d  = direct_arith_d / exp(direct_povrate_d)
-  # so the FH/FH_Bench EBLUPs target the arithmetic mean (Duan-style
-  # smearing). Variance is propagated by the delta method using the
-  # per-domain back-transformed point estimate as the multiplier:
-  # Var(cÂ·exp(Î·)) â‰ˆ (cÂ·exp(Î·))Â² Â· Var(Î·).
-  #
-  # When bias correction is OFF (user explicitly picked "none"), we
-  # set smear_d = 1, which makes FH/FH_Bench = exp(Î·Ì‚) -- the naive,
-  # downward-biased back-transform. The Direct column is still
-  # replaced with the population-weighted arithmetic mean of welfare
-  # because that quantity is unbiased and identifies "mean welfare"
-  # by definition; the user is opting out of bias correction for the
-  # MODEL EBLUP, not redefining what "Direct" means.
-  if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform)) {
-    # Variance smoothing earlier in run_fh_year() merges direct_dt against
-    # var_smooth using by.x = "Domain", by.y = "domain", which renames the
-    # join column. Normalise to lowercase `domain` here so the smearing
-    # lookup and the region merge below both work regardless of which
-    # branch was taken upstream.
-    .direct_norm <- direct_dt
-    if ("Domain" %in% names(.direct_norm) && !"domain" %in% names(.direct_norm)) {
-      names(.direct_norm)[names(.direct_norm) == "Domain"] <- "domain"
-    }
-
-    # `ufh_bias_correction` is set in the outer scope (chunk near top of
-    # the qmd) from cfg$ufh$bias_correction. TRUE -> bc_sm (smearing),
-    # FALSE -> none (naive exp). Default is TRUE if missing.
-    .apply_smearing <- isTRUE(ufh_bias_correction)
-    smear_lookup <- .direct_norm |>
-      dplyr::mutate(smear_d = if (.apply_smearing) {
-        ifelse(
-          is.finite(direct_arith) & is.finite(direct_povrate) & abs(direct_povrate) < 50,
-          direct_arith / exp(direct_povrate),
-          1
-        )
-      } else {
-        # No bias correction: naive exp(eta) for FH/FH_Bench.
-        rep(1, dplyr::n())
-      }) |>
-      dplyr::select(domain, smear_d, direct_arith, SD_arith)
-    if (!.apply_smearing) {
-      cat(sprintf("UFH back-transform (year %s): bias correction = none (naive exp); FH/FH_Bench target the geometric mean.\n", yr))
-    }
-
-    pov_fh <- pov_fh |>
-      dplyr::left_join(smear_lookup, by = "domain")
-
-    for (col in c("Direct", "FH", "FH_Bench")) {
-      mse_col <- paste0(col, "_MSE")
-      cv_col  <- paste0(col, "_CV")
-      if (!col %in% names(pov_fh)) next
-      eta <- pov_fh[[col]]
-      if (col == "Direct") {
-        # Replace with the actual population-weighted arithmetic mean and its variance
-        pov_fh[[col]] <- pov_fh$direct_arith
-        if (mse_col %in% names(pov_fh)) {
-          pov_fh[[mse_col]] <- (pov_fh$SD_arith)^2
-        }
-      } else {
-        # Per-domain anchored back-transform of the model EBLUP
-        pov_fh[[col]] <- pov_fh$smear_d * exp(eta)
-        if (mse_col %in% names(pov_fh)) {
-          pov_fh[[mse_col]] <- (pov_fh[[col]])^2 * pov_fh[[mse_col]]
-        }
-      }
-      if (cv_col %in% names(pov_fh) && mse_col %in% names(pov_fh)) {
-        pov_fh[[cv_col]] <- .safe_cv_from_mse(pov_fh[[mse_col]], pov_fh[[col]])
-      }
-    }
-    # ---- Re-benchmark on the currency scale ----------------------------
-    # The FH_Bench column we just back-transformed was produced by a ratio
-    # benchmark applied on the log scale. After exponentiation the result
-    # is no longer guaranteed to satisfy the regional aggregation
-    # constraint on the original currency scale. Override FH_Bench with a
-    # fresh ratio adjustment on the currency scale:
-    #   factor_r = target_r / population-weighted mean of FH in region r,
-    #   FH_Bench = factor_r * FH.
-    # The target is the uploaded regional figure when a Benchmark Target
-    # Database is used (already converted to the run's prices); otherwise
-    # it is the population-weighted mean of the survey's arithmetic means.
-    # The MSE keeps the relative precision (CV) of the log-scale bootstrap
-    # of the benchmarked estimates -- an approximation; redoing the
-    # bootstrap on the currency scale is on the future-work list.
-    if (do_benchmark && !is.null(region_map) &&
-        "FH" %in% names(pov_fh) && "FH_Bench" %in% names(pov_fh)) {
-      reg_lookup <- .direct_norm |>
-        dplyr::left_join(region_map, by = "domain") |>
-        dplyr::left_join(pop_dt, by = "domain") |>
-        dplyr::left_join(
-          dplyr::tibble(domain = pov_fh$domain, FH_eur = pov_fh$FH),
-          by = "domain"
-        )
-      if ("Nd" %in% names(reg_lookup)) {
-        if (!is.null(external_benchmark_mat)) {
-          # Uploaded targets cover the whole region, so the regional average
-          # of FH uses every domain of the region.
-          ext_targets <- tibble::tibble(
-            region = rownames(external_benchmark_mat),
-            B_eur  = as.numeric(external_benchmark_mat[, as.character(yr)])
-          )
-          bench_basis <- tibble::tibble(
-            domain = as.character(pov_fh$domain),
-            FH_eur = pov_fh$FH
-          ) |>
-            dplyr::left_join(
-              region_map |> dplyr::transmute(domain = as.character(domain),
-                                             region = as.character(region)),
-              by = "domain"
-            ) |>
-            dplyr::left_join(
-              pop_dt |> dplyr::transmute(domain = as.character(domain), Nd),
-              by = "domain"
-            ) |>
-            dplyr::filter(!is.na(region), is.finite(FH_eur), is.finite(Nd))
-          # The uploaded targets describe whole groups; say so when some
-          # domains of a group have no estimate this year.
-          .no_estimate <- setdiff(unique(as.character(region_map$domain)), bench_basis$domain)
-          if (length(.no_estimate)) {
-            cat(sprintf(paste("WARNING: UFH benchmarking (year %s): %d domain(s) of the benchmark",
-                              "groups have no estimate (%s%s); the uploaded targets are matched",
-                              "by the other domains only. Check that the targets cover the same domains.\n"),
-                        yr, length(.no_estimate), paste(utils::head(.no_estimate, 10), collapse = ", "),
-                        if (length(.no_estimate) > 10) ", ..." else ""))
-          }
-          region_lambda <- bench_basis |>
-            dplyr::group_by(region) |>
-            dplyr::summarise(
-              FH_bar = stats::weighted.mean(FH_eur, Nd),
-              .groups = "drop"
-            ) |>
-            dplyr::left_join(ext_targets, by = "region") |>
-            dplyr::mutate(lambda_eur = ifelse(is.finite(B_eur) & abs(FH_bar) > 1e-8,
-                                              B_eur / FH_bar, 1))
-          cat(sprintf("UFH benchmarking (year %s): currency-scale factors to the uploaded targets: %s\n",
-                      yr, paste(sprintf("%s %.4f", region_lambda$region, region_lambda$lambda_eur),
-                                collapse = ", ")))
-        } else {
-          region_lambda <- reg_lookup |>
-            dplyr::filter(!is.na(direct_arith), !is.na(FH_eur), !is.na(Nd)) |>
-            dplyr::group_by(region) |>
-            dplyr::summarise(
-              B_eur     = stats::weighted.mean(direct_arith, Nd, na.rm = TRUE),
-              FH_bar    = stats::weighted.mean(FH_eur,       Nd, na.rm = TRUE),
-              lambda_eur = ifelse(abs(FH_bar) > 1e-8, B_eur / FH_bar, 1),
-              .groups   = "drop"
-            )
-        }
-        lambda_for_pov_fh <- region_lambda$lambda_eur[match(
-          as.character(region_map$region[match(as.character(pov_fh$domain),
-                                               as.character(region_map$domain))]),
-          as.character(region_lambda$region)
-        )]
-        lambda_for_pov_fh[!is.finite(lambda_for_pov_fh)] <- 1
-        # Cache the OLD FH_Bench (log-scale-derived bench in EUR) before
-        # overwriting; FH_Bench_MSE was tied to that point estimate, not
-        # to the unbenchmarked FH. Mirrors the MFH fix.
-        FH_Bench_old <- pov_fh$FH_Bench
-        pov_fh$FH_Bench <- lambda_for_pov_fh * pov_fh$FH
-        if ("FH_Bench_MSE" %in% names(pov_fh)) {
-          ratio_sq <- (pov_fh$FH_Bench / pmax(abs(FH_Bench_old), 1e-8))^2
-          ratio_sq[!is.finite(ratio_sq)] <- 1
-          pov_fh$FH_Bench_MSE <- pov_fh$FH_Bench_MSE * ratio_sq
-        }
-        if ("FH_Bench_CV" %in% names(pov_fh) && "FH_Bench_MSE" %in% names(pov_fh)) {
-          pov_fh$FH_Bench_CV <- .safe_cv_from_mse(pov_fh$FH_Bench_MSE,
-                                                  pov_fh$FH_Bench)
-        }
-        attr(pov_fh, "bench_scale") <- "EUR"
-      }
-    }
-
-    pov_fh <- pov_fh |> dplyr::select(-any_of(c("smear_d", "direct_arith", "SD_arith")))
+  if (log_mean_run) {
     attr(pov_fh, "log_back_transformed") <- TRUE
-    attr(pov_fh, "smearing_anchor")       <- "per_domain_arithmetic"
+    attr(pov_fh, "log_model_target") <- "log_direct_arithmetic_mean"
+    attr(pov_fh, "backtransformation") <- fit_backtransformation
   }
 
   # Return objects needed for diagnostics and downstream analysis

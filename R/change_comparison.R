@@ -1,3 +1,12 @@
+# Count significance flags across domains. Returns NA when no domain has a test
+# result (inference unavailable), so untested domains are never reported as
+# "0 significant".
+sae_count_flags <- function(x) {
+  x <- as.logical(x)
+  if (!any(!is.na(x))) return(NA_integer_)
+  as.integer(sum(x, na.rm = TRUE))
+}
+
 # Descriptive comparison of unbenchmarked changes, without refitting models.
 sae_change_comparison <- function(significance, years, indicator_type = "poverty",
                                   currency_symbol = "EUR", fgt_alpha = 0L,
@@ -19,7 +28,7 @@ sae_change_comparison <- function(significance, years, indicator_type = "poverty
     d$domain <- trimws(as.character(d$domain))
     if (anyNA(d$domain) || any(!nzchar(d$domain)) || anyDuplicated(d$domain)) stop("Each method must have one nonmissing row per domain.")
     out <- data.frame(domain = d$domain, change = as.numeric(d$diff) * multiplier)
-    for (field in intersect(c("lb", "ub", "significant_unadjusted", "significant_bh", "significant_bonferroni"), names(d))) {
+    for (field in intersect(c("lb", "ub", "significant_unadjusted", "significant_bh", "significant_bonferroni", "inference_status", "inference_warning"), names(d))) {
       out[[field]] <- if (field %in% c("lb", "ub")) as.numeric(d[[field]]) * multiplier else d[[field]]
     }
     names(out)[-1L] <- paste0(prefix, "_", names(out)[-1L])
@@ -79,8 +88,9 @@ sae_method_colors <- function() {
 #           scripts/03_comparison.R.
 #   sig     named list of the steps' change tables (FH, FH_Bench, MFH,
 #           MFH_Bench) with domain, diff and mse; for mean welfare, after
-#           the conversion to percentage changes, with mse_eur (the MSE of
-#           the change in currency units).
+#           the conversion to percentage changes. MFH tables must include
+#           annual_mse_y1, annual_mse_y2 and annual_mcpe from the same joint
+#           bootstrap; unrelated annual MSEs cannot reconstruct this matrix.
 #   labels  named display labels, for example c(MFH = "MFH2").
 # Poverty indicators: the change is the later minus the earlier rate in
 # percentage points and the RMSE is the square root of the change MSE the
@@ -103,8 +113,10 @@ sae_change_rmse_by_method <- function(levels, sig, years, indicator_type = "pove
   lv$domain <- trimws(as.character(lv$domain))
   lv$year <- suppressWarnings(as.integer(lv$year))
   names_col <- intersect(c("geographic_name", "domain_name"), names(lv))
-  level_pair <- function(col) {
-    if (!all(c(col, paste0(col, "_MSE")) %in% names(lv))) return(NULL)
+  level_pair <- function(col, require_mse = TRUE) {
+    mse_col <- paste0(col, "_MSE")
+    required_cols <- c(col, if (require_mse) mse_col)
+    if (!all(required_cols %in% names(lv))) return(NULL)
     y1 <- lv[lv$year == years[1], , drop = FALSE]
     y2 <- lv[lv$year == years[2], , drop = FALSE]
     dom <- intersect(y1$domain, y2$domain)
@@ -113,8 +125,8 @@ sae_change_rmse_by_method <- function(levels, sig, years, indicator_type = "pove
     data.frame(domain = dom,
                m1 = suppressWarnings(as.numeric(y1[[col]][i1])),
                m2 = suppressWarnings(as.numeric(y2[[col]][i2])),
-               s1 = suppressWarnings(as.numeric(y1[[paste0(col, "_MSE")]][i1])),
-               s2 = suppressWarnings(as.numeric(y2[[paste0(col, "_MSE")]][i2])),
+               s1 = if (mse_col %in% names(lv)) suppressWarnings(as.numeric(y1[[mse_col]][i1])) else NA_real_,
+               s2 = if (mse_col %in% names(lv)) suppressWarnings(as.numeric(y2[[mse_col]][i2])) else NA_real_,
                stringsAsFactors = FALSE)
   }
   one_method <- function(key) {
@@ -123,7 +135,7 @@ sae_change_rmse_by_method <- function(levels, sig, years, indicator_type = "pove
       if (is.null(pr)) return(NULL)
       mse_diff <- pr$s1 + pr$s2
       if (is_mean) {
-        pc <- sae_percent_change(pr$m1, pr$m2, pr$s1, pr$s2, mse_diff)
+        pc <- sae_percent_change(pr$m1, pr$m2, pr$s1, pr$s2, mse_diff, mcpe = 0)
         change <- pc$log_ratio; rmse <- sqrt(pc$log_ratio_var)
       } else {
         change <- 100 * (pr$m2 - pr$m1); rmse <- 100 * sqrt(mse_diff)
@@ -136,23 +148,28 @@ sae_change_rmse_by_method <- function(levels, sig, years, indicator_type = "pove
     d <- as.data.frame(d)
     d$domain <- trimws(as.character(d$domain))
     if (is_mean) {
-      pr <- level_pair(key)
+      is_mfh <- key %in% c("MFH", "MFH_Bench")
+      pr <- level_pair(key, require_mse = !is_mfh)
       if (is.null(pr)) return(NULL)
-      mse_eur <- if ("mse_eur" %in% names(d)) d$mse_eur else d$mse
-      mse_diff <- suppressWarnings(as.numeric(mse_eur))[match(pr$domain, d$domain)]
-      # Rows flagged mse_fallback_used use independence, as in the
-      # significance table (.to_percent_change() in 03_comparison.R): the
-      # change MSE is the sum of the two level MSEs, so the RMSE here equals
-      # the standard error behind the percentage-change inference.
-      fb <- if ("mse_fallback_used" %in% names(d)) {
-        as.logical(d$mse_fallback_used)[match(pr$domain, d$domain)] %in% TRUE
-      } else {
-        rep(FALSE, nrow(pr))
-      }
-      mse_diff <- ifelse(fb, pr$s1 + pr$s2, mse_diff)
       keep <- pr$domain %in% d$domain
-      pr <- pr[keep, , drop = FALSE]; mse_diff <- mse_diff[keep]
-      pc <- sae_percent_change(pr$m1, pr$m2, pr$s1, pr$s2, mse_diff)
+      pr <- pr[keep, , drop = FALSE]
+      if (!nrow(pr)) return(NULL)
+      matched <- match(pr$domain, d$domain)
+      # MFH uncertainty must use all three jointly estimated error moments.
+      # Legacy tables without them retain their point changes but no RMSE.
+      joint_cols <- c("annual_mse_y1", "annual_mse_y2", "annual_mcpe")
+      if (is_mfh && all(joint_cols %in% names(d))) {
+        s1 <- suppressWarnings(as.numeric(d$annual_mse_y1[matched]))
+        s2 <- suppressWarnings(as.numeric(d$annual_mse_y2[matched]))
+        cross <- suppressWarnings(as.numeric(d$annual_mcpe[matched]))
+      } else if (is_mfh) {
+        s1 <- s2 <- cross <- rep(NA_real_, nrow(pr))
+      } else {
+        # Separate UFH fits retain the explicit period-independence policy.
+        s1 <- pr$s1; s2 <- pr$s2; cross <- rep(0, nrow(pr))
+      }
+      pc <- sae_percent_change(pr$m1, pr$m2, s1, s2, s1 + s2 - 2 * cross,
+                                mcpe = cross)
       return(data.frame(domain = pr$domain, change = pc$log_ratio,
                         rmse = sqrt(pc$log_ratio_var), stringsAsFactors = FALSE))
     }
@@ -171,13 +188,17 @@ sae_change_rmse_by_method <- function(levels, sig, years, indicator_type = "pove
     out$method_key <- keys[k]
     out$method <- unname(labels[keys[k]])
     out$method_order <- k
+    source_status <- sig[[keys[k]]]
+    out$inference_status <- if (!is.null(source_status) && "inference_status" %in% names(source_status)) {
+      as.character(source_status$inference_status[match(out$domain, as.character(source_status$domain))])
+    } else if (keys[k] %in% c("Direct", "FH", "FH_Bench")) "period_independence" else "not_recorded"
     out
   })
   long <- do.call(rbind, parts[!vapply(parts, is.null, logical(1))])
   if (is.null(long)) {
     long <- data.frame(domain = character(), change = numeric(), rmse = numeric(),
                        method_key = character(), method = character(),
-                       method_order = integer(), stringsAsFactors = FALSE)
+                       method_order = integer(), inference_status = character(), stringsAsFactors = FALSE)
   }
   long$name <- if (length(names_col)) {
     nm <- lv[[names_col[1]]][match(long$domain, lv$domain)]

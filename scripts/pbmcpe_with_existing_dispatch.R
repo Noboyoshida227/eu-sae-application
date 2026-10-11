@@ -27,6 +27,9 @@ pbmcpe_with_existing <- function(diag_model,
                                  existing_model,
                                  nB   = 200,
                                  data,
+                                 back_transform = c("none", "log"),
+                                 bias_correction = TRUE,
+                                 fit_validator = NULL,
                                  ...) {
 
   diag_model <- toupper(as.character(diag_model))
@@ -65,5 +68,8 @@ pbmcpe_with_existing <- function(diag_model,
      existing_model = existing_model,
      nB             = nB,
      data           = data,
+     back_transform = match.arg(back_transform),
+     bias_correction = bias_correction,
+     fit_validator = fit_validator,
      ...)
 }

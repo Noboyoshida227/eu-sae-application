@@ -1,0 +1,4 @@
+"scenario","draws","production_rejected","fast_rejected","mse_max_relative_difference","mcpe_max_absolute_difference","mcpe_relative_to_mean_mse"
+"log_realistic",30,0,0,0.000616162630817266,83.1412326444988,0.000363725073597059
+"boundary",30,0,0,0.000778997762537786,57.981667249318,0.000571817764137888
+"heterogeneous",30,0,0,0.000918746977711901,162.758716801996,0.000432849387528314

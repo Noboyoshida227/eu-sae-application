@@ -103,3 +103,7 @@ Data/Greece/
 
 # Python bytecode
 __pycache__/
+
+# Private QER authoring backups and rendered QA pages
+_private_build/
+tools/qer_guide_build/

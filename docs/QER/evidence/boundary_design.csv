@@ -1,0 +1,2 @@
+"scenario","domains","regressors_per_year","outer_replicates","bootstrap_replicates","q","rho","r_min","r_max","sampling_correlation","beta1_intercept","beta1_slope","beta2_intercept","beta2_slope","scale","seed_base","seed_rule","fitter","r_version","helper_md5","runner_md5"
+"boundary",60,2,500,1000,0.002,0.8,0.004,0.004,0.5,9,0.15,9.03,0.18,"log",658000,"outer=seed_base+iteration; bootstrap=outer_seed+1000000","exact balanced eigenspace REML","4.5.2","1a31451e0ba597940947b1db96af66b9","5e5cfb2735010be3e2122593e35257fc"

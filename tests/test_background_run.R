@@ -12,6 +12,15 @@
 root <- normalizePath(if (file.exists("app_support.R")) "." else "..",
                       winslash = "/", mustWork = TRUE)
 setwd(root)
+# Run every write and child driver in an isolated application copy. A broken
+# validation rule must not make this regression test touch real run outputs.
+fixture <- tempfile("sae_bg_workspace_")
+dir.create(fixture)
+stopifnot(file.copy(file.path(root, "app_support.R"), fixture))
+for (folder in c("R", "scripts")) {
+  stopifnot(file.copy(file.path(root, folder), fixture, recursive = TRUE))
+}
+setwd(fixture)
 source("app_support.R")
 
 checks <- 0L
@@ -119,6 +128,8 @@ unlink(list.files(sae_bg_pid_dir(run_dir), full.names = TRUE))
 unlink(sae_bg_stop_marker(run_dir))
 
 cat("-- driver: failure path end to end --\n")
+dir.create("outputs", showWarnings = FALSE)
+writeLines("preserve existing results", "outputs/existing_result.txt")
 # The job points at a configuration the pipeline cannot use; the driver
 # must record the failure in run_status.rds and run.log and exit.
 driver_run <- file.path(run_dir, "driver_run")
@@ -142,6 +153,35 @@ log_txt <- paste(readLines(file.path(driver_run, "run.log"), warn = FALSE), coll
 ok(grepl("Background analysis process started", log_txt) && grepl("ERROR:", log_txt),
    "run.log has the start line and the error")
 ok(file.exists(driver_log), "driver_output.log exists")
+ok(identical(readLines("outputs/existing_result.txt"), "preserve existing results"),
+   "invalid configuration preserves existing outputs")
+
+# A complete configuration with a stale path must also fail before cleanup.
+# Test the supported legacy path migration without launching an estimator.
+dir.create("Data/Spain", recursive = TRUE)
+for (filename in c("survey.rds", "auxiliary.rds", "shapefile.rds"))
+  saveRDS(data.frame(value = 1), file.path("Data/Spain", filename))
+preflight_cfg <- list(years_keep = c(2012L, 2013L), run = list(steps = "UFH"),
+  ufh = list(survey_path = "data/survey.rds", rhs_path = "data/auxiliary.rds",
+             shp_path = "data/shapefile.rds"))
+preflight_path <- file.path(run_dir, "preflight.yml")
+original_package_check <- check_pipeline_packages
+check_pipeline_packages <- function(steps) stop("preflight_passed", call. = FALSE)
+probe <- function(config) {
+  yaml::write_yaml(config, preflight_path)
+  tryCatch({ run_pipeline_from_config(preflight_path, render_report = FALSE); "unexpected_run" },
+           error = function(e) conditionMessage(e))
+}
+ok(identical(probe(preflight_cfg), "preflight_passed"),
+   "explicit legacy package paths reach the dependency gate without running or cleanup")
+preflight_cfg$ufh$survey_path <- file.path(fixture, "missing_user_survey.rds")
+ok(grepl("Missing or unavailable analysis input", probe(preflight_cfg), fixed = TRUE),
+   "a missing absolute user path is rejected without example substitution")
+check_pipeline_packages <- original_package_check
+ok(identical(readLines("outputs/existing_result.txt"), "preserve existing results"),
+   "stale input rejection preserves existing outputs")
 
 unlink(run_dir, recursive = TRUE, force = TRUE)
+setwd(root)
+unlink(fixture, recursive = TRUE, force = TRUE)
 cat(sprintf("All %d background-run checks passed.\n", checks))

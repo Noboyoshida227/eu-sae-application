@@ -1,0 +1,2 @@
+"comparison","original_reml","revised_reml","original_status","revised_status","original_rho","revised_rho","revised_innovation_variance","revised_marginal_variance","max_level_shift_pp","max_change_shift_pp"
+"Saved Spanish poverty fitting frame; formulas and sampling covariance held fixed",170.396992034994,172.770909970227,"not_at_maximum","ok",0.78451,0.999999,7.02845302501994e-09,0.00351422826948418,8.04888891550825,5.15976025172555

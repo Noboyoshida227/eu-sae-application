@@ -1,31 +1,26 @@
 #' Robust REML wrapper for eblupMFH2()
 #'
 #' msae's `eblupMFH2()` uses unconstrained Newton-Raphson to estimate the
-#' random-effects variance components (sigma2_u, rho_u). During iteration
-#' sigma2_u can be driven negative; the function clamps it to 0 only AFTER
-#' the loop terminates, which means the optimizer frequently converges to
-#' a spurious boundary at sigma2_u = 0. The fingerprint is a refvar that
-#' jumps non-monotonically as inputs vary smoothly -- strong evidence that
-#' the zero is a numerical artifact rather than a true REML boundary.
+#' random-effects variance components (sigma2_u, rho_u). Its stopping rule
+#' may accept endpoints that are not restricted-likelihood maxima, including
+#' positive-variance fits whose correlation updates repeatedly hit a bound.
+#' A zero variance alone does not establish an optimization failure.
 #'
 #' This wrapper:
 #'   1. Calls the original `eblupMFH2()` first (the AST-patched version
 #'      that fixes the R 4.4 `&&` issue, but otherwise unchanged).
-#'   2. If it returns a positive refvar, returns the result unchanged --
-#'      so well-behaved fits keep using the standard msae implementation.
-#'   3. If refvar = 0 (boundary), refits the variance components via
-#'      `optim()` over the unconstrained parameterization
-#'         tau = log(sigma2_u),  eta = atanh(rho_u)
-#'      so sigma2_u > 0 and |rho_u| < 1 are enforced by construction.
-#'      Multiple starting points are tried to reduce the chance of being
-#'      trapped in a local optimum. After optim() converges, the full fit
+#'   2. Retains the original result when its convergence flag and independent
+#'      REML endpoint checks pass, including valid zero-variance boundaries.
+#'   3. Otherwise refits marginal variance >= 0 and -1 < rho < 1 using
+#'      bounded optimization with exact REML gradients and multiple starts.
+#'      After optimization and endpoint validation, the full fit
 #'      object (eblup, MSE, randomEffect, fit$*) is reconstructed using
 #'      the same plug-in formulas as msae's post-iteration block, so
 #'      downstream code (`pbmcpe_*`, `compare_mfh`, benchmarking) sees an
 #'      interchangeable structure.
 #'
-#'   4. If `optim()` itself fails or also returns a near-zero variance,
-#'      the original (boundary) fit is returned unchanged with attribute
+#'   4. If the refit fails or has an inferior restricted likelihood,
+#'      the original fit is returned with attribute
 #'      `.robust_refit_failed = TRUE` so callers can detect it.
 #'
 #' Parameter contract: same as `eblupMFH2()` plus an extra `.orig_fn`
@@ -161,33 +156,37 @@
   Omega_AR <- bg$Omega_AR
   GI <- bg$GI
   v_inverse <- .safe_sym_inverse(GI + R, "MFH2 marginal covariance V")
-  if (!isTRUE(v_inverse$available)) {
+  if (!isTRUE(v_inverse$available) || !identical(v_inverse$method, "chol2inv")) {
     stop("MFH2 finalization failed: marginal covariance V is not invertible.", call. = FALSE)
   }
   Omega <- v_inverse$inverse           # = V_inv
   Xto   <- t(Omega %*% x.matrix)
   xtvx_inverse <- .safe_sym_inverse(Xto %*% x.matrix, "MFH2 X'V^-1X")
-  if (!isTRUE(xtvx_inverse$available)) {
+  if (!isTRUE(xtvx_inverse$available) || !identical(xtvx_inverse$method, "chol2inv")) {
     stop("MFH2 finalization failed: X'V^-1X is not invertible.", call. = FALSE)
   }
   Qh    <- xtvx_inverse$inverse         # = (X'V_inv X)_inv
   P     <- Omega - t(Xto) %*% Qh %*% Xto
 
-  # Derivative matrices (for Fisher information & g3)
+  # Use marginal variance and rho for derivatives: unlike innovation-variance
+  # coordinates these remain well conditioned near |rho| = 1. The g3 quadratic
+  # form is invariant to this smooth reparameterization in the interior.
+  marginal_variance <- sigma2_u / (1 - rho_u^2)
   d.Omega <- list()
-  d.Omega[[1]] <- kronecker(Omega_AR, I_n)
+  correlation <- outer(seq_len(r), seq_len(r), function(i, j) rho_u^abs(i - j))
+  d.Omega[[1]] <- kronecker(correlation, I_n)
   d.Omega[[2]] <- matrix(NA, r, r)
   for (i in 1:r) for (j in 1:r) {
     k <- abs(i - j)
-    d.Omega[[2]][i, j] <- sigma2_u *
-      (k * rho_u^(k - 1) + (2 - k) * rho_u^(k + 1)) /
-      ((1 - rho_u^2)^2)
+    # Explicit k=0 avoids 0 * 0^(-1) when rho is exactly zero.
+    d.Omega[[2]][i, j] <- if (k == 0L) 0 else marginal_variance * k * rho_u^(k - 1L)
   }
   d.Omega[[2]] <- kronecker(d.Omega[[2]], I_n)
 
   # Fisher information (expected) at converged (sigma2_u, rho_u)
   iF <- matrix(unlist(lapply(d.Omega, function(x)
     lapply(d.Omega, function(y) 0.5 * sum(diag(P %*% x %*% P %*% y))))), 2)
+  dimnames(iF) <- list(c("marginal_variance", "rho"), c("marginal_variance", "rho"))
   fisher_inverse <- .safe_sym_inverse(iF, "MFH2 Fisher information")
   FI <- fisher_inverse$inverse
 
@@ -248,24 +247,33 @@
     rho_u / sqrt(FI[2, 2])
   } else NA_real_
   p.val  <- if (is.finite(T.test)) 2 * pnorm(abs(T.test), lower.tail = FALSE) else NA_real_
-  rho.df <- data.frame(rho = signif(rho_u, 5),
+  rho.df <- data.frame(rho = rho_u,
                        T.test = signif(T.test, 5),
                        `p-value` = signif(p.val, 5),
                        check.names = FALSE)
 
   list(
-    eblup        = signif(eblup.df, digits = 5),
-    MSE          = signif(mse.df, digits = 5),
-    randomEffect = signif(u.cap.df, digits = 5),
-    Rmatrix      = signif(R, digits = 5),
+    eblup        = eblup.df,
+    MSE          = mse.df,
+    randomEffect = u.cap.df,
+    Rmatrix      = R,
     fit = list(
-      method            = "REML (robust: optim, log(sigma2_u))",
+      method            = "REML (constrained marginal variance and AR1 correlation)",
       convergence       = convergence,
       iterations        = iterations,
       estcoef           = coef,
-      refvar            = signif(sigma2_u, digits = 5),
+      refvar            = sigma2_u,
       rho               = rho.df,
-      informationFisher = signif(iF, digits = 5),
+      informationFisher = {
+        jacobian <- matrix(c(1 / (1 - rho_u^2), 0,
+                             2 * rho_u * sigma2_u / (1 - rho_u^2)^2, 1), 2, 2)
+        reported <- t(jacobian) %*% iF %*% jacobian
+        dimnames(reported) <- list(c("sigma2_u", "rho"), c("sigma2_u", "rho"))
+        reported
+      },
+      informationFisher_working = iF,
+      mse_method = "second_order_interior_approximation",
+      variance_boundary = marginal_variance == 0 || abs(rho_u) >= 1 - 1.01e-6,
       numerical_diagnostics = list(
         marginal_covariance = v_inverse[c("method", "condition_number", "available")],
         fixed_effect_information = xtvx_inverse[c("method", "condition_number", "available")],
@@ -276,109 +284,72 @@
   )
 }
 
-#' Refit (sigma2_u, rho_u) by maximizing the REML profile log-likelihood
-#' with optim(), using the unconstrained parameterization
-#'   tau = log(sigma2_u), eta = atanh(rho_u).
-#' Returns a finalized fit object on success, or NULL on failure.
-.eblupMFH2_optim_refit <- function(formula, vardir, data) {
+# Refit on a dimensionless marginal-variance scale with analytic REML score.
+# The correlation bound is a numerical approximation of the stationary limit.
+.eblupMFH2_optim_refit <- function(formula, vardir, data, initial_model = NULL) {
+  if (!exists("sae_mfh_reml_evaluate", mode = "function")) {
+    source(file.path("R", "mfh_convergence_check.R"))
+  }
   r <- length(formula)
-  required_vars <- unique(c(unlist(lapply(formula, all.vars)), vardir))
-  missing_vars <- setdiff(required_vars, names(data))
-  if (length(missing_vars) > 0L) return(NULL)
-  shared_mask <- stats::complete.cases(data[, required_vars, drop = FALSE])
-  data_complete <- data[shared_mask, , drop = FALSE]
-  if (nrow(data_complete) < 3L) return(NULL)
-  y_terms <- lapply(formula, function(f) model.frame(f, data_complete, na.action = na.fail))
-  y.matrix <- unlist(lapply(y_terms, function(mf) mf[[1]]))
-  if (!requireNamespace("magic", quietly = TRUE)) {
-    stop(".eblupMFH2_optim_refit: package 'magic' is required (msae uses it for adiag).")
-  }
-  x.blocks <- lapply(formula, function(f) model.matrix(f, data_complete))
-  x.matrix <- Reduce(magic::adiag, x.blocks)
-  # adiag() is expected to concatenate the per-period column names; make
-  # sure they are present whatever the magic version does with dimnames.
-  .x_colnames <- unlist(lapply(x.blocks, colnames), use.names = FALSE)
-  if (is.null(colnames(x.matrix)) && length(.x_colnames) == ncol(x.matrix)) {
-    colnames(x.matrix) <- .x_colnames
-  }
-  n <- nrow(data_complete)
-  y.var <- sapply(formula, "[[", 2)
-
-  vardir_df <- data_complete[, vardir, drop = FALSE]
-  if (any(is.na(vardir_df))) {
-    return(NULL)
-  }
-  R <- .df2matR_local(vardir_df, r)
-  I_n <- diag(n)
-
-  neg_reml <- function(par) {
-    tau <- par[1]; eta <- par[2]
-    sigma2_u <- exp(tau)
-    rho      <- tanh(eta)
-    if (!is.finite(sigma2_u) || !is.finite(rho) || abs(rho) > 1 - 1e-9) {
-      return(1e10)
+  if (r != 2L) stop("The validated robust MFH2 refit supports two periods.")
+  design <- sae_mfh_design(formula, vardir, data)
+  if (design$n < 3L) return(NULL)
+  ols <- stats::lm.fit(design$X, design$y)
+  base_var <- max(mean(diag(design$R)), mean(ols$residuals^2), .Machine$double.eps)
+  rho_limit <- 1 - 1e-6
+  last_par <- last_value <- NULL
+  evaluate <- function(par) {
+    if (identical(par, last_par)) return(last_value)
+    q <- par[1] * base_var
+    rho <- par[2]
+    if (!all(is.finite(par)) || q < 0 || abs(rho) >= 1) {
+      return(list(value = Inf, gradient = rep(NA_real_, 2)))
     }
-    bg <- .build_G_GI(sigma2_u, rho, r, n, I_n)
-    V  <- bg$GI + R
-    Vc <- tryCatch(chol(V), error = function(e) NULL)
-    if (is.null(Vc)) return(1e10)
-    log_det_V <- 2 * sum(log(diag(Vc)))
-    Vinv <- chol2inv(Vc)
-    XtVinvX <- t(x.matrix) %*% Vinv %*% x.matrix
-    Mc <- tryCatch(chol(XtVinvX), error = function(e) NULL)
-    if (is.null(Mc)) return(1e10)
-    log_det_M <- 2 * sum(log(diag(Mc)))
-    Minv <- chol2inv(Mc)
-    VinvX <- Vinv %*% x.matrix
-    P <- Vinv - VinvX %*% Minv %*% t(VinvX)
-    yPy <- as.numeric(t(y.matrix) %*% P %*% y.matrix)
-    val <- 0.5 * (log_det_V + log_det_M + yPy)
-    if (!is.finite(val)) return(1e10)
-    val
+    C <- matrix(c(1, rho, rho, 1), 2, 2)
+    ans <- tryCatch(sae_mfh_reml_evaluate(design, q * C,
+      list(C, q * matrix(c(0, 1, 1, 0), 2, 2))), error = function(e) NULL)
+    out <- if (is.null(ans) || !is.finite(ans$loglik)) {
+      list(value = Inf, gradient = rep(NA_real_, 2))
+    } else list(value = -ans$loglik, gradient = -ans$score * c(base_var, 1))
+    last_par <<- par
+    last_value <<- out
+    out
   }
-
-  diag_R <- diag(R)
-  base_var <- max(mean(diag_R, na.rm = TRUE), 1e-8)
-  start_grid <- list(
-    c(log(0.05 * base_var),  atanh(0.30)),
-    c(log(0.20 * base_var),  atanh(0.00)),
-    c(log(0.50 * base_var),  atanh(0.50)),
-    c(log(0.01 * base_var),  atanh(0.70)),
-    c(log(1.00 * base_var),  atanh(-0.30))
-  )
-
-  best <- NULL
-  best_val <- Inf
-  for (init_par in start_grid) {
-    opt <- tryCatch(
-      optim(init_par, neg_reml, method = "BFGS",
-            control = list(maxit = 500, reltol = 1e-9)),
-      error = function(e) NULL
-    )
-    if (is.null(opt) || !is.finite(opt$value)) next
-    if (opt$value < best_val) {
-      best_val <- opt$value
-      best <- opt
+  starts <- list(c(.05, .30), c(.20, 0), c(.50, .50), c(.01, .90),
+                 c(1, -.30), c(1, -.90), c(1, rho_limit), c(1, -rho_limit))
+  if (!is.null(initial_model)) {
+    theta <- tryCatch(sae_mfh_theta(initial_model, "MFH2"), error = function(e) c(NA, NA))
+    if (all(is.finite(theta)) && theta[1] >= 0 && abs(theta[2]) < 1) {
+      starts <- c(list(c(theta[1] / (1 - theta[2]^2) / base_var,
+                        max(-rho_limit, min(rho_limit, theta[2])))), starts)
     }
+  }
+  zero <- evaluate(c(0, 0))
+  best <- if (is.finite(zero$value)) {
+    list(par = c(0, 0), value = zero$value, convergence = 0L,
+         counts = c("function" = 1L))
+  } else NULL
+  for (start in starts) {
+    opt <- tryCatch(stats::optim(start, function(x) evaluate(x)$value,
+      gr = function(x) evaluate(x)$gradient, method = "L-BFGS-B",
+      lower = c(0, -rho_limit), upper = c(Inf, rho_limit),
+      control = list(maxit = 500, factr = 1e4, pgtol = 1e-8)), error = function(e) NULL)
+    if (is.null(opt) || opt$convergence != 0L || !is.finite(opt$value)) next
+    if (is.null(best) || opt$value < best$value) best <- opt
   }
   if (is.null(best)) return(NULL)
-
-  sigma2_u <- exp(best$par[1])
-  rho_u    <- tanh(best$par[2])
-  if (!is.finite(sigma2_u) || sigma2_u < 1e-10) return(NULL)
-
-  .eblupMFH2_finalize(
-    sigma2_u    = sigma2_u,
-    rho_u       = rho_u,
-    y.matrix    = y.matrix,
-    x.matrix    = x.matrix,
-    R           = R,
-    r           = r,
-    n           = n,
-    y.var       = y.var,
-    convergence = (best$convergence == 0),
-    iterations  = best$counts[["function"]]
-  )
+  q <- best$par[1] * base_var
+  rho <- if (q == 0) 0 else best$par[2]
+  result <- .eblupMFH2_finalize(
+    sigma2_u = q * (1 - rho^2), rho_u = rho,
+    y.matrix = design$y, x.matrix = design$X, R = design$R,
+    r = r, n = design$n,
+    y.var = vapply(formula, function(f) as.character(f[[2]]), character(1)),
+    convergence = TRUE, iterations = best$counts[["function"]])
+  result$fit$optimization <- list(reml_loglik = -best$value,
+                                  marginal_variance = q, rho_limit = rho_limit,
+                                  starts = length(starts), exact_zero_candidate = TRUE)
+  result
 }
 
 #' Public wrapper. Drop-in replacement for eblupMFH2().
@@ -389,7 +360,10 @@
 #' which has been globally replaced by this wrapper, so passing the
 #' wrapper itself as `.orig_fn` would loop forever.
 eblupMFH2_robust <- function(formula, vardir, MAXITER = 100, PRECISION = 1e-04,
-                             data, .orig_fn = NULL) {
+                              data, .orig_fn = NULL) {
+  if (!exists("sae_mfh_reml_endpoint", mode = "function")) {
+    source(file.path("R", "mfh_convergence_check.R"))
+  }
   if (is.null(.orig_fn)) {
     if (exists(".eblupMFH2_patched", envir = globalenv()) &&
         is.function(get(".eblupMFH2_patched", envir = globalenv()))) {
@@ -405,18 +379,16 @@ eblupMFH2_robust <- function(formula, vardir, MAXITER = 100, PRECISION = 1e-04,
     error = function(e) NULL
   )
 
-  base_refvar <- if (!is.null(base_fit)) {
-    v <- base_fit$fit$refvar
-    if (is.null(v) || any(is.na(v))) 0 else as.numeric(v)
-  } else NA_real_
+  if (!is.null(base_fit)) {
+    attr(base_fit, ".reml_endpoint") <- sae_mfh_reml_endpoint(
+      base_fit, "MFH2", formula, vardir, data)
+    if (sae_mfh_fit_usable(base_fit, "MFH2", formula, vardir, data)) return(base_fit)
+  }
 
-  # Standard path: original eblupMFH2 returned a usable positive refvar.
-  # Return as-is -- no robust refit needed.
-  if (!is.na(base_refvar) && base_refvar > 1e-12) return(base_fit)
-
-  # Boundary fallback: refit via optim() with constrained parameterization.
+  # Refit failed convergence/endpoint checks, including positive-variance fits.
   refit <- tryCatch(
-    .eblupMFH2_optim_refit(formula = formula, vardir = vardir, data = data),
+    .eblupMFH2_optim_refit(formula = formula, vardir = vardir, data = data,
+                           initial_model = base_fit),
     error = function(e) NULL
   )
   if (is.null(refit)) {
@@ -424,5 +396,20 @@ eblupMFH2_robust <- function(formula, vardir, MAXITER = 100, PRECISION = 1e-04,
     return(base_fit)
   }
   attr(refit, ".robust_refit_used") <- TRUE
+  attr(refit, ".reml_endpoint") <- sae_mfh_reml_endpoint(refit, "MFH2", formula, vardir, data)
+  base_check <- if (is.null(base_fit)) NULL else attr(base_fit, ".reml_endpoint")
+  refit_check <- attr(refit, ".reml_endpoint")
+  if (!is.null(base_check) && is.finite(base_check$reml_loglik) &&
+      is.finite(refit_check$reml_loglik) &&
+      refit_check$reml_loglik < base_check$reml_loglik -
+        1e-8 * max(1, abs(base_check$reml_loglik))) {
+    attr(base_fit, ".robust_refit_failed") <- TRUE
+    attr(base_fit, ".robust_refit_failure_reason") <- "The refit had an inferior restricted likelihood."
+    return(base_fit)
+  }
+  if (!sae_mfh_fit_usable(refit, "MFH2", formula, vardir, data)) {
+    attr(refit, ".robust_refit_failed") <- TRUE
+    refit$fit$convergence <- FALSE
+  }
   refit
 }

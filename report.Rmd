@@ -110,6 +110,13 @@ selection_diag <- if (length(selection_parts) > 0) bind_rows(selection_parts) el
 mfh_numerical_diag <- safe_read_csv("mfh_numerical_diagnostics.csv")
 mfh_variance_selection <- safe_read_csv("mfh_variance_structure_selection.csv")
 mfh_mcpe_validation <- safe_read_csv("mfh_mcpe_validation.csv")
+mfh_boundary_sensitive <- identical(mfh_artifacts$inference_status, "boundary_sensitive") ||
+  identical(run_meta$mfh_inference_status, "boundary_sensitive")
+mfh_boundary_warning <- paste(
+  "The fitted random-effect covariance is on a boundary (zero variance or correlation at its numerical limit).",
+  "Estimates remain available, but normal/delta intervals and p-values can substantially understate uncertainty about change.",
+  "Treat significance as provisional; compare Direct results and alternative admissible models before external conclusions.",
+  "Increasing bootstrap draws alone does not resolve this limitation.")
 
 # MFH model requested in the setup. The MFH3/MFH2 variance-structure rule runs
 # only when MFH3 (or the legacy AUTO) was requested; when MFH1 or MFH2 was
@@ -136,7 +143,14 @@ level_noun_plural <- if (is_mean_welfare) "mean welfare values" else "poverty ra
 # Mean welfare: changes are percentage changes of the mean; prices as entered.
 change_is_percent <- is_mean_welfare &&
   identical(as.character(indicator_info$change_unit[1] %||% ""), "%")
-change_unit_suffix <- if (change_is_percent) " (%)" else ""
+change_unit_suffix <- if (change_is_percent) " (%)" else if (!is_mean_welfare) " (percentage points)" else ""
+inference_label <- function(x) {
+  labels <- c(boundary_sensitive = "Provisional", period_independence = "Independent years",
+              regular = "Approximate", ok = "Approximate", not_recorded = "Not recorded",
+              unavailable = "Unavailable")
+  result <- unname(labels[as.character(x)])
+  ifelse(is.na(result), gsub("_", " ", as.character(x)), result)
+}
 price_basis <- as.character(indicator_info$price_basis[1] %||% "")
 if (is.na(price_basis)) price_basis <- ""
 price_sentence <- if (is_mean_welfare && nzchar(price_basis)) {
@@ -169,6 +183,12 @@ cat(paste0(
 ))
 ```
 
+```{r boundary-summary-warning, results='asis'}
+if (mfh_boundary_sensitive) {
+  cat("\n> **MFH change significance is provisional.** ", mfh_boundary_warning, "\n\n", sep = "")
+}
+```
+
 ```{r exec-summary-table}
 if (!is.null(exec_summary)) {
   kable(exec_summary, digits = 4,
@@ -178,8 +198,22 @@ if (!is.null(exec_summary)) {
 
 ```{r sig-summary-table}
 if (!is.null(sig_summary)) {
-  kable(sig_summary, digits = 0,
-        caption = "Number of domains with statistically significant changes")
+  sig_summary_display <- sig_summary
+  if ("inference_status" %in% names(sig_summary_display)) sig_summary_display$inference_status <- inference_label(sig_summary_display$inference_status)
+  # A count is NA when no domain could be tested (inference unavailable): say so instead of showing 0 or NA.
+  for (count_col in intersect(c("pointwise_significant", "bh_significant", "bonferroni_significant"), names(sig_summary_display))) {
+    count_val <- sig_summary_display[[count_col]]
+    sig_summary_display[[count_col]] <- ifelse(is.na(count_val), "Unavailable", format(count_val, trim = TRUE))
+  }
+  summary_labels <- c(method = "Method", pointwise_significant = "Pointwise", bh_significant = "BH",
+                      bonferroni_significant = "Bonferroni", tested_domains = "Tested", total_domains = "Domains",
+                      inference_status = "Inference")
+  names(sig_summary_display) <- ifelse(names(sig_summary_display) %in% names(summary_labels),
+                                       summary_labels[names(sig_summary_display)], names(sig_summary_display))
+  kable(sig_summary_display, digits = 0,
+        caption = if (mfh_boundary_sensitive)
+          "Number of domains with nominally significant changes (MFH significance is provisional)" else
+          "Number of domains with statistically significant changes")
 }
 ```
 
@@ -188,6 +222,20 @@ if (!is.null(sig_summary)) {
 ```{r run-setup}
 if (!is.null(run_meta)) {
   bm <- run_meta$benchmarking %||% list()
+  benchmark_files <- run_meta$input_manifest$file_name[
+    run_meta$input_manifest$input_role == "benchmark"] %||% character()
+  benchmark_files <- benchmark_files[!is.na(benchmark_files) & nzchar(benchmark_files)]
+  benchmark_source <- bm$source %||% ""
+  if (is.na(benchmark_source) || !nzchar(benchmark_source)) {
+    benchmark_source <- if (!isTRUE(bm$enabled)) "Not applicable" else if (length(benchmark_files)) {
+      "Fixed external target"
+    } else if (!is.null(run_meta$input_manifest)) "Survey-derived (no external target recorded)" else "Not recorded"
+  }
+  benchmark_target <- bm$target_path %||% ""
+  if (is.na(benchmark_target) || !nzchar(benchmark_target)) {
+    benchmark_target <- if (length(benchmark_files)) paste(benchmark_files, collapse = "; ") else
+      if (grepl("survey", benchmark_source, ignore.case = TRUE) || !isTRUE(bm$enabled)) "Not applicable" else "Not recorded"
+  }
   ai_meta <- run_meta$ai_interpretations %||% list()
   generated_sections <- ai_meta$generated_sections %||% character()
   generated_sections_label <- if (length(generated_sections)) {
@@ -230,9 +278,9 @@ if (!is.null(run_meta)) {
       "Selected MFH model",
       "MFH3 reference-variance test adjustment",
       "Analysis seed",
-      "MCPE bootstrap replicates",
+      "Bootstrap replicates (MFH / UFH / benchmark)",
       "UFH change variance assumption",
-      "Poverty-change inference",
+      "Change inference",
       "External AI enabled",
       "AI interpretations included",
       "AI provider and model",
@@ -241,7 +289,7 @@ if (!is.null(run_meta)) {
       "AI human-review status"
     ),
     Value = c(
-      run_meta$application_version %||% "",
+      run_meta$wizard_version %||% run_meta$application_version %||% "",
       run_meta$country_or_territory %||% "Not specified",
       run_meta$run_id %||% "",
       run_meta$run_label %||% "",
@@ -249,13 +297,15 @@ if (!is.null(run_meta)) {
       run_meta$archived_outputs %||% "",
       if (isTRUE(bm$enabled)) "enabled" else "off",
       bm$level_label %||% bm$level %||% "",
-      bm$source %||% "",
-      bm$target_path %||% "",
+      benchmark_source,
+      benchmark_target,
       run_meta$mfh_requested_model %||% "",
       run_meta$mfh_selected_model %||% "",
       mfh_refvar_label,
       run_meta$analysis_seed %||% "",
-      run_meta$mcpe_bootstrap_replicates %||% "",
+      paste(run_meta$mcpe_bootstrap_replicates %||% "not recorded",
+            run_meta$ufh_bootstrap_replicates %||% "not recorded",
+            run_meta$benchmark_bootstrap_replicates %||% "not recorded", sep = " / "),
       run_meta$ufh_change_variance_assumption %||% "",
       "pointwise primary; BH and Bonferroni sensitivities reported",
       if (isTRUE(run_meta$ai$enabled)) "yes (advisory commentary only)" else "no",
@@ -312,7 +362,11 @@ mfh_status <- if (!is.null(mfh_artifacts)) {
 }
 
 mfh_not_executed <- !is.null(mfh_status) &&
-  (mfh_status$fit_failed || mfh_status$refvar_zero)
+  mfh_status$fit_failed
+
+if (mfh_boundary_sensitive && !mfh_not_executed) {
+  cat("\n> **MFH change significance is provisional.** ", mfh_boundary_warning, "\n\n", sep = "")
+}
 
 mfh_change <- safe_read_csv("comparison_final.csv")
 mfh_change_available <- !is.null(mfh_change) &&
@@ -365,11 +419,7 @@ if (!is.null(mfh_status) && !mfh_not_executed && !mfh_rule_applied) {
 }
 
 if (mfh_not_executed) {
-  if (mfh_status$fit_failed) {
-    reason <- "The selected MFH model did not return a valid fit object."
-  } else {
-    reason <- "The selected MFH model estimated the random-effects variance at zero, so no domain-specific shrinkage was produced."
-  }
+  reason <- "The selected MFH model did not return a valid fit object."
 
   cat(sprintf(
     paste0(
@@ -477,7 +527,7 @@ if (!mfh_rule_applied) {
 
 ## MCPE Bootstrap Assurance
 
-The table below reports run-specific computational diagnostics for the parametric-bootstrap MCPE calculation, including successful refits, failures, covariance repairs, and Monte Carlo standard errors. These diagnostics assess numerical execution and simulation precision; they do not, by themselves, constitute an independent validation of statistical bias or interval coverage.
+The table below reports run-specific computational diagnostics for the parametric-bootstrap MCPE calculation, including successful refits, failures, accepted refits on covariance boundaries, covariance repairs, and Monte Carlo standard errors. The boundary fraction uses accepted refits as its denominator. Zero-variance and correlation-limit counts can overlap. These diagnostics assess numerical execution and simulation precision; they do not, by themselves, constitute an independent validation of statistical bias or interval coverage. A high boundary fraction deserves sensitivity review even when the original fit is interior. No boundary-fraction cutoff has been validated as an inferential guarantee.
 
 ```{r mfh-mcpe-validation-table}
 if (!is.null(mfh_mcpe_validation)) {
@@ -531,8 +581,10 @@ The table below records the inversion method and condition-number diagnostic
 for the robust MFH2 fit. Successful Cholesky paths report a low-cost estimate
 derived from the Cholesky factor; fallback paths report an exact value when it
 can be computed. A generalized inverse or an unavailable Fisher-information
-inverse requires review. When `g3_available` is false, the package reports MSE
-and CV as unavailable rather than substituting a partial MSE.
+inverse requires review. The `g3_available` flag refers to the package's analytical
+MSE approximation. The selected model instead uses joint bootstrap MSE when its
+fit passes the numerical checks and enough usable refits are available. It does
+not substitute a partial analytical MSE when that approximation is unavailable.
 
 ```{r mfh-numerical-diagnostics, results='asis'}
 if (!is.null(mfh_numerical_diag) && nrow(mfh_numerical_diag) > 0) {
@@ -557,30 +609,31 @@ if (!is.null(mfh_numerical_diag) && nrow(mfh_numerical_diag) > 0) {
 
 ## MFH Convergence Check
 
-The MFH variance parameters are estimated by msae's Fisher-scoring routine,
-which stops when the parameters change by less than a relative tolerance. That
-rule can stop at a point that is not a maximum of the REML likelihood. The
-table checks each fitted MFH model at msae's reported parameters: the REML
-score should be zero there. The Newton decrement summarises the score in one
-number (zero at a maximum); half of it approximates how much the REML
-log-likelihood could still rise. Status `ok` means a REML maximum (or a
-maximum on a bound, such as a variance of zero); `not_at_maximum` means msae
-reported convergence at a point that is not a maximum; `not_converged` means
-msae stopped at its iteration limit and its last iterate is used. The
-estimates are msae's in every case.
+The selected MFH fit must pass an independent REML endpoint check of its score,
+local curvature and boundary conditions. MFH2 uses a constrained REML refit when
+needed. Status `ok` means that the numerical checks passed; it is not a proof of
+a global maximum. Failed fits cannot produce significance results. A valid
+zero-variance boundary is allowed for estimation, but its change significance is
+provisional. Correlation at the numerical stationary limit also receives
+`boundary_sensitive` inference status. Passing numerical checks does not establish
+nominal confidence-interval coverage. Annual MSE and cross-year prediction-error
+moments for the selected model are estimated together by bootstrap, with the
+same endpoint checks applied to every refit.
 
 ```{r mfh-convergence-check, results='asis'}
 mfh_conv <- safe_read_csv("mfh_convergence_check.csv")
 if (!is.null(mfh_conv) && nrow(mfh_conv) > 0) {
   conv_show <- mfh_conv[, intersect(c("model", "selected", "msae_converged", "iterations",
                                       "sigma2", "sigma2_1", "sigma2_2", "rho",
-                                      "newton_decrement", "loglik_gain_approx", "status"),
+                                      "newton_decrement", "loglik_gain_approx", "status",
+                                      "covariance_boundary", "inference_status"),
                                     names(mfh_conv)), drop = FALSE]
   conv_show <- conv_show[, vapply(conv_show, function(x) !all(is.na(x)), logical(1)), drop = FALSE]
   conv_labels <- c(model = "Model", selected = "Selected", msae_converged = "msae conv.",
                    iterations = "Iter.", sigma2 = "sigma2", sigma2_1 = "sigma2 y1",
                    sigma2_2 = "sigma2 y2", rho = "rho", newton_decrement = "Newton decr.",
-                   loglik_gain_approx = "logLik gain", status = "Status")
+                   loglik_gain_approx = "logLik gain", status = "Status",
+                   covariance_boundary = "Covariance boundary", inference_status = "Inference status")
   names(conv_show) <- unname(conv_labels[names(conv_show)])
   conv_show[["Newton decr."]] <- signif(conv_show[["Newton decr."]], 3)
   conv_show[["logLik gain"]] <- signif(conv_show[["logLik gain"]], 3)
@@ -656,6 +709,8 @@ if (!is.null(mfh_coefs)) {
 ```
 
 ## Normality Diagnostics
+
+MFH residuals are standardized using their fitted covariance, including fixed-effect estimation. They remain correlated, so the Shapiro-Wilk p-values are descriptive checks rather than exact independent-sample normality tests.
 
 ```{r normality-tests}
 normality <- safe_read_csv("normality_tests.csv",
@@ -814,12 +869,21 @@ if ("grid_rmse.png" %in% rmse_map_files) {
 
 ## Statistical Significance of `r indicator_title` Changes
 
+```{r boundary-significance-warning, results='asis'}
+if (mfh_boundary_sensitive) {
+  cat("\n> **Provisional MFH significance:** ", mfh_boundary_warning,
+      " The tables retain raw p-values and interval endpoints for audit and sensitivity analysis.\n\n", sep = "")
+}
+```
+
 The primary significance status is pointwise at alpha = 0.05: a domain is
 classified as significant when its unadjusted two-sided p-value is below 0.05,
-equivalently when the plotted pointwise 95% confidence interval excludes zero.
+equivalently when the plotted nominal pointwise 95% confidence interval excludes zero.
 The table also reports Benjamini-Hochberg (BH) and Bonferroni adjustments across
-the geographic domains within each method. BH controls the false discovery rate;
-Bonferroni controls the family-wise probability of any false rejection. These
+the geographic domains within each method. With valid p-values, BH targets the
+false discovery rate under its dependence assumptions; Bonferroni controls the
+family-wise probability of any false rejection. Neither adjustment repairs
+undercoverage or invalid boundary-sensitive p-values. These
 are sensitivity results and do not control the figure colors or headline counts.
 `r if (mfh_rule_applied) "They are separate from the MFH3 reference-variance test adjustment, which applies only to pairwise time-variance contrasts when MFH3 is fitted." else ""`
 
@@ -835,7 +899,7 @@ if (!is.null(sig_cmp)) {
     "domain", "method", "diff", "mse", "lb", "ub",
     "p_value", "significant_unadjusted",
     "p_value_bh", "significant_bh",
-    "p_value_bonferroni", "significant_bonferroni"
+    "p_value_bonferroni", "significant_bonferroni", "inference_status"
   )
   sig_display <- sig_cmp %>%
     select(any_of(sig_cols)) %>%
@@ -850,16 +914,22 @@ if (!is.null(sig_cmp)) {
     select(-.method_order, -.domain_order)
   sig_labels <- c(
     domain = "Domain", method = "Method",
-    diff = paste0("Change", change_unit_suffix),
-    mse = if (change_is_percent) "MSE of % change" else "MSE",
+    diff = if (!is_mean_welfare) "Change (pp)" else paste0("Change", change_unit_suffix),
+    mse = if (change_is_percent) "MSE of % change" else if (!is_mean_welfare) "MSE (pp^2)" else "MSE",
     lb = "95% CI lower", ub = "95% CI upper",
     p_value = "Pointwise p-value",
     significant_unadjusted = "Pointwise significant",
     p_value_bh = "BH-adjusted p-value",
     significant_bh = "BH significant",
     p_value_bonferroni = "Bonferroni-adjusted p-value",
-    significant_bonferroni = "Bonferroni significant"
+    significant_bonferroni = "Bonferroni significant",
+    inference_status = "Inference"
   )
+  if (!is_mean_welfare) {
+    for (column in intersect(c("diff", "lb", "ub"), names(sig_display))) sig_display[[column]] <- 100 * sig_display[[column]]
+    if ("mse" %in% names(sig_display)) sig_display$mse <- 10000 * sig_display$mse
+  }
+  if ("inference_status" %in% names(sig_display)) sig_display$inference_status <- inference_label(sig_display$inference_status)
   names(sig_display) <- unname(sig_labels[names(sig_display)])
   cat('<div class="full-significance-table">')
   cat(as.character(kable(
@@ -869,8 +939,8 @@ if (!is.null(sig_cmp)) {
     escape = TRUE,
     table.attr = 'class="table table-condensed"',
     caption = sprintf(
-      "Complete statistical significance comparison (%d rows; pointwise status is primary)",
-      nrow(sig_display)
+      "Complete statistical significance comparison (%d rows; pointwise status is primary%s)",
+      nrow(sig_display), if (mfh_boundary_sensitive) "; MFH significance is provisional" else ""
     )
   )))
   cat('</div>')
@@ -1022,6 +1092,7 @@ if (!is.null(ci_width_paired) && nrow(ci_width_paired) > 0) {
     as.numeric(.paired$median_MFH_minus_UFH_width),
     as.character(.paired$unit)
   ))
+  if (mfh_boundary_sensitive) cat("<p><strong>Provisional precision comparison.</strong> The MFH covariance is on a boundary. Narrower intervals can reflect understated uncertainty rather than more reliable inference; their nominal 95% coverage is not established for this fit.</p>")
 }
 ```
 

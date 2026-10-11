@@ -161,11 +161,9 @@ selected_mfh_model <- mfh_artifacts$selected_model
 mfh_formula <- mfh_artifacts$formula
 diag_model <- if (!is.null(mfh_artifacts$diag_model)) mfh_artifacts$diag_model else "MFH2"
 
-# Detect whether eblupMFH2 was properly executed (random effects estimated).
-# When var_choice = "direct" and cov_choice = "direct", the model either
-# fails outright or converges to sigma2_u = 0, producing no shrinkage.
+# Numerical fit validity is separate from boundary-sensitive inference.
 .mfh_not_executed <- isTRUE(mfh_artifacts$model_fit_failed) ||
-  isTRUE(mfh_artifacts$refvar_zero)
+  identical(mfh_artifacts$inference_valid, FALSE)
 
 # The Comparison report is driven by whichever MFH variant was chosen in
 # 50-mfh_v2.qmd. We build the column names for the selected variant up
@@ -349,13 +347,7 @@ if (.benchmark_requested) {
 
   if (length(.missing_ufh_bench) > 0L || length(.missing_mfh_bench) > 0L) {
     .benchmark_enabled <- FALSE
-    .benchmark_status_reason <- if (isTRUE(mfh_artifacts$refvar_zero)) {
-      paste(
-        "Benchmarking was requested, but the selected MFH model reached the",
-        "zero random-effect-variance boundary. Cross-model benchmark comparisons",
-        "are unavailable; the report continues with unbenchmarked estimates."
-      )
-    } else if (isTRUE(mfh_artifacts$model_fit_failed)) {
+    .benchmark_status_reason <- if (isTRUE(mfh_artifacts$model_fit_failed)) {
       paste(
         "Benchmarking was requested, but the selected MFH model was unavailable.",
         "Cross-model benchmark comparisons are unavailable; the report continues",
@@ -575,18 +567,21 @@ comparison_dt <- sae_enrich_result_table(
     message(sprintf("NOTE: %s changes in the step output differ from the level estimates for %d domain(s); the percentage change uses the level estimates.",
                     level_col, sum(is.finite(gap) & gap > 1e-6 * pmax(1, abs(m2 - m1)))))
   }
-  # If the step already fell back to the independence variance for a row, use
-  # independence here too: pass MSE1 + MSE2 of the level estimates as the
-  # change MSE, so the implied covariance is exactly zero. (The step's
-  # fallback MSE comes from its own bootstrap MSEs, which need not equal the
-  # level MSEs used here, so passing it on would imply a spurious covariance.)
-  upstream_fb <- if ("mse_fallback_used" %in% names(sig)) {
-    as.logical(sig$mse_fallback_used) %in% TRUE
+  # MFH changes carry all three moments from one joint bootstrap. Do not
+  # reconstruct MCPE from analytical level MSEs and a bootstrap difference MSE.
+  .joint_cols <- c("annual_mse_y1", "annual_mse_y2", "annual_mcpe")
+  if (all(.joint_cols %in% names(sig))) {
+    s1 <- as.numeric(sig$annual_mse_y1)
+    s2 <- as.numeric(sig$annual_mse_y2)
+    cross <- as.numeric(sig$annual_mcpe)
+  } else if (startsWith(level_col, "MFH")) {
+    message("MFH joint error moments are unavailable. Rerun MFH before percentage-change inference.")
+    s1[] <- NA_real_; s2[] <- NA_real_; cross <- rep(NA_real_, length(s1))
   } else {
-    rep(FALSE, nrow(sig))
+    # Separately fitted UFH changes explicitly assume period independence.
+    cross <- rep(0, length(s1))
   }
-  mse_for_pc <- ifelse(upstream_fb, s1 + s2, mse_eur)
-  pc <- sae_percent_change(m1, m2, s1, s2, mse_for_pc, alpha)
+  pc <- sae_percent_change(m1, m2, s1, s2, s1 + s2 - 2 * cross, alpha, mcpe = cross)
   sig$diff_eur <- diff_eur
   sig$mse_eur <- mse_eur
   sig$lb_eur <- if ("lb" %in% names(sig)) suppressWarnings(as.numeric(sig$lb)) else NA_real_
@@ -606,12 +601,14 @@ comparison_dt <- sae_enrich_result_table(
   sig$significant_bh <- NULL
   sig$significant_bonferroni <- NULL
   sig$change_measure <- "percent change of the mean"
-  # Rows where the step fell back to independence use independence here too
-  # (see above); flag them where an inference is made, and add any fallback of
-  # the log-ratio guard. A row without inference (for example, a missing level
-  # MSE) carries no fallback flag.
-  sig$covariance_used <- pc$log_ratio_covariance_used & !upstream_fb
-  sig$mse_fallback_used <- (upstream_fb & is.finite(pc$log_ratio_var)) | pc$mse_fallback_used
+  # Preserve the variance used for percentage inference and diagnostic plots.
+  sig$log_ratio_var <- pc$log_ratio_var
+  sig$covariance_used <- startsWith(level_col, "MFH") & pc$log_ratio_covariance_used
+  sig$mse_fallback_used <- pc$mse_fallback_used
+  sig$joint_moment_status <- pc$inference_status
+  previous_status <- sig$inference_status %||% rep("ok", nrow(sig))
+  sig$inference_status <- ifelse(pc$inference_status == "ok",
+                                  previous_status, pc$inference_status)
   sig
 }
 sig_fh        <- .to_percent_change(sig_fh, "FH")
@@ -710,6 +707,8 @@ dir.create(here::here("outputs", "data"), recursive = TRUE, showWarnings = FALSE
   })
 }
 .comparison_export <- comparison_dt
+.comparison_export$MFH_inference_status <- mfh_artifacts$inference_status %||% "not_recorded"
+.comparison_export$MFH_inference_warning <- mfh_artifacts$inference_warning %||% ""
 if (!.benchmark_enabled) {
   .comparison_export_cols <- grep("(^|_)Bench($|_)", names(.comparison_export), value = TRUE)
   .comparison_export <- .comparison_export %>%
@@ -916,43 +915,23 @@ prepare_sig_tbl <- function(df, method_label, signif_true = c("TRUE", "Significa
     ) -> out
   # Mean welfare: keep the currency-unit difference next to the % change.
   extra <- intersect(c("change_measure", "diff_eur", "mse_eur", "lb_eur", "ub_eur",
-                       "p_value_eur", "covariance_used", "mse_fallback_used"), names(df))
+                       "p_value_eur", "covariance_used", "mse_fallback_used",
+                       "inference_status", "inference_warning", "joint_moment_status"), names(df))
   if (length(extra)) out <- dplyr::bind_cols(out, as.data.frame(df)[, extra, drop = FALSE])
+  if (!"inference_status" %in% names(out)) out$inference_status <-
+    if (grepl("^MFH", method_label)) mfh_artifacts$inference_status %||% "not_recorded" else "period_independence"
+  if (!"inference_warning" %in% names(out)) out$inference_warning <-
+    if (grepl("^MFH", method_label)) mfh_artifacts$inference_warning %||% "" else "Separate-year independence is assumed."
   out
 }
 
 
 if (.mfh_not_executed) {
-  cat(
-    "\n::: {.callout-important}\n",
-    "## eblupMFH2 was not properly executed\n\n",
-    "The MFH model (**", diag_model, "**) did not produce valid random-effects estimates. ",
-    "With `var_choice = \"direct\"` and `cov_choice = \"direct\"`, `eblupMFH2()` either ",
-    "failed outright or converged to $\\sigma^2_u = 0$ (no domain-specific shrinkage).\n\n",
-    "**All MFH maps, UFH-vs-MFH comparisons, and poverty change analyses are skipped** ",
-    "because the MFH estimates are not meaningful without estimated random effects.\n\n",
-    "**Action:** rerun with smoothed variance/covariance options (e.g., ",
-    "`var_choice = \"sm_out\"`, `cov_choice = \"rho_sm_out\"`) to obtain valid MFH estimates.\n",
-    "\n",
-    sep = ""
-  )
+  cat("\n## MFH fit unavailable\n\n",
+      "The selected ", diag_model, " fit failed its numerical checks. MFH comparisons and inference are unavailable. Inspect the convergence and sampling-covariance diagnostics before revising the model or data. A genuine zero-variance boundary is allowed and is not itself a failure.\n", sep = "")
 } else if (!.mfh_change_available) {
-  cat(
-    "\n::: {.callout-note}\n",
-    "## MFH change analysis not available for this run\n\n",
-    "The MCPE-based change analysis for MFH is not available. This typically ",
-    "happens when `var_choice = \"direct\"` is selected: `eblupMFH2()` does not ",
-    "converge inside the parametric bootstrap because the raw direct sampling ",
-    "variances are unstable across domains. **This is expected behaviour with ",
-    "`direct` -- it is not a code error.**\n\n",
-    "Tables and figures that depend on the change analysis (significance counts, ",
-    "change confidence intervals) will show NA. Levels-based comparisons ",
-    "(rates, MSEs, RMSEs, CVs) are unaffected. ",
-    "Re-run with `var_choice = \"sm_out\"` or `\"sm_all\"` to obtain the ",
-    "change-significance analysis.\n",
-    "\n",
-    sep = ""
-  )
+  cat("\n## MFH uncertainty unavailable\n\n",
+      "The joint bootstrap did not produce usable uncertainty estimates. Selected-model annual MSE, RMSE, CV and change inference are unavailable; point estimates remain available. Inspect refit failures and Monte Carlo diagnostics before rerunning.\n")
 }
 
 
@@ -996,9 +975,10 @@ if (.mfh_not_executed) {
   sig_summary_tbl <- bind_rows(.summary_sig_inputs) %>%
     group_by(method) %>%
     summarize(
-      pointwise_significant = sum(significant_unadjusted, na.rm = TRUE),
-      bh_significant = sum(significant_bh, na.rm = TRUE),
-      bonferroni_significant = sum(significant_bonferroni, na.rm = TRUE),
+      pointwise_significant = sae_count_flags(significant_unadjusted),
+      bh_significant = sae_count_flags(significant_bh),
+      bonferroni_significant = sae_count_flags(significant_bonferroni),
+      tested_domains = sum(!is.na(significant_unadjusted)),
       total_domains = dplyr::n(),
       .groups = "drop"
     )
@@ -1016,13 +996,17 @@ if (.mfh_not_executed) {
   sig_summary_tbl <- bind_rows(.summary_sig_inputs) %>%
     group_by(method) %>%
     summarize(
-      pointwise_significant = sum(significant_unadjusted, na.rm = TRUE),
-      bh_significant = sum(significant_bh, na.rm = TRUE),
-      bonferroni_significant = sum(significant_bonferroni, na.rm = TRUE),
+      pointwise_significant = sae_count_flags(significant_unadjusted),
+      bh_significant = sae_count_flags(significant_bh),
+      bonferroni_significant = sae_count_flags(significant_bonferroni),
+      tested_domains = sum(!is.na(significant_unadjusted)),
       total_domains = dplyr::n(),
       .groups = "drop"
     )
 }
+
+sig_summary_tbl$inference_status <- ifelse(grepl("^MFH", sig_summary_tbl$method),
+  mfh_artifacts$inference_status %||% "not_recorded", "period_independence")
 
 kable(
   summary_tbl,
@@ -1033,7 +1017,7 @@ kable(
 kable(
   sig_summary_tbl,
   digits = 0,
-  caption = paste("Number of domains with statistically significant", tolower(pov_lab$short), "changes")
+  caption = paste("Number of domains with pointwise change flags; boundary-sensitive MFH inference is provisional:", tolower(pov_lab$short))
 )
 
 
@@ -1153,23 +1137,14 @@ if (is.list(.mfh_fit) && !is.null(.mfh_fit$rho)) {
 }
 
 
-# Indicator-aware residual scale.
-# Normality assumptions in the FH/MFH model live on the scale the model
-# was fitted on. When `log_transform = TRUE` for `mean_welfare`, the FH
-# model object already holds log-scale Direct/FH values (so its residuals
-# are on the log scale by construction). The MFH `comparison_dt` is built
-# from `pov_mfh.xlsx`, which has been back-transformed to the original
-# currency scale; we therefore take logs here so MFH residuals match FH on
-# the log scale. Mathematically log(Direct_back) - log(MFH_back) recovers
-# the log-scale residual exactly (the Duan smearing factor cancels).
-.use_log_resid <- isTRUE(log_transform) && identical(indicator_type, "mean_welfare")
-.mfh_resid_fn <- function(direct, mfh) {
-  if (.use_log_resid) {
-    safe_log <- function(x) ifelse(!is.na(x) & x > 0, log(x), NA_real_)
-    safe_log(direct) - safe_log(mfh)
-  } else {
-    direct - mfh
-  }
+# Diagnostics stay on the fitted scale and use standardized residuals.
+# Never recover model residuals by logging bias-corrected currency predictions.
+.mfh_residual_file <- here::here("outputs", "tables", "mfh_standardized_residuals.csv")
+.mfh_residuals <- data.frame(year = integer(), standardized_residual = numeric())
+if (identical(mfh_artifacts$residual_method, "RPR_standardized") && file.exists(.mfh_residual_file)) {
+  .mfh_residuals <- read.csv(.mfh_residual_file)
+} else if (!.mfh_not_executed) {
+  message("Standardized MFH residuals are unavailable; rerun MFH to refresh diagnostics.")
 }
 
 fh_diag_long <- bind_rows(
@@ -1178,7 +1153,7 @@ fh_diag_long <- bind_rows(
       year = as.integer(year_label),
       method = "FH",
       component = "Residual",
-      value = model$ind$Direct - model$ind$FH
+      value = as.numeric(model$model$std_real_residuals)
     ) %>%
       bind_rows(
         tibble(
@@ -1213,13 +1188,13 @@ if (!.mfh_not_executed) {
       year = years_keep[1],
       method = "MFH",
       component = "Residual",
-      value = comparison_dt %>% filter(year == years_keep[1]) %>% mutate(.resid = .mfh_resid_fn(Direct, MFH)) %>% pull(.resid)
+      value = .mfh_residuals$standardized_residual[.mfh_residuals$year == years_keep[1]]
     ),
     tibble(
       year = years_keep[2],
       method = "MFH",
       component = "Residual",
-      value = comparison_dt %>% filter(year == years_keep[2]) %>% mutate(.resid = .mfh_resid_fn(Direct, MFH)) %>% pull(.resid)
+      value = .mfh_residuals$standardized_residual[.mfh_residuals$year == years_keep[2]]
     ),
     tibble(
       year = years_keep[1],
@@ -1300,24 +1275,8 @@ write.csv(normality_long, here::here("outputs", "tables", "normality_raw_values.
 
 
 if (.mfh_re_all_zero) {
-  cat(
-    "\n::: {.callout-warning}\n",
-    "## MFH random-effects variance estimated at zero -- likely a numerical artifact\n\n",
-    "The random-effects variance ($\\sigma^2_u$) for the selected MFH model (**",
-    diag_model, "**) was estimated at zero. All MFH random effects are identically zero, ",
-    "so the MFH EBLUP equals the regression-synthetic predictor with no domain-specific shrinkage.\n\n",
-    "**This is most likely a numerical artifact, not a true REML boundary.** The `msae` ",
-    "package's `eblupMFH*()` functions use unconstrained Newton--Raphson and only clamp ",
-    "$\\sigma^2_u \\ge 0$ after iteration ends; the optimizer can therefore converge to a ",
-    "spurious zero. This is observed especially with `cov_choice = \"zero\"`. ",
-    "MFH random-effect Q-Q plots and Shapiro--Wilk tests below are not meaningful in this case.\n\n",
-    "**Workaround:** rerun with a non-zero covariance (`cov_choice = \"rho_sm_out\"`, ",
-    "`\"rho_dir\"`, or `\"direct\"`) and compare $\\sigma^2_u$. If the non-zero specification ",
-    "gives a positive variance, the zero-covariance result is unreliable and should not be ",
-    "used as evidence that between-domain random variation is zero.\n",
-    "\n",
-    sep = ""
-  )
+  cat("\n## MFH zero-variance boundary\n\n",
+      "The accepted ", diag_model, " fit has zero random effects and produces regression-synthetic predictions. Benchmarking and bootstrap inference remain valid procedures to attempt. Random-effect Q-Q plots and Shapiro-Wilk tests are uninformative for a constant vector and are skipped.\n", sep = "")
 }
 
 
@@ -1612,6 +1571,10 @@ if (.mfh_not_executed) {
     )
 }
 
+sig_plot_dt$significant_label <- ifelse(
+  sig_plot_dt$inference_status == "boundary_sensitive",
+  ifelse(sig_plot_dt$significant, "Provisional: p < 0.05", "Provisional: p >= 0.05"),
+  sig_plot_dt$significant_label)
 .write_xlsx_safe(sig_plot_dt, here::here("outputs", "data", "statistical_significance_comparison.xlsx"))
 
 # One legend range, centred on zero, for every change map (all methods):
@@ -1630,8 +1593,9 @@ if (.mfh_not_executed) {
          "poverty rate")
 }
 # Mean-welfare changes are percentage changes of the mean (see above).
-.change_unit_suffix <- if (.is_mean_welfare) " (%)" else ""
-.change_label_accuracy <- if (.is_mean_welfare) 0.1 else 0.01
+.change_unit_suffix <- if (.is_mean_welfare) " (%)" else " (percentage points)"
+.change_label_accuracy <- 0.1
+.change_display_scale <- if (.is_mean_welfare) 1 else 100
 .change_method_label <- function(method) {
   labs <- c("FH" = "UFH", "FH Benchmarked" = "UFH benchmarked",
             "MFH" = diag_model, "MFH Benchmarked" = paste(diag_model, "benchmarked"))
@@ -1701,7 +1665,8 @@ tryCatch({
     MFH_95_CI_width = (as.numeric(ub) - as.numeric(lb)) * .ci_multiplier,
     MFH_pointwise_significant = as.logical(significant_unadjusted),
     MFH_BH_significant = as.logical(significant_bh),
-    MFH_Bonferroni_significant = as.logical(significant_bonferroni)
+    MFH_Bonferroni_significant = as.logical(significant_bonferroni),
+    MFH_inference_status = as.character(inference_status)
   )
 
 ci_width_domain <- inner_join(.ufh_ci, .mfh_ci, by = "domain") %>%
@@ -1797,12 +1762,12 @@ if (!is.null(change_rmse)) {
   change_rmse$long$color <- unname(sae_method_colors()[change_rmse$long$method_key])
   utils::write.csv(change_rmse$long[, c("domain", "name", "method_key", "method", "method_order",
                                         "change", "rmse", "unit", "change_label", "rmse_label",
-                                        "color")],
+                                        "color", "inference_status")],
                    here::here("outputs", "tables", "change_rmse_by_method.csv"),
                    row.names = FALSE)
 }
 .change_rmse_sheets <- if (is.null(change_rmse)) list() else list(
-  `Change and RMSE by method` = change_rmse$long[, c("domain", "name", "method", "change", "rmse", "unit")],
+  `Change and RMSE by method` = change_rmse$long[, c("domain", "name", "method", "change", "rmse", "unit", "inference_status")],
   `Change and RMSE summary` = change_rmse$summary
 )
 
@@ -1853,13 +1818,16 @@ plot_ci_width_paired <- function() {
     labs(
       title = "Domain-level comparison of pointwise 95% CI widths",
       subtitle = "Points below the dashed equality line have narrower MFH intervals",
+      caption = if (identical(mfh_artifacts$inference_status, "boundary_sensitive"))
+        "Provisional MFH inference at a covariance boundary.\nNarrower intervals may understate uncertainty." else NULL,
       x = sprintf("UFH 95%% CI width (%s)", .ci_unit),
       y = sprintf("MFH 95%% CI width (%s)", .ci_unit),
       color = NULL,
       shape = NULL
     ) +
     theme_minimal(base_size = 14) +
-    theme(plot.title = element_text(face = "bold"), legend.position = "top")
+    theme(plot.title = element_text(face = "bold"), legend.position = "top",
+          plot.caption = element_text(hjust = 0), plot.caption.position = "plot")
 }
 
 
@@ -1868,10 +1836,12 @@ plot_significance <- function(data, method_name) {
   df$domain_axis <- factor(as.character(df$domain),
                            levels = .domain_axis_levels(df$domain))
   ggplot(df, aes(x = domain_axis, y = diff, color = significant_label)) +
+    scale_y_continuous(labels = label_number(scale = .change_display_scale, accuracy = .change_label_accuracy)) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
     geom_point(size = 2.5, alpha = 0.8) +
     geom_errorbar(aes(ymin = lb, ymax = ub), width = 0.25, alpha = 0.5) +
-    scale_color_manual(values = c("Not Significant" = "gray60", "Significant" = "red")) +
+    scale_color_manual(values = c("Not Significant" = "gray60", "Significant" = "red",
+                                  "Provisional: p < 0.05" = "#A65F00", "Provisional: p >= 0.05" = "gray60")) +
     labs(
       title = if (.is_mean_welfare) {
         sprintf("Percentage changes in mean welfare (%s vs %s): %s", years_keep[2],
@@ -1883,7 +1853,9 @@ plot_significance <- function(data, method_name) {
       x = "Domain",
       y = paste0("Estimated change", .change_unit_suffix),
       color = "Pointwise status",
-      caption = "Red points indicate pointwise significance (unadjusted p < 0.05); bars are pointwise 95% confidence intervals"
+      caption = if (any(df$inference_status == "boundary_sensitive", na.rm = TRUE))
+        "Provisional MFH inference: covariance boundary; nominal 95% intervals can understate uncertainty.\nLarger bootstrap counts alone do not resolve this limitation." else
+        "Red points indicate pointwise significance (unadjusted p < 0.05); bars are pointwise 95% confidence intervals"
     ) +
     theme_minimal(base_size = 14) +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
@@ -1911,7 +1883,7 @@ change_map_fh <- shp_dt %>%
 
 ggplot(change_map_fh) +
   geom_sf(aes(fill = diff), color = NA) +
-  sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy), limits = .change_map_limits, oob = scales::squish) +
+  sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy, scale = .change_display_scale), limits = .change_map_limits, oob = scales::squish) +
   labs(caption = sae_map_caption(.map_attribution), 
     title = .change_map_title("FH"),
     fill = paste0("Change", .change_unit_suffix)
@@ -1934,7 +1906,7 @@ if (.benchmark_enabled) {
 
   ggplot(change_map_fh_bench) +
     geom_sf(aes(fill = diff), color = NA) +
-    sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy), limits = .change_map_limits, oob = scales::squish) +
+    sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy, scale = .change_display_scale), limits = .change_map_limits, oob = scales::squish) +
     labs(caption = sae_map_caption(.map_attribution), 
       title = .change_map_title("FH Benchmarked"),
       fill = paste0("Change", .change_unit_suffix)
@@ -1957,7 +1929,7 @@ if (!.mfh_not_executed) {
 
   ggplot(change_map_mfh) +
     geom_sf(aes(fill = diff), color = NA) +
-    sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy), limits = .change_map_limits, oob = scales::squish) +
+    sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy, scale = .change_display_scale), limits = .change_map_limits, oob = scales::squish) +
     labs(caption = sae_map_caption(.map_attribution), 
       title = .change_map_title("MFH"),
       fill = paste0("Change", .change_unit_suffix)
@@ -1979,7 +1951,7 @@ if (!.mfh_not_executed) {
 
     ggplot(change_map_mfh_bench) +
       geom_sf(aes(fill = diff), color = NA) +
-      sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy), limits = .change_map_limits, oob = scales::squish) +
+      sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy, scale = .change_display_scale), limits = .change_map_limits, oob = scales::squish) +
       labs(caption = sae_map_caption(.map_attribution), 
         title = .change_map_title("MFH Benchmarked"),
         fill = paste0("Change", .change_unit_suffix)
@@ -2454,7 +2426,7 @@ for (.spec in .change_map_specs) {
     )
   .p <- ggplot(.map_sf) +
     geom_sf(aes(fill = diff), color = NA) +
-    sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy), limits = .change_map_limits, oob = scales::squish) +
+    sae_fill_change(name = paste0("Change", .change_unit_suffix), labels = label_number(accuracy = .change_label_accuracy, scale = .change_display_scale), limits = .change_map_limits, oob = scales::squish) +
     labs(caption = sae_map_caption(.map_attribution), title = .spec$title, fill = paste0("Change", .change_unit_suffix)) +
     theme_minimal(base_size = 17) +
     theme(

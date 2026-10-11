@@ -377,10 +377,12 @@ build_comparison_ai_prompts <- function(language = "en",
   sig_counts <- sig_plot_dt |>
     dplyr$group_by(method) |>
     dplyr$summarise(
-      significant_domains = sum(significant_unadjusted, na.rm = TRUE),
-      pointwise_significant = sum(significant_unadjusted, na.rm = TRUE),
-      bh_significant = sum(significant_bh, na.rm = TRUE),
-      bonferroni_significant = sum(significant_bonferroni, na.rm = TRUE),
+      # NA when no domain could be tested (inference unavailable), not 0.
+      significant_domains = if (any(!is.na(significant_unadjusted))) sum(significant_unadjusted, na.rm = TRUE) else NA_integer_,
+      pointwise_significant = if (any(!is.na(significant_unadjusted))) sum(significant_unadjusted, na.rm = TRUE) else NA_integer_,
+      bh_significant = if (any(!is.na(significant_bh))) sum(significant_bh, na.rm = TRUE) else NA_integer_,
+      bonferroni_significant = if (any(!is.na(significant_bonferroni))) sum(significant_bonferroni, na.rm = TRUE) else NA_integer_,
+      tested_domains = sum(!is.na(significant_unadjusted)),
       total_domains = dplyr$n(),
       mean_abs_change = mean(abs(diff), na.rm = TRUE),
       .groups = "drop"
@@ -517,6 +519,13 @@ build_comparison_ai_prompts <- function(language = "en",
 
   prompt_system <- paste(
     "You are a statistician writing short commentary blocks for a Small Area Estimation comparison report.",
+    if ("inference_status" %in% names(sig_plot_dt) &&
+        any(sig_plot_dt$inference_status == "boundary_sensitive", na.rm = TRUE))
+      paste("This MFH fit has covariance-boundary-sensitive inference.",
+            "Explicitly state that its change intervals and p-values are provisional and can substantially understate uncertainty.",
+            "Do not claim a narrower interval establishes greater reliable precision or a significant change is confirmed.",
+            "More bootstrap draws alone do not resolve boundary undercoverage; compare Direct results and admissible alternative models.") else
+      "Normal/delta intervals are finite-sample approximations; nominal confidence levels are not universal coverage guarantees.",
     sprintf("The indicator being modelled is the %s, expressed %s.",
             indicator_noun, indicator_unit_phrase),
     if (identical(indicator_type, "mean_welfare")) {
@@ -566,7 +575,7 @@ build_comparison_ai_prompts <- function(language = "en",
       "Keep the total length short to avoid truncation.",
       "",
       "Paragraph 1 (opening): State that this section synthesizes three sources of evidence",
-      "(Shapiro-Wilk test, Q-Q plot, density plot) and that the Shapiro-Wilk test can be sensitive to sample size.",
+      "(Shapiro-Wilk test, Q-Q plot, density plot). MFH residuals are covariance-standardized but remain correlated: treat Shapiro-Wilk p-values as descriptive, not exact independent-sample tests.",
       "Write 2-3 sentences only.",
       "",
       "Then write one paragraph for EACH model/year/component combination actually listed below, in order.",

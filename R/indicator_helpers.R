@@ -9,10 +9,10 @@
 #                      available; benchmarking ratios stay on the
 #                      original scale.
 #   * "mean_welfare" -- population-weighted mean of the welfare
-#                      variable. Optionally fitted on the log scale
-#                      and back-transformed (with Duan smearing)
-#                      for display, benchmarking, and significance
-#                      tests on changes in means.
+#                      variable. The optional log model transforms
+#                      the direct arithmetic area mean, then uses
+#                      the model-specific original-scale predictor
+#                      for display, benchmarking, and changes.
 #
 # All UFH/MFH/Comparison code should call these helpers rather
 # than hard-coding indicator-specific behaviour or labels.
@@ -87,18 +87,19 @@ indicator_label <- function(indicator_type = "poverty",
   )
 }
 
-#' Build the per-observation target column the model is fitted on
+#' Build the per-observation target for direct estimation
 #'
 #' For "poverty" this returns the FGT(α) indicator. For
-#' "mean_welfare" it returns either welfare or log(welfare) depending
-#' on `log_transform`. Zero/negative welfare values are NA-ed when
-#' log-transforming and a warning is issued.
+#' "mean_welfare" it always returns welfare, including zero/negative
+#' values. When requested, log transformation is applied to the
+#' arithmetic direct area mean after aggregation, never to microdata.
 #'
 #' @param survey_dt Data frame with at least `welfare` and (for
 #'   poverty) `povline`.
 #' @param indicator_type "poverty" or "mean_welfare"
 #' @param fgt_alpha integer 0/1/2 for poverty
-#' @param log_transform logical, mean_welfare only
+#' @param log_transform retained for compatibility; the per-observation
+#'   target is unchanged because logging occurs after direct estimation.
 #' @param compute_fgt FGT helper from ufh_functions.R; passed in to
 #'   avoid an order-of-source dependency.
 #' @return Numeric vector aligned with `survey_dt`.
@@ -118,20 +119,7 @@ build_target_column <- function(survey_dt,
     }
     return(compute_fgt_fn(survey_dt$welfare, survey_dt$povline, fgt_alpha))
   }
-  # mean_welfare branch
-  w <- as.numeric(survey_dt$welfare)
-  if (isTRUE(log_transform)) {
-    bad <- !is.na(w) & w <= 0
-    if (any(bad)) {
-      warning(sprintf(
-        "%d observation(s) have welfare <= 0 and were NA-ed before log transform.",
-        sum(bad)
-      ), call. = FALSE)
-      w[bad] <- NA_real_
-    }
-    return(log(w))
-  }
-  w
+  as.numeric(survey_dt$welfare)
 }
 
 #' Whether arcsin transformation is sensible for the chosen indicator
@@ -140,37 +128,6 @@ build_target_column <- function(survey_dt,
 #' transformation option.
 indicator_supports_arcsin <- function(indicator_type = "poverty") {
   identical(indicator_type, "poverty")
-}
-
-#' Back-transform an EBLUP fit on the log scale to the original scale
-#'
-#' Uses Duan's smearing estimator when `residuals_log` is supplied,
-#' otherwise falls back to the parametric correction
-#' \eqn{\exp(\hat\eta + \frac{1}{2}\hat\sigma^{2})}.
-#' Variance is propagated by the delta method:
-#' \eqn{\widehat{\mathrm{Var}}(Y) \approx (\partial g)^{2}\,\widehat{\mathrm{Var}}(\eta)}
-#' with \eqn{g(\eta) = \exp(\eta)}.
-#'
-#' @param eblup_log EBLUP on the log scale (numeric vector or matrix).
-#' @param mse_log MSE on the log scale (same shape as `eblup_log`).
-#' @param residuals_log optional vector of model residuals on the log
-#'   scale, used to compute Duan's smearing factor
-#'   \eqn{\frac{1}{n}\sum_i \exp(\hat\varepsilon_i)}.
-#' @param sigma2_log optional scalar variance of residuals; only used
-#'   if `residuals_log` is NULL.
-#' @return List with `estimate` and `mse` on the original scale.
-back_transform_log <- function(eblup_log, mse_log = NULL,
-                               residuals_log = NULL, sigma2_log = NULL) {
-  smear <- if (!is.null(residuals_log) && length(residuals_log) > 0) {
-    mean(exp(residuals_log[is.finite(residuals_log)]), na.rm = TRUE)
-  } else if (!is.null(sigma2_log) && is.finite(sigma2_log)) {
-    exp(0.5 * as.numeric(sigma2_log))
-  } else {
-    1
-  }
-  est <- smear * exp(eblup_log)
-  mse <- if (!is.null(mse_log)) (est)^2 * mse_log else NULL
-  list(estimate = est, mse = mse, smearing_factor = smear)
 }
 
 #' MSE / variance of the difference between two estimates

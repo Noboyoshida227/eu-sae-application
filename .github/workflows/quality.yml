@@ -21,18 +21,11 @@ jobs:
           # source, which keeps this job to a couple of minutes.
           use-public-rspm: true
 
-      # tests/run_tests.R needs these at run time. Nothing installed them
-      # before, so every run stopped at the first package it could not load -
-      # which is why this workflow failed on every commit up to 1e52a69.
-      #
-      # Deliberately NOT installed: sf and dplyr are used only by the Spain
-      # example-data checks, and Data/Spain/*.rds are excluded from this
-      # repository for licence reasons, so those checks skip here regardless.
-      # Installing sf would pull in the GDAL/GEOS/PROJ toolchain to support
-      # tests that cannot run in a clone. glmnet and msae are optional and the
-      # test script already skips them cleanly.
+      # Statistical regressions must exercise the actual production estimators.
+      # Spain end-to-end data are not in the clone; synthetic method tests run
+      # here, including emdi/msae, while the private-data integration skips.
       - name: Install the R packages the tests need
-        run: install.packages(c("ggplot2", "rmarkdown", "xml2", "zip"))
+        run: install.packages(c("ggplot2", "rmarkdown", "xml2", "zip", "emdi", "msae", "survey", "dplyr"))
         shell: Rscript {0}
 
       - name: Parse and run targeted tests

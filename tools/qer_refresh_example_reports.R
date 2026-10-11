@@ -1,0 +1,37 @@
+# Refresh presentation-only outputs of an isolated QER integration fixture.
+# Does not refit models, change estimates, or touch the repository outputs/.
+# Rscript tools/qer_refresh_example_reports.R <tmp/.../poverty-or-log>
+args <- commandArgs(trailingOnly = TRUE)
+stopifnot(length(args) == 1L)
+root <- normalizePath(".", winslash = "/", mustWork = TRUE)
+work <- normalizePath(args[1L], winslash = "/", mustWork = TRUE)
+if (!startsWith(tolower(work), paste0(tolower(root), "/tmp/"))) stop("Expected an isolated fixture under this workspace's tmp/.")
+cfg_path <- file.path(work, "integration_config.yml")
+cfg <- yaml::read_yaml(cfg_path)
+if (!identical(cfg$country_name, "Spain integration fixture")) stop("Not a QER integration fixture.")
+files <- c("scripts/03_comparison.R", "R/change_comparison.R", "R/comparison_report_ai.R",
+            "R/report_export.R", "R/report_word.lua", "report.Rmd", "docs/report_reference.docx")
+for (p in files) stopifnot(file.copy(file.path(root, p), file.path(work, p), overwrite = TRUE))
+outputs <- file.path(work, "outputs")
+protected <- file.path(outputs, "data", c("pov_fh.xlsx", "pov_mfh.xlsx", "mfh_artifacts.rds", "fh_model_y1.rds", "fh_model_y2.rds"))
+before <- tools::md5sum(protected)
+metadata_path <- file.path(outputs, "data", "run_metadata.rds")
+metadata <- readRDS(metadata_path)
+metadata$wizard_version <- trimws(readLines(file.path(work, "WIZARD_VERSION"), warn = FALSE)[1L])
+saveRDS(metadata, metadata_path)
+rscript <- file.path(R.home("bin"), if (.Platform$OS.type == "windows") "Rscript.exe" else "Rscript")
+for (stage in c("03_comparison", "report")) {
+  log <- file.path(outputs, "logs", paste0("qer_final_", stage, ".log"))
+  result <- system2(rscript, c("--vanilla", shQuote(file.path(work, "integration_worker.R")), stage), stdout = log, stderr = log)
+  if (result != 0L) stop("Report refresh failed; inspect ", log)
+}
+stopifnot(identical(before, tools::md5sum(protected)))
+a <- readRDS(file.path(outputs, "data", "mfh_artifacts.rds"))
+sig <- as.data.frame(readxl::read_excel(file.path(outputs, "data", "statistical_significance_comparison.xlsx")))
+mfh <- grepl("^MFH", sig$method) & is.finite(sig$p_value)
+stopifnot(all(sig$inference_status[mfh] == a$inference_status))
+html <- paste(readLines(file.path(outputs, "final_report.html"), warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+stopifnot(grepl("Bootstrap replicates", html, fixed = TRUE), file.exists(file.path(outputs, "final_report.docx")))
+if (a$inference_status == "boundary_sensitive") stopifnot(grepl("MFH change significance is provisional", html, fixed = TRUE))
+if (cfg$indicator_type == "poverty") stopifnot(grepl("MSE (pp^2)", html, fixed = TRUE))
+cat("PASS final comparison/report refresh; fitted estimates unchanged; status and units verified:\n", work, "\n")

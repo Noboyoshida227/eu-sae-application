@@ -1,6 +1,6 @@
 # Supported-platform status
 
-This review candidate is intended for R 4.2 or later on current Windows,
+This pre-release is intended for R 4.2 or later on current Windows,
 macOS, and Linux systems. Users may use the newest R version that their
 organization has approved and made available; installing the absolute latest R
 release is not required. Each R/platform combination still needs a smoke test,

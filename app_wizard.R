@@ -569,7 +569,7 @@ ui <- fluidPage(
               tip_label("Country or territory", "Used only in report and brief titles; it does not affect estimation."),
               value = ""),
             numericInput("analysis_seed",
-              tip_label("Analysis seed", "Controls the LASSO folds and the MFH bootstrap draws. The UFH and benchmarking bootstraps use a fixed seed, so identical inputs and settings always reproduce the same results."),
+              tip_label("Analysis seed", "Controls LASSO folds and the UFH, MFH and benchmarking bootstrap draws. Identical inputs, settings and package versions reproduce the same results."),
               value = 123, min = 0, step = 1),
             textInput("run_label",
               tip_label("Run label", "Optional short label appended to the saved app_runs folder so outputs from different runs are easier to distinguish."),
@@ -793,7 +793,7 @@ ui <- fluidPage(
                         paste(
                           "Transformation of the direct estimates before model fitting.",
                           "For poverty rates: 'arcsin' constrains estimates to [0,1] and stabilizes variances.",
-                          "For mean welfare: 'log' addresses the right-skewness of welfare; the back-transform to currency units is bias-corrected with a domain-level smearing factor (see Bias Correction below).",
+                          "For mean welfare: 'log' models the logarithm of each area's direct arithmetic mean, with its sampling variance transformed by the delta method. Predictions return to currency units using the correction selected below.",
                           "'no' fits on the original scale.")),
               choices = c("arcsin", "no"), selected = "arcsin"),
             # Bias correction is meaningful under arcsin AND log. For arcsin, it
@@ -806,8 +806,8 @@ ui <- fluidPage(
                 tip_label("Bias Correction",
                           paste(
                             "How the model estimates are bias-corrected when back-transforming to the original scale.",
-                            "For arcsin: 'bc' integrates sin^2(.) against the predictive density (correct under Gaussianity); 'none' returns the naive sin^2(eta_hat).",
-                            "For log: 'bc_sm' multiplies exp(eta_hat) by the domain's direct arithmetic mean divided by its direct geometric mean (exp of the direct mean of log welfare), so the estimate is an arithmetic mean in currency units; it is not set equal to the direct estimate. 'none' returns the naive exp(eta_hat), which estimates the geometric mean (downward-biased for the arithmetic mean).")),
+                            "For arcsin: 'bc' uses the correction implemented by emdi; inspect reported boundary cautions. 'none' returns the naive sin^2(eta_hat).",
+                            "For log: 'bc_sm' uses the Slud-Maiti correction implemented by emdi, with maximum-likelihood variance estimation. 'none' uses exp(eta_hat) without bias correction. Both target the area's arithmetic mean welfare; the naive prediction can be biased downwards. Corrected predictions are unavailable for areas without a direct estimate.")),
                 choices = c("bc", "none"), selected = "bc")
             ),
             # Variance smoothing menu is only meaningful when no transformation
@@ -848,7 +848,7 @@ ui <- fluidPage(
             #   - poverty: hidden (MFH never used arcsin; identity scale only)
             #   - mean_welfare: log / no, default log
             # The bias-correction subchoice mirrors the UFH menu but only
-            # offers bc_sm (Duan smearing) for log; arcsin is not an MFH
+            # offers conditional lognormal correction for log; arcsin is not an MFH
             # option and so 'bc' (integration-based) is not exposed here.
             conditionalPanel(
               condition = "input.indicator_type == 'mean_welfare'",
@@ -856,7 +856,7 @@ ui <- fluidPage(
                 tip_label("Transformation (MFH)",
                           paste(
                             "Transformation applied to the MFH model. Independent of the UFH choice above.",
-                            "'log' fits MFH on log(welfare) per year, then back-transforms each (domain, year) cell with a per-domain-year smearing factor anchored to the population-weighted arithmetic mean of welfare. MCPE is back-transformed to the currency scale (squared currency units) via a delta-method approximation, so the variance of the change between the years is also on the currency scale (the report shows mean-welfare changes as percentage changes of the mean).",
+                            "'log' models the logarithm of each area's direct arithmetic mean in each year. Annual MSE and cross-year prediction-error moments are estimated jointly by refitting bootstrap samples and back-transforming their predictions to currency units. The report expresses mean-welfare changes as percentages.",
                             "'no' fits on the identity scale.")),
                 choices = c("log", "no"), selected = "log"),
               conditionalPanel(
@@ -865,9 +865,9 @@ ui <- fluidPage(
                   tip_label("Bias Correction (MFH)",
                             paste(
                               "Bias correction for the log -> currency back-transform.",
-                              "'bc_sm' multiplies exp(eta_hat) by each domain-year's direct arithmetic mean divided by its direct geometric mean (a factor of 1 where there is no direct estimate), so the estimate is an arithmetic mean in currency units.",
+                              "'Conditional lognormal' uses exp(eta_hat + v/2), where v is the conditional prediction variance under the fitted MFH model. Parameter estimation is included in the bootstrap uncertainty. This is a model-based extension for MFH log predictions.",
                               "'none' returns the naive exp(eta_hat), which is downward-biased for the mean.")),
-                  choices = c("bc_sm", "none"), selected = "bc_sm")
+                  choices = c("Conditional lognormal" = "conditional_lognormal", "none" = "none"), selected = "conditional_lognormal")
               )
             ),
             ic_criterion_input("mfh", selected = "AIC",
@@ -908,8 +908,8 @@ ui <- fluidPage(
                 selected = "bonferroni")
             ),
             numericInput("mcpe_bootstrap_replicates",
-              tip_label("MCPE bootstrap replicates", "Controls Monte Carlo precision for MFH change inference. 200 is the interactive default; use at least 500 for production after checking Monte Carlo stability."),
-              value = 200, min = 50, step = 50),
+              tip_label("Bootstrap replicates", "Controls UFH bootstrap MSE, MFH annual and change uncertainty, and benchmarking. The default is 500. Smaller counts are for quick checks; inspect Monte Carlo precision before interpreting inference. More draws reduce simulation noise but do not guarantee interval coverage."),
+              value = 500, min = 50, step = 50),
             textInput("mfh_candidates_y1",
               tip_label("MFH covariates for Year 1 (comma-separated, optional)",
                         "If LASSO is on, these variables define the candidate pool for the first analysis year. If LASSO is off, they define the fixed MFH specification. Leave blank to use the eligible auxiliary variables."),
@@ -1094,8 +1094,8 @@ ui <- fluidPage(
         style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
         tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
         tags$li(tags$code("docs/MCPE_VALIDATION_STATUS.md")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_13.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_13.pptx")),
+        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_14.pdf")),
+        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_14.pptx")),
         tags$li(tags$code("outputs/final_report.html"), " after a completed run")
       )
     )
@@ -1474,7 +1474,7 @@ wizard_server <- function(input, output, session) {
         }
       ),
       row("Poverty-change inference", "pointwise primary; BH and Bonferroni sensitivities reported"),
-      row("MCPE bootstrap replicates", wiz_fmt(input$mcpe_bootstrap_replicates, "200")),
+      row("Bootstrap replicates", wiz_fmt(input$mcpe_bootstrap_replicates, "500")),
       row("Benchmarking",
           if (isTRUE(input$do_benchmark)) {
             lvl <- if (identical(input$benchmark_level %||% "national", "national")) {

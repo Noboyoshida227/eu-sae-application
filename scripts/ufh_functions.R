@@ -49,11 +49,17 @@ varsmoothie_king <- function(domain,
                    var = direct_var,
                    n = sampsize)
   
+  if (any(!is.finite(dt$n) | dt$n <= 0)) stop("GVF requires positive finite sample sizes.")
   dt$log_n <- log(dt$n)
-  dt$log_var <- log(dt$var)
-  
-  lm_model <- lm(formula = log_var ~ log_n,
-                 data = dt[!(abs(dt$log_var) == Inf),])
+  dt$log_var <- ifelse(is.finite(dt$var) & dt$var > 0, log(pmax(dt$var, .Machine$double.xmin)), NA_real_)
+  training <- dt[is.finite(dt$log_var), ]
+  if (!nrow(training)) stop("GVF cannot be estimated because no positive finite direct variances are available.")
+  if (nrow(training) < 3L || length(unique(training$log_n)) < 2L) {
+    warning("Too few distinct sample sizes/positive variances for log-linear GVF; using their mean variance.")
+    dt$var_smooth <- mean(training$var)
+    return(dt[, c("Domain", "var_smooth"), with = FALSE])
+  }
+  lm_model <- lm(formula = log_var ~ log_n, data = training)
   
   dt$pred_var <- predict(lm_model, newdata = dt)
   residual_var <-  summary(lm_model)$sigma^2
@@ -93,8 +99,10 @@ step_wrapper_fh <- function(dt, xvars, y, cor_thresh = 0.95, criteria = "AIC",
   
   xvars <- xvars[xvars %in% colnames(dt)]
   
-  # Keep only complete cases
-  dt <- dt[complete.cases(dt),] 
+  # Optional labels and unused diagnostics must not change the model sample.
+  required <- unique(c(y, vardir, xvars,
+                       if (identical(transformation, "arcsin")) eff_smpsize))
+  dt <- dt[complete.cases(dt[, ..required]), ]
   
   # Step 1: Remove aliased (perfectly collinear) variables
   model_formula <- as.formula(paste(y, "~", paste(xvars, collapse = " + ")))
@@ -2165,311 +2173,303 @@ wrapper_estsigmau2 <- function(framework, method, interval) {
 }
 
 
-#' Regional ratio-adjustment benchmarking for Fay-Herriot estimates
-#'
-#' Benchmarks province-level FH point estimates to region-level poverty rates,
-#' where each region's target is the population-weighted average of the direct
-#' province estimates within that region:
-#' \deqn{B_r = \frac{\sum_{d \in r} N_d\,\hat\theta_d^{\text{Dir}}}
-#'                   {\sum_{d \in r} N_d}}
-#' A separate ratio factor \eqn{\lambda_r = B_r / \bar\theta_r^{\text{FH}}}
-#' is computed for each region and applied to every province in that region,
-#' where \eqn{\bar\theta_r^{\text{FH}}} is the population-weighted mean of
-#' the unbenchmarked FH estimates within region \eqn{r}.
-#'
-#' @param model     An object of class \code{"fh"} (output of \code{emdi::fh}
-#'   with \code{MSE = TRUE}).
-#' @param region_df A data.frame with one row per province and columns:
-#'   \describe{
-#'     \item{domain}{Province identifier matching \code{model$ind$Domain}.}
-#'     \item{region}{Integer region code (1, 2, ...).}
-#'     \item{Nd}{Province population size used as benchmark weight.}
-#'     \item{direct_povrate}{Direct province poverty-rate estimate; may be
-#'       \code{NA} for out-of-sample provinces (they still receive a
-#'       benchmarked estimate via their region's ratio factor).}
-#'   }
-#'
-#' @param MSE       Logical. If \code{TRUE}, compute benchmarked MSEs using
-#'   a bootstrap similar to the one used in \code{fh(..., mse_type = "boot")}
-#'   and store them in \code{model$MSE$FH_Bench}. Defaults to \code{FALSE}.
-#' @param B         Number of bootstrap iterations for benchmarked MSE
-#'   estimation when \code{MSE = TRUE}. Defaults to \code{200}.
-#' @param seed      Optional integer seed for reproducibility.
-#'
-#' @return The \code{model} object with \code{FH_Bench} appended to both
-#'   \code{model$ind} and \code{model$MSE}. If \code{MSE = FALSE}, benchmarked
-#'   MSE is approximated by the unbenchmarked FH MSE.
-#'
-#' @export
-bench_regional <- function(model, region_df, MSE = FALSE, B = 200,
-                           seed = 123) {
-
-  eps_denom <- 1e-8
-
-  apply_regional_bench <- function(model, region_df) {
-    ind <- model$ind   # columns: Domain, Direct, FH, Out, ...
-
-    # Attach region metadata
-    ind <- merge(
-      ind,
-      region_df[, c("domain", "region", "Nd", "direct_povrate")],
-      by.x  = "Domain", by.y = "domain",
-      all.x = TRUE, sort = FALSE
-    )
-
-    reg_ids  <- sort(unique(ind$region[!is.na(ind$region)]))
-    B_r_vec  <- setNames(numeric(length(reg_ids)), as.character(reg_ids))
-    Nd_sum_r <- setNames(numeric(length(reg_ids)), as.character(reg_ids))
-
-    # Regional benchmark B_r and total population N_r
-    for (r in reg_ids) {
-      rows <- which(ind$region == r)
-      Nd_sum_r[as.character(r)] <- sum(ind$Nd[rows], na.rm = TRUE)
-      ok <- rows[!is.na(ind$direct_povrate[rows]) & !is.na(ind$Nd[rows])]
-      B_r_vec[as.character(r)] <- if (length(ok) > 0) {
-        weighted.mean(ind$direct_povrate[ok], ind$Nd[ok])
-      } else {
-        NA_real_
-      }
+# Point transformations are delegated to the installed emdi implementation.
+# In particular emdi 2.2.3's arcsine bc integrates over [0, pi/2], unlike
+# the infinite integration limits printed in its methodology paper. Keeping
+# this call shared by fitting and bootstrap avoids silently mixing estimators.
+sae_ufh_backtransform <- function(eta, variance, vardir, observed,
+                                  transformation, backtransformation) {
+  eta <- as.numeric(eta)
+  if (identical(transformation, "no")) return(eta)
+  framework <- list(M = length(eta), obs_dom = observed)
+  eblup <- list(eblup_data = data.frame(FH = eta),
+                gamma = variance / (variance + vardir))
+  if (identical(transformation, "arcsin")) {
+    if (identical(backtransformation, "bc") && variance == 0) {
+      # Degenerate normal distribution: evaluate the integrand at its atom.
+      # This avoids dnorm(sd=0) inside numerical integration; for positive
+      # variance the package's point estimator is used without alteration.
+      answer <- sin(eta)^2
+      answer[observed & (eta < 0 | eta > pi / 2)] <- 0
+      return(answer)
     }
-
-    ind$B_r      <- B_r_vec[as.character(ind$region)]
-    ind$Nd_sum_r <- Nd_sum_r[as.character(ind$region)]
-    ind$share_r  <- ind$Nd / ind$Nd_sum_r   # province share within its region
-
-    # Weighted mean of FH estimates within each region
-    FH_bar_r <- setNames(numeric(length(reg_ids)), as.character(reg_ids))
-    for (r in reg_ids) {
-      rows <- which(ind$region == r)
-      FH_bar_r[as.character(r)] <-
-        sum(ind$FH[rows] * ind$share_r[rows], na.rm = TRUE)
-    }
-
-    ind$FH_bar_r <- FH_bar_r[as.character(ind$region)]
-    ind$lambda_r <- ifelse(
-      is.na(ind$B_r) | is.na(ind$FH_bar_r) | abs(ind$FH_bar_r) < eps_denom,
-      1,
-      ind$B_r / ind$FH_bar_r
-    )                                             # per-region ratio factor
-    ind$FH_Bench <- ind$FH * ind$lambda_r          # benchmarked estimate
-
-    model$ind$FH_Bench <- ind$FH_Bench[match(model$ind$Domain, ind$Domain)]
-    model
+    return(as.numeric(getFromNamespace("arcsin_point", "emdi")(
+      framework, variance, eblup, backtransformation)))
   }
-
-  boot_bench_regional <- function(model, region_df, B) {
-    framework <- model$framework
-    sigmau2 <- model$model$variance
-    vardir <- framework$vardir
-    in_sample <- model$ind$Out == 0
-    out_sample <- model$ind$Out == 1
-    m <- framework$N_dom_smp
-    M <- framework$N_dom_smp + framework$N_dom_unobs
-
-    transformation <- model$transformation$transformation
-    backtransformation <- model$transformation$backtransformation
-
-    # Design matrix for ALL domains (used for out-of-sample prediction)
-    pred_X <- model.matrix(
-      update(model$fixed, helper ~ .),
-      data = transform(framework$combined_data,
-                       helper = rnorm(nrow(framework$combined_data)))
-    )
-    Xbeta <- as.numeric(pred_X %*% model$model$coefficients$coefficients)
-
-    # Nonparametric bootstrap: center and rescale random effects & residuals
-    vhat <- model$model$random_effects[, 1]
-    vhat_cs <- ((vhat - mean(vhat)) /
-      sqrt(sum((vhat - mean(vhat))^2) / m)) * sqrt(sigmau2)
-
-    res <- model$model$real_residuals
-    res_cs <- (res - mean(res)) / sqrt(sum((res - mean(res))^2) / m)
-
-    true_value_boot <- matrix(NA_real_, nrow = M, ncol = B)
-    est_value_boot_bench <- matrix(NA_real_, nrow = M, ncol = B)
-
-    # Regional metadata for benchmarking
-    meta <- merge(
-      data.frame(Domain = model$ind$Domain, stringsAsFactors = FALSE),
-      region_df[, c("domain", "region", "Nd", "direct_povrate")],
-      by.x = "Domain", by.y = "domain",
-      all.x = TRUE, sort = FALSE
-    )
-    reg_ids <- sort(unique(meta$region[!is.na(meta$region)]))
-    B_r_vec <- setNames(rep(NA_real_, length(reg_ids)), as.character(reg_ids))
-    Nd_sum_r <- setNames(rep(NA_real_, length(reg_ids)), as.character(reg_ids))
-
-    for (r in reg_ids) {
-      rows <- which(meta$region == r)
-      Nd_sum_r[as.character(r)] <- sum(meta$Nd[rows], na.rm = TRUE)
-      ok <- rows[!is.na(meta$direct_povrate[rows]) & !is.na(meta$Nd[rows])]
-      B_r_vec[as.character(r)] <- if (length(ok) > 0) {
-        weighted.mean(meta$direct_povrate[ok], meta$Nd[ok])
-      } else {
-        NA_real_
-      }
-    }
-
-    meta$B_r <- B_r_vec[as.character(meta$region)]
-    meta$Nd_sum_r <- Nd_sum_r[as.character(meta$region)]
-    meta$share_r <- meta$Nd / meta$Nd_sum_r
-
-    # Helper: apply regional ratio-adjustment to a vector of FH estimates
-    regional_bench_vec <- function(fh_vec) {
-      FH_bar_r <- setNames(rep(NA_real_, length(reg_ids)), as.character(reg_ids))
-      for (r in reg_ids) {
-        rows <- which(meta$region == r)
-        FH_bar_r[as.character(r)] <-
-          sum(fh_vec[rows] * meta$share_r[rows], na.rm = TRUE)
-      }
-      lambda_r <- ifelse(
-        is.na(meta$B_r) | is.na(FH_bar_r[as.character(meta$region)]) |
-          abs(FH_bar_r[as.character(meta$region)]) < eps_denom,
-        1,
-        meta$B_r / FH_bar_r[as.character(meta$region)]
-      )
-      fh_vec * lambda_r
-    }
-
-    for (b in seq_len(B)) {
-      tryCatch({
-        v_boot <- sample(vhat_cs, M, replace = TRUE)
-        res_boot <- sample(res_cs, m, replace = TRUE)
-        e_boot <- res_boot * sqrt(vardir)
-
-        if (transformation == "no") {
-          # ==== No transformation: use update() safely ====
-
-          # True values (original scale)
-          true_value_boot[, b] <- Xbeta + v_boot
-
-          # Bootstrap y*
-          ystar <- rep(NA_real_, M)
-          ystar[in_sample] <- Xbeta[in_sample] + v_boot[in_sample] + e_boot
-
-          combined_data_star <- framework$combined_data
-          combined_data_star$ystar <- ystar
-
-          fh_star <- suppressMessages(
-            update(
-              model,
-              fixed = update.formula(formula(model), ystar ~ .),
-              combined_data = combined_data_star,
-              MSE = FALSE,
-              seed = NULL
-            )
-          )
-
-          est_boot <- fh_star$ind$FH
-          est_value_boot_bench[, b] <- regional_bench_vec(est_boot)
-
-        } else if (transformation == "arcsin") {
-          # ==== Arcsin transformation: manual EBLUP (avoids double-transformation) ====
-          # Following the same approach as bench() -- do NOT call update() because
-          # it would re-apply arcsin(sqrt(.)) to already-transformed y*.
-
-          # ---- True values: truncate + naive back-transform ----
-          true_trans <- Xbeta + v_boot
-          true_trans[true_trans < 0] <- 0
-          true_trans[true_trans > (pi / 2)] <- (pi / 2)
-          true_value_boot[, b] <- (sin(true_trans))^2
-
-          # ---- Bootstrap y* on the transformed scale ----
-          ystar_trans <- Xbeta[in_sample] + v_boot[in_sample] + e_boot
-
-          # ---- Re-estimate sigmau2 from bootstrap data ----
-          framework2 <- framework
-          framework2$direct <- ystar_trans
-          framework2$model_X <- model.matrix(
-            update(model$fixed, helper ~ .),
-            data = transform(framework$combined_data[in_sample, ],
-                             helper = rnorm(sum(in_sample)))
-          )
-          sigmau2_boot <- wrapper_estsigmau2(
-            framework = framework2, method = model$method$method,
-            interval = c(0, var(framework2$direct))
-          )
-
-          # ---- Manual GLS coefficient estimation ----
-          x <- framework2$model_X                         # in-sample design matrix
-          D <- diag(1, m)
-          V <- sigmau2_boot * D %*% t(D) + diag(as.numeric(vardir))
-          Vi <- solve(V)
-          Q <- solve(t(x) %*% Vi %*% x)
-          Beta.hat_boot <- Q %*% t(x) %*% Vi %*% ystar_trans
-
-          # ---- Manual EBLUP on transformed scale ----
-          res_star <- ystar_trans - c(x %*% Beta.hat_boot)
-          Sigma.u <- sigmau2_boot * D
-          u.hat <- Sigma.u %*% t(D) %*% Vi %*% res_star
-
-          est_mean_boot_trans <- x %*% Beta.hat_boot + D %*% u.hat    # in-sample
-          pred_out_boot_trans <- pred_X %*% Beta.hat_boot              # all domains
-
-          est_value_boot_trans <- rep(NA_real_, M)
-          est_value_boot_trans[in_sample]  <- est_mean_boot_trans
-          est_value_boot_trans[out_sample] <- pred_out_boot_trans[out_sample]
-
-          # ---- Conditional variance (needed for bias-corrected back-transform) ----
-          gamma_trans <- as.numeric(vardir) / (sigmau2_boot + as.numeric(vardir))
-          est_value_boot_trans_var <- sigmau2_boot * gamma_trans
-          est_value_boot_trans_var_ <- rep(0, M)
-          est_value_boot_trans_var_[in_sample] <- est_value_boot_trans_var
-
-          # ---- Back-transformation ----
-          if (backtransformation == "bc") {
-            # Bias-corrected: integrate sin^2(x) * phi(x; mu, sigma^2) over [0, pi/2]
-            int_value <- NULL
-            for (i in seq_len(M)) {
-              if (in_sample[i] == TRUE) {
-                mu_dri  <- est_value_boot_trans[i]
-                Var_dri <- as.numeric(est_value_boot_trans_var_[i])
-
-                integrand <- function(x, mean, sd) {
-                  sin(x)^2 * dnorm(x, mean = mu_dri, sd = sqrt(Var_dri))
-                }
-
-                int_value <- c(int_value, integrate(integrand,
-                                                     lower = 0, upper = pi / 2)$value)
-              } else {
-                int_value <- c(int_value, (sin(est_value_boot_trans[i]))^2)
-              }
-            }
-          } else if (backtransformation == "naive") {
-            int_value <- NULL
-            for (i in seq_len(M)) {
-              int_value <- c(int_value, (sin(est_value_boot_trans[i]))^2)
-            }
-          }
-
-          est_boot <- int_value
-          est_value_boot_bench[, b] <- regional_bench_vec(est_boot)
-        }
-
-        message("Regional bootstrap b = ", b, "\n")
-      }, error = function(e) {
-        message("Regional bootstrap iteration ", b, " failed: ", e$message)
-      })
-    }
-
-    # Use unbenchmarked true values (Datta et al. 2011: MSE = E[(bench_est - true)^2])
-    apply((est_value_boot_bench - true_value_boot)^2, 1, mean, na.rm = TRUE)
+  if (identical(transformation, "log")) {
+    if (identical(backtransformation, "naive")) return(exp(eta))
+    return(as.numeric(getFromNamespace("bc_sm", "emdi")(
+      framework = framework, sigmau2 = variance, combined_data = NULL,
+      eblup = eblup, method = "ml", MSE = FALSE)$point_backtransformed))
   }
+  stop("Unsupported UFH transformation: ", transformation)
+}
 
-  if (!is.null(seed)) {
-    set.seed(seed)
+sae_ufh_inverse <- function(value, transformation) {
+  if (identical(transformation, "log")) return(exp(value))
+  if (identical(transformation, "arcsin")) {
+    return(sin(pmin(pi / 2, pmax(0, value)))^2)
   }
+  as.numeric(value)
+}
 
-  model <- apply_regional_bench(model, region_df)
-
-  if (!is.null(model$MSE)) {
-    if (MSE) {
-      mse_bench <- boot_bench_regional(model, region_df = region_df, B = B)
-      model$MSE$FH_Bench <- mse_bench[match(model$MSE$Domain, model$ind$Domain)]
+sae_ufh_ratio_benchmark <- function(estimate, direct, region, population,
+                                    fixed_targets = NULL) {
+  if (anyNA(region) || any(!is.finite(population) | population <= 0)) {
+    stop("UFH benchmarking requires a group and positive population for every domain.")
+  }
+  if (any(!is.finite(estimate))) {
+    stop("UFH benchmarking requires a finite estimate for every domain in the benchmark groups; check unsampled domains and target coverage.")
+  }
+  result <- as.numeric(estimate)
+  for (group in unique(as.character(region))) {
+    rows <- which(as.character(region) == group)
+    if (is.null(fixed_targets)) {
+      observed <- rows[is.finite(direct[rows])]
+      if (!length(observed)) stop("No survey direct estimate for benchmark group ", group)
+      target <- stats::weighted.mean(direct[observed], population[observed])
     } else {
-      model$MSE$FH_Bench <- model$MSE$FH
+      target <- unname(fixed_targets[group])
+    }
+    average <- stats::weighted.mean(estimate[rows], population[rows])
+    if (!is.finite(target) || !is.finite(average)) stop("Non-finite UFH benchmark target or mean.")
+    if (abs(average) <= .Machine$double.eps) {
+      if (abs(target) <= .Machine$double.eps) {
+        result[rows] <- 0
+      } else {
+        stop("Cannot ratio-benchmark a zero model mean to a non-zero target.")
+      }
+    } else {
+      result[rows] <- estimate[rows] * target / average
     }
   }
+  result
+}
 
-  return(model)
+# Parametric FH bootstrap on the model scale, with the actual point estimator
+# and final (original-scale) benchmark repeated in every successful replicate.
+# Sampling variances/covariates are conditioned on, as in the FH model.
+# Survey-derived targets are re-estimated from the SAME replicate direct
+# estimates. Uploaded targets are treated as fixed, explicitly.
+sae_ufh_bootstrap <- function(model, region_df = NULL, target_source = "survey",
+                              B = 200L, seed = 123L, min_success = 0.9) {
+  B <- as.integer(B)
+  if (length(B) != 1L || is.na(B) || B < 2L) stop("UFH bootstrap requires B >= 2.")
+  if (!is.finite(min_success) || min_success <= 0 || min_success > 1) {
+    stop("UFH bootstrap min_success must be in (0, 1].")
+  }
+  if (!target_source %in% c("survey", "fixed")) stop("Unknown UFH benchmark target source.")
+  if (!is.null(seed)) set.seed(seed)
+  framework <- model$framework
+  observed <- model$ind$Out == 0
+  M <- nrow(model$ind)
+  m <- sum(observed)
+  transformation <- model$transformation$transformation
+  backtransformation <- model$transformation$backtransformation
+  variance <- as.numeric(model$model$variance)
+  vardir <- as.numeric(framework$vardir)
+  if (length(variance) != 1L || !is.finite(variance) || variance < 0 ||
+      length(vardir) != m || any(!is.finite(vardir) | vardir <= 0)) {
+    stop("UFH bootstrap requires non-negative random-effect variance and positive model-scale sampling variances.")
+  }
+  pred_X <- stats::model.matrix(stats::delete.response(stats::terms(model$fixed)),
+                                framework$combined_data)
+  if (nrow(pred_X) != M) stop("Missing UFH bootstrap covariates would change domain coverage.")
+  Xbeta <- as.numeric(pred_X %*% model$model$coefficients$coefficients)
+  framework$model_X <- pred_X[observed, , drop = FALSE]
+  framework$obs_dom <- observed
+  framework$m <- m
+  framework$M <- M
+  framework$p <- ncol(pred_X)
+  framework$formula <- model$fixed
+  framework$correlation <- "no"
+  interval <- model$sae_variance_interval
+  if (is.null(interval)) interval <- c(0, max(stats::var(framework$direct), mean(vardir), 1e-8))
+  active <- is.finite(model$ind$FH)
+  if (!any(active)) stop("UFH bootstrap has no estimable domains.")
+  meta <- NULL
+  fixed_targets <- NULL
+  if (!is.null(region_df)) {
+    meta <- region_df[match(as.character(model$ind$Domain), as.character(region_df$domain)), , drop = FALSE]
+    if (anyNA(meta$domain) || anyDuplicated(region_df$domain)) stop("UFH benchmark metadata must match domains one-to-one.")
+    if (identical(target_source, "fixed")) {
+      fixed_targets <- vapply(split(seq_len(M), as.character(meta$region)), function(rows) {
+        values <- unique(meta$direct_povrate[rows])
+        if (length(values) != 1L || !is.finite(values)) stop("Each fixed UFH benchmark group must have one finite target.")
+        values
+      }, numeric(1))
+    }
+  }
+  errors <- matrix(NA_real_, M, B)
+  bench_errors <- if (!is.null(meta)) matrix(NA_real_, M, B) else NULL
+  successful <- logical(B)
+  failure_messages <- character()
+  estimate_variance <- getFromNamespace("wrapper_estsigmau2", "emdi")
+  estimate_eblup <- getFromNamespace("eblup_FH", "emdi")
+  for (b in seq_len(B)) {
+    tryCatch({
+      # rnorm(sd=0) is well-defined. No division by empirical residual or
+      # random-effect SD, including when the fitted area variance is zero.
+      true_trans <- Xbeta + stats::rnorm(M, sd = sqrt(variance))
+      ystar <- true_trans[observed] + stats::rnorm(m, sd = sqrt(vardir))
+      frame_star <- framework
+      frame_star$direct <- ystar
+      variance_star <- as.numeric(estimate_variance(frame_star, model$method$method, interval))
+      if (!is.finite(variance_star) || variance_star < 0) stop("Invalid bootstrap area variance.")
+      fit_star <- estimate_eblup(frame_star, variance_star, frame_star$combined_data)
+      point_star <- sae_ufh_backtransform(
+        fit_star$eblup_data$FH, variance_star, vardir, observed,
+        transformation, backtransformation)
+      true_star <- sae_ufh_inverse(true_trans, transformation)
+      if (any(!is.finite(point_star[active])) || any(!is.finite(true_star[active]))) {
+        stop("Non-finite original-scale bootstrap estimate or truth.")
+      }
+      squared_error <- (point_star[active] - true_star[active])^2
+      if (any(!is.finite(squared_error))) stop("Non-finite squared bootstrap error.")
+      if (!is.null(meta)) {
+        direct_star <- rep(NA_real_, M)
+        direct_star[observed] <- sae_ufh_inverse(ystar, transformation)
+        bench_star <- sae_ufh_ratio_benchmark(point_star, direct_star,
+                                              meta$region, meta$Nd, fixed_targets)
+        if (any(!is.finite(bench_star[active]))) stop("Non-finite bootstrap benchmark.")
+        squared_bench_error <- (bench_star[active] - true_star[active])^2
+        if (any(!is.finite(squared_bench_error))) stop("Non-finite squared benchmark bootstrap error.")
+        bench_errors[active, b] <- squared_bench_error
+      }
+      errors[active, b] <- squared_error
+      successful[b] <- TRUE
+    }, error = function(e) {
+      failure_messages <<- c(failure_messages, conditionMessage(e))
+    })
+  }
+  n_success <- sum(successful)
+  required <- ceiling(min_success * B)
+  if (n_success < required) {
+    stop(sprintf("UFH bootstrap produced %d/%d finite replicates; at least %d are required. %s",
+                 n_success, B, required, paste(unique(failure_messages), collapse = "; ")))
+  }
+  if (n_success < B) warning(sprintf("UFH bootstrap retained %d/%d finite replicates: %s",
+                                    n_success, B, paste(unique(failure_messages), collapse = "; ")))
+  mse <- rep(NA_real_, M)
+  mse_mcse <- rep(NA_real_, M)
+  mse[active] <- rowMeans(errors[active, successful, drop = FALSE])
+  mse_mcse[active] <- apply(errors[active, successful, drop = FALSE], 1L, stats::sd) / sqrt(n_success)
+  mse_bench <- NULL
+  mse_bench_mcse <- NULL
+  if (!is.null(meta)) {
+    mse_bench <- rep(NA_real_, M)
+    mse_bench_mcse <- rep(NA_real_, M)
+    mse_bench[active] <- rowMeans(bench_errors[active, successful, drop = FALSE])
+    mse_bench_mcse[active] <- apply(bench_errors[active, successful, drop = FALSE], 1L, stats::sd) / sqrt(n_success)
+  }
+  list(mse = mse, mse_bench = mse_bench, mse_mcse = mse_mcse,
+       mse_bench_mcse = mse_bench_mcse,
+       diagnostics = list(requested = B, successful = n_success,
+                          required = required, seed = seed,
+                          target_source = if (is.null(meta)) "not_benchmarked" else target_source,
+                          failures = unique(failure_messages)))
+}
+
+sae_ufh_fit <- function(fixed, vardir, combined_data, domains = "Domain",
+                        transformation = "no", backtransformation = NULL,
+                        eff_smpsize = "n_eff", B = 200L, seed = 123L,
+                        bootstrap_mse = TRUE) {
+  outcome <- all.vars(fixed)[1L]
+  original_direct <- as.numeric(combined_data[[outcome]])
+  original_variance <- as.numeric(combined_data[[vardir]])
+  observed <- !is.na(original_direct)
+  model_direct <- original_direct[observed]
+  model_variance <- original_variance[observed]
+  if (identical(transformation, "log")) {
+    if (any(!is.finite(model_direct) | model_direct <= 0)) {
+      stop("Log UFH requires positive finite direct arithmetic means in every sampled domain; choose no transformation otherwise.")
+    }
+    model_variance <- model_variance / model_direct^2
+    model_direct <- log(model_direct)
+  } else if (identical(transformation, "arcsin")) {
+    model_direct <- asin(sqrt(model_direct))
+    model_variance <- 1 / (4 * combined_data[[eff_smpsize]][observed])
+  }
+  interval <- c(0, max(stats::var(model_direct), mean(model_variance), 1e-8))
+  naive_log <- identical(transformation, "log") && identical(backtransformation, "naive")
+  args <- list(fixed = fixed, vardir = vardir, combined_data = combined_data,
+               domains = domains, method = if (identical(transformation, "log")) "ml" else "reml",
+               interval = interval, transformation = transformation,
+               backtransformation = backtransformation, eff_smpsize = eff_smpsize,
+               MSE = !identical(transformation, "arcsin") && !naive_log,
+               mse_type = if (identical(transformation, "arcsin")) "boot" else "analytical",
+               B = c(0, 0), seed = seed)
+  if (naive_log) {
+    args$combined_data[[outcome]][observed] <- model_direct
+    args$combined_data[[vardir]][observed] <- model_variance
+    args$transformation <- "no"
+    args$backtransformation <- NULL
+  }
+  model <- do.call(emdi::fh, args)
+  model$sae_variance_interval <- interval
+  model$sae_bootstrap_mse <- identical(transformation, "arcsin") || naive_log
+  if (identical(transformation, "arcsin") && identical(backtransformation, "bc")) {
+    eta <- as.numeric(model$framework$direct) - as.numeric(model$model$real_residuals)
+    conditional_variance <- as.numeric(model$model$variance) *
+      (1 - as.numeric(model$model$gamma$Gamma[observed]))
+    upper_tail <- stats::pnorm(pi / 2, eta, sqrt(pmax(conditional_variance, 0)), lower.tail = FALSE)
+    model$sae_arcsin_bc_upper_tail <- data.frame(
+      Domain = model$ind$Domain[observed], excluded_upper_tail = upper_tail)
+    if (any(upper_tail > .01, na.rm = TRUE)) {
+      warning(sprintf(paste0("EMDI's package-defined arcsine correction excludes normal mass above pi/2 ",
+                             "(maximum %.2f%% in this fit). It differs from the paper's full-line integral; ",
+                             "inspect boundary domains before interpreting bias correction."),
+                      100 * max(upper_tail, na.rm = TRUE)), call. = FALSE)
+    }
+  }
+  if (naive_log) {
+    model$ind$FH <- exp(model$ind$FH)
+    model$ind$Direct <- original_direct
+    model$framework$combined_data <- combined_data
+    model$transformation <- list(transformation = "log", backtransformation = "naive")
+  }
+  if (isTRUE(model$sae_bootstrap_mse)) {
+    model$MSE <- data.frame(Domain = model$ind$Domain, Direct = original_variance,
+                           FH = NA_real_, Out = model$ind$Out)
+    if (bootstrap_mse) {
+      boot <- sae_ufh_bootstrap(model, B = B, seed = seed)
+      model$MSE$FH <- boot$mse
+      model$sae_mse_mcse <- data.frame(Domain = model$ind$Domain, FH = boot$mse_mcse)
+      model$successful_bootstraps <- boot$diagnostics
+    }
+    model$method$MSE_method <- "parametric bootstrap of original-scale point estimator"
+  }
+  model
+}
+
+# Ratio benchmarking is always performed on the reported indicator scale.
+bench_regional <- function(model, region_df, MSE = FALSE, B = 200,
+                            seed = 123, target_source = "survey") {
+  meta <- region_df[match(as.character(model$ind$Domain), as.character(region_df$domain)), , drop = FALSE]
+  if (anyNA(meta$domain) || anyDuplicated(region_df$domain)) stop("UFH benchmark metadata must match domains one-to-one.")
+  fixed_targets <- NULL
+  if (identical(target_source, "fixed")) {
+    fixed_targets <- vapply(split(seq_len(nrow(meta)), as.character(meta$region)), function(rows) {
+      values <- unique(meta$direct_povrate[rows])
+      if (length(values) != 1L || !is.finite(values)) stop("Each fixed UFH benchmark group must have one finite target.")
+      values
+    }, numeric(1))
+  }
+  model$ind$FH_Bench <- sae_ufh_ratio_benchmark(model$ind$FH, model$ind$Direct,
+                                               meta$region, meta$Nd, fixed_targets)
+  if (MSE) {
+    boot <- sae_ufh_bootstrap(model, region_df, target_source, B, seed)
+    if (is.null(model$MSE)) model$MSE <- data.frame(Domain = model$ind$Domain,
+                                                 Direct = NA_real_, FH = NA_real_, Out = model$ind$Out)
+    if (isTRUE(model$sae_bootstrap_mse)) model$MSE$FH <- boot$mse
+    model$MSE$FH_Bench <- boot$mse_bench
+    model$sae_mse_mcse <- data.frame(Domain = model$ind$Domain,
+                                    FH = if (isTRUE(model$sae_bootstrap_mse)) boot$mse_mcse else NA_real_,
+                                    FH_Bench = boot$mse_bench_mcse)
+    model$successful_bootstraps <- boot$diagnostics
+  } else if (!is.null(model$MSE)) {
+    # An unbenchmarked MSE is not a benchmarked MSE.
+    model$MSE$FH_Bench <- NA_real_
+  }
+  model
 }

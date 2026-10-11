@@ -1,5 +1,22 @@
 # Changelog
 
+## 5.2.0-rc.6-wizard.5.14 - 2026-10-11
+
+- Follow-up mapping fix: preserve every mapped role when a source column is reused; warn when strata and household size share a source. Reject blank required mappings and stop readiness estimates when weights are unavailable, instead of reporting misleading zero-household/NA summaries. Correctly mapped inputs retain the same values.
+- MFH2 remains the default; optional MFH3-first selection is retained.
+- Correct log welfare aggregation and native emdi Slud-Maiti UFH correction; retain nonpositive household incomes when constructing area arithmetic means.
+- Validate REML endpoints and refit MFH2 when needed; allow genuine zero-variance boundaries.
+- Estimate coherent original-scale annual MSE/MCPE and final benchmark uncertainty inside the bootstrap; refuse impossible covariance instead of falling back to independence.
+- Use covariance-standardized MFH residuals; update app help, readiness and report prose.
+- Add numerical, boundary, package-compatibility, larger simulation and isolated pipeline checks. Estimates and significance can change; historical saved runs require explicit rerunning.
+- Use one **Bootstrap replicates** control for UFH, MFH and benchmarking, defaulting to 500; preserve explicit saved settings and export Monte Carlo precision.
+- Flag covariance-boundary MFH inference as provisional, with accepted-bootstrap boundary diagnostics. More bootstrap draws do not remove the observed boundary-coverage limitation.
+- Report significance counts as **Unavailable**, with the number of tested domains, when no domain could be tested (for example missing benchmarked UFH uncertainty), instead of 0 significant changes.
+- Revise the English guidelines, four technical notes, 57-slide guide and download instructions. Update the Polish and Greek user guides to 5.14 (docs/instructions).
+- Reject incomplete or stale analysis configurations before clearing outputs; isolate the background-driver regression test from the working application's outputs.
+- Package reproducible QER evidence and renewed Spanish example checks. Published as a GitHub pre-release for review by the Polish and Greek teams; not institutional clearance for production publication.
+- See [Methodology alignment and QER notes](METHODOLOGY_ALIGNMENT.md) for reference mapping, explicit extensions and validation limits.
+
 ## 5.2.0-rc.6-wizard.5.13 - 2026-10-08
 
 - Documentation release with help-text corrections. No change to estimates.

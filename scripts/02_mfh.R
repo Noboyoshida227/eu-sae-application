@@ -57,6 +57,7 @@ source(here::here("R", "pipeline_helpers.R"))
 source(here::here("R", "variance_policy.R"))
 source(here::here("R", "mfh_model_selection.R"))
 source(here::here("R", "mfh_convergence_check.R"))
+source(here::here("R", "mfh_bootstrap_helpers.R"))
 source(here::here("R", "map_style.R"))
 
 # ---- Invalidate stale MFH output artifacts ----
@@ -75,7 +76,9 @@ dir.create(here::here("outputs", "data"), showWarnings = FALSE, recursive = TRUE
   here::here("outputs", "tables", "mfh_model_diagnostics.csv"),
   here::here("outputs", "tables", "mfh_variance_structure_selection.csv"),
   here::here("outputs", "tables", "mfh_mcpe_validation.csv"),
-  here::here("outputs", "tables", "mfh_convergence_check.csv")
+  here::here("outputs", "tables", "mfh_convergence_check.csv"),
+  here::here("outputs", "tables", "mfh_sampling_covariance.csv"),
+  here::here("outputs", "tables", "mfh_standardized_residuals.csv")
 )
 for (.f in .mfh_outputs_to_clean) {
   if (file.exists(.f)) {
@@ -107,27 +110,9 @@ cat("Cleaned stale MFH output artifacts before render.\n")
 source(here::here("R", "msae_compat.R"))
 sae_install_msae_compat_functions(envir = globalenv())
 
-# ---- Robust refit fallback for eblupMFH2 ---------------------------------
-# msae's eblupMFH2() uses unconstrained Newton-Raphson on (sigma2_u, rho_u)
-# and only clamps sigma2_u >= 0 AFTER iteration ends. In some configurations
-# (e.g., highly heterogeneous sm_out variances paired with cov = "zero", or
-# near-rank-deficient sampling-error covariance matrices when rho_R is close
-# to 1), the optimizer is driven into the negative region during iteration
-# and converges to a spurious sigma2_u = 0. The fingerprint is a refvar
-# that varies non-monotonically with the inputs, which is inconsistent with
-# a true REML boundary.
-#
-# To handle that case robustly without disturbing well-behaved fits, we:
-#   (a) keep the AST-patched eblupMFH2 above as `.eblupMFH2_patched` so it
-#       can still be invoked directly when needed; and
-#   (b) replace the GLOBAL `eblupMFH2` with a thin wrapper that calls the
-#       patched function first, returns its result unchanged when refvar > 0,
-#       and only falls back to a constrained optim() refit when refvar = 0.
-# This means standard runs continue to use msae's implementation byte-for-
-# byte, while pathological boundary cases get auto-corrected. The same
-# wrapped `eblupMFH2` is used by every downstream caller (pbmcpe_with_existing,
-# bench_regional_mfh, etc.) because they all reach `eblupMFH2` through the
-# global env.
+# ---- Robust MFH2 REML endpoint validation and refit ----
+# Retain a usable package fit; otherwise refit with constrained REML. Original
+# fits and every bootstrap refit share this wrapper and the independent gate.
 .eblupMFH2_patched <- get("eblupMFH2", envir = globalenv())
 source(here::here("scripts", "eblupMFH2_robust.R"))
 .eblupMFH2_with_robust <- function(formula, vardir, MAXITER = 100,
@@ -139,7 +124,7 @@ source(here::here("scripts", "eblupMFH2_robust.R"))
 assign("eblupMFH2", .eblupMFH2_with_robust, envir = globalenv())
 cat(
   "patch-msae: eblupMFH2 wrapped with robust refit fallback ",
-  "(activates only when msae returns refvar = 0).\n",
+  "(activates when the package fit fails the REML endpoint check).\n",
   sep = ""
 )
 
@@ -232,8 +217,8 @@ ufh_msae_label <- if (isTRUE(log_transform)) "UFH, log scale" else "UFH, untrans
   out
 }
 
-# MFH bias correction. TRUE -> apply Duan smearing (bc_sm) when
-# back-transforming the log fit to the original scale. FALSE -> use
+# MFH bias correction uses the Gaussian conditional lognormal mean.
+# This multivariate extension is evaluated by a refitted bootstrap. FALSE -> use
 # naive exp(eta_hat). Default TRUE if missing. Only meaningful when
 # log_transform is on; otherwise ignored.
 mfh_bias_correction <- as.logical(cfg_or_default(cfg$mfh$bias_correction, TRUE))
@@ -264,7 +249,7 @@ if (identical(indicator_type, "poverty")) {
   cat("Indicator: Mean welfare", if (log_transform) "(log-fit, back-transformed)" else "(identity scale)", "\n")
   if (isTRUE(log_transform)) {
     cat("Bias correction:", if (isTRUE(mfh_bias_correction)) {
-      "TRUE (Duan smearing, bc_sm)"
+      "TRUE (Gaussian conditional lognormal mean)"
     } else {
       "FALSE (naive exponential back-transform)"
     }, "\n")
@@ -351,22 +336,18 @@ if (benchmark_level %in% c("custom", "region")) {
 # ---- Harmonize variable names ----
 rename_cols_mfh <- c(
   year = var_map$year, domain = var_map$domain, psu = var_map$psu,
-  weight = var_map$weight, welfare = var_map$welfare
+  weight = var_map$weight, welfare = var_map$welfare, hh_size = var_map$hh_size
 )
-if (!is.null(var_map$strata) && nzchar(var_map$strata) &&
-    var_map$strata %in% names(survey_raw) && var_map$strata != "strata") {
-  rename_cols_mfh <- c(rename_cols_mfh, strata = var_map$strata)
+if (use_strata) rename_cols_mfh <- c(rename_cols_mfh, strata = var_map$strata)
+if (!is.null(var_map$benchmark_level) && nzchar(var_map$benchmark_level) &&
+    var_map$benchmark_level %in% names(survey_raw)) {
+  rename_cols_mfh <- c(rename_cols_mfh, region = var_map$benchmark_level)
 }
 if (identical(indicator_type, "poverty") &&
     povline_type == "column" && !is.null(var_map$povline)) {
   rename_cols_mfh <- c(rename_cols_mfh, povline = var_map$povline)
 }
-if (!is.null(var_map$hh_size) && nzchar(var_map$hh_size) &&
-    var_map$hh_size %in% names(survey_raw) && var_map$hh_size != "hh_size") {
-  rename_cols_mfh <- c(rename_cols_mfh, hh_size = var_map$hh_size)
-}
-survey_raw <- sae_resolve_rename_collisions(survey_raw, rename_cols_mfh, context = "MFH mapping")
-survey_dt <- survey_raw %>% rename(!!!rename_cols_mfh)
+survey_dt <- sae_apply_column_mapping(survey_raw, rename_cols_mfh, context = "MFH mapping")
 if (!use_strata && "strata" %in% names(survey_dt)) {
   survey_dt <- survey_dt %>% select(-any_of("strata"))
 }
@@ -411,21 +392,6 @@ cat("MFH direct estimates use population_weight = weight * hh_size.\n")
 survey_dt <- survey_dt %>%
   mutate(domain = trimws(as.character(domain)))
 
-if (nzchar(var_map$benchmark_level) &&
-    !"region" %in% names(survey_dt) &&
-    var_map$benchmark_level %in% unname(rename_cols_mfh)) {
-  copied_from <- names(rename_cols_mfh)[match(var_map$benchmark_level, unname(rename_cols_mfh))]
-  if (!is.na(copied_from) && copied_from %in% names(survey_dt)) {
-    survey_dt$region <- survey_dt[[copied_from]]
-  }
-}
-
-# Rename benchmark-level column if present in survey data (needed for grouped benchmarking)
-if (nzchar(var_map$benchmark_level) &&
-    var_map$benchmark_level %in% colnames(survey_dt) &&
-    var_map$benchmark_level != "region") {
-  survey_dt <- survey_dt %>% rename(region = !!var_map$benchmark_level)
-}
 if ("region" %in% names(survey_dt)) {
   survey_dt <- survey_dt %>% mutate(region = trimws(as.character(region)))
 }
@@ -573,7 +539,7 @@ mfh_candidate_vars_y2 <- validate_mfh_covs(mfh_candidate_vars_y2, "Year 2")
 # used accidentally.
 do_benchmark <- isTRUE(mfh_cfg$do_benchmark)
 population_path <- cfg_or_default(mfh_cfg$population_path, "")
-bench_nB <- as.integer(cfg_or_default(mfh_cfg$bench_nB, 200))
+bench_nB <- sae_bootstrap_count(mfh_cfg$bench_nB %||% mfh_cfg$mcpe_nB, label = "mfh.bench_nB")
 
 # Model selection criterion: "AIC" (default) or "BIC"; "none" when the
 # covariates are fixed for both years with LASSO off (no stepwise selection).
@@ -601,8 +567,7 @@ cat("Model-selection criterion:",
 mfh_lasso_lambda <- cfg_or_default(mfh_cfg$lasso_lambda, "lambda.1se")
 analysis_seed <- suppressWarnings(as.integer(cfg_or_default(cfg$analysis_seed, 123L)))
 if (!is.finite(analysis_seed) || analysis_seed < 0L) analysis_seed <- 123L
-mcpe_nB <- suppressWarnings(as.integer(cfg_or_default(mfh_cfg$mcpe_nB, 200L)))
-if (!is.finite(mcpe_nB) || mcpe_nB < 50L) mcpe_nB <- 200L
+mcpe_nB <- sae_bootstrap_count(mfh_cfg$mcpe_nB, label = "mfh.mcpe_nB")
 if (!mfh_lasso_lambda %in% c("lambda.1se", "lambda.min")) {
   warning(sprintf("Invalid lasso_lambda '%s' for MFH; defaulting to lambda.1se.",
                   mfh_lasso_lambda))
@@ -738,8 +703,6 @@ survey_step1 <- survey_dt %>%
     poor = if (identical(indicator_type, "poverty")) {
       ifelse(is.na(welfare) | is.na(povline), NA_real_,
              compute_fgt(welfare, povline, fgt_alpha))
-    } else if (isTRUE(log_transform)) {
-      .safe_log_positive(welfare)
     } else {
       as.numeric(welfare)
     },
@@ -777,27 +740,20 @@ dir_est_domain_long <- svyby(
 ) %>%
   mutate(mse = se^2)
 
-# When fitting on the log scale we additionally compute the population-
-# weighted arithmetic mean of welfare per domain-year. This anchors the
-# back-transform so the exported direct_rate equals svymean(welfare)
-# exactly and FH/MFH EBLUPs are scaled by the same per-domain factor.
-direct_arith_domain_long <- if (identical(indicator_type, "mean_welfare") &&
-                                isTRUE(log_transform)) {
-  svyby(
-    formula  = ~welfare,
-    by       = ~year + domain,
-    design   = des,
-    FUN      = svymean,
-    na.rm    = TRUE,
-    keep.var = TRUE
-  ) %>%
-    transmute(
-      year         = as.integer(year),
-      domain       = domain,
-      direct_arith = welfare,
-      SD_arith     = se
-    )
+# EMDI transforms the direct arithmetic area mean, not individual welfare.
+# Retain direct estimates and design variances in original currency units.
+direct_arith_domain_long <- if (isTRUE(log_transform)) {
+  dir_est_domain_long %>% transmute(year = as.integer(year), domain,
+                                   direct_arith = poor, SD_arith = se)
 } else NULL
+if (isTRUE(log_transform)) {
+  if (any(!is.finite(dir_est_domain_long$poor) | dir_est_domain_long$poor <= 0)) {
+    stop("Log mean-welfare estimation requires positive finite direct area means. ",
+         "Use the identity transformation or review the affected domain-year inputs.")
+  }
+  dir_est_domain_long <- dir_est_domain_long %>%
+    mutate(mse = mse / poor^2, se = sqrt(mse), poor = log(poor))
+}
 
 # Pivot to wide format for the MFH modeling frame (one row per domain)
 dir_est_domain_all_years <- dir_est_domain_long %>%
@@ -972,6 +928,15 @@ covariances <- map_dfr(svyby_out, function(x) {
     v12_d  = as.numeric(v12)
   )
 })
+
+if (isTRUE(log_transform)) {
+  .arith_pair <- direct_arith_domain_long %>%
+    select(domain, year, direct_arith) %>%
+    pivot_wider(names_from = year, values_from = direct_arith)
+  .cov_match <- match(as.character(covariances$domain), as.character(.arith_pair$domain))
+  covariances$v12_d <- covariances$v12_d /
+    (.arith_pair[[as.character(y1)]][.cov_match] * .arith_pair[[as.character(y2)]][.cov_match])
+}
 
 print(covariances)
 
@@ -1514,6 +1479,18 @@ if (.n_bad_rows > 0) {
   domain_dt <- domain_dt[!.bad_row_mask, , drop = FALSE]
 }
 
+# Repair once; every original fit and bootstrap refit uses these same matrices.
+.sampling_covariance <- sae_mfh_prepare_sampling_covariance(
+  domain_dt, vardir_cols, length(mfh_formula), repair = TRUE)
+domain_dt <- .sampling_covariance$data
+if (any(.sampling_covariance$diagnostics$repaired)) {
+  cat(sum(.sampling_covariance$diagnostics$repaired),
+      "domain sampling covariance matrices were repaired before fitting; inspect mfh_sampling_covariance.csv.\n")
+}
+.sampling_covariance$diagnostics$domain <- as.character(domain_dt$domain)
+write.csv(.sampling_covariance$diagnostics,
+          here::here("outputs", "tables", "mfh_sampling_covariance.csv"), row.names = FALSE)
+
 .fit_skipped <- FALSE
 .mfh_fitted_domain_ids <- trimws(as.character(domain_dt$domain))
 if (any(is.na(.mfh_fitted_domain_ids) | !nzchar(.mfh_fitted_domain_ids))) {
@@ -1555,10 +1532,11 @@ if (fit_mfh3) {
   .model_mfh3_attempt <- model_mfh3
   if (!is.null(model_mfh3)) {
     .mfh3_iterations <- suppressWarnings(as.integer(model_mfh3$fit$iterations %||% NA_integer_))
-    if (!isTRUE(model_mfh3$fit$convergence)) {
+    if (!sae_mfh_fit_usable(model_mfh3, "MFH3", mfh_formula, vardir_cols, domain_dt)) {
+      .model_mfh3_attempt$fit$convergence <- FALSE
       .mfh3_failure_type <- "non_convergence"
       .mfh3_failure_message <- paste0(
-        "Fisher-scoring convergence criterion was not met",
+        "The MFH3 fit did not pass the convergence and REML endpoint checks",
         if (is.finite(.mfh3_iterations)) paste0(" after ", .mfh3_iterations, " iterations") else "",
         "."
       )
@@ -1650,6 +1628,18 @@ selected_model <- model_lookup[[diag_model]]
 })
 .mfh_conv_tbl <- do.call(rbind, lapply(.mfh_conv_checks, sae_mfh_check_row,
                                        selected_model = diag_model))
+.mfh_boundary_checks <- setNames(lapply(names(.mfh_conv_models), function(model_name) {
+  tryCatch(sae_mfh_covariance_boundary(.mfh_conv_models[[model_name]], model_name),
+           error = function(e) NULL)
+}), names(.mfh_conv_models))
+for (.j in if (is.null(.mfh_conv_tbl)) integer() else seq_len(nrow(.mfh_conv_tbl))) {
+  .b <- .mfh_boundary_checks[[as.character(.mfh_conv_tbl$model[.j])]]
+  .mfh_conv_tbl$covariance_boundary[.j] <- if (is.null(.b)) NA else .b$boundary
+  .mfh_conv_tbl$variance_zero[.j] <- if (is.null(.b)) NA else .b$variance_zero
+  .mfh_conv_tbl$correlation_limit[.j] <- if (is.null(.b)) NA else .b$correlation_limit
+  .mfh_conv_tbl$inference_status[.j] <- if (is.null(.b) || .mfh_conv_tbl$status[.j] != "ok")
+    "unavailable" else .b$inference_status
+}
 dir.create(here::here("outputs", "tables"), showWarnings = FALSE, recursive = TRUE)
 write.csv(.mfh_conv_tbl, here::here("outputs", "tables", "mfh_convergence_check.csv"),
           row.names = FALSE)
@@ -1660,8 +1650,8 @@ for (.chk in .mfh_conv_checks) {
               .chk$status, .chk$message))
   if (.is_sel && !identical(.chk$status, "ok")) {
     warning(sprintf(paste(
-      "%s (selected MFH model): %s Estimates, MSEs and change tests rest on these",
-      "variance parameters; see outputs/tables/mfh_convergence_check.csv and the",
+      "%s (selected MFH model): %s This endpoint cannot support inference; see",
+      "outputs/tables/mfh_convergence_check.csv and the",
       "'MFH Convergence Check' section of the report."), .chk$model, .chk$message),
       call. = FALSE)
   }
@@ -1677,14 +1667,29 @@ rm(.chk)
 .model_fit_failed <- is.null(selected_model) ||
   is.null(selected_model$fit) ||
   is.null(selected_model$fit$refvar) ||
-  length(selected_model$fit$refvar) == 0
+  length(selected_model$fit$refvar) == 0 ||
+  !sae_mfh_fit_usable(selected_model, diag_model, mfh_formula, vardir_cols, domain_dt)
 
-# Check for boundary random-effects variance (refvar = 0). After the robust
-# refit fallback in patch-msae, this should fire only when both msae's
-# Newton-Raphson AND the constrained optim() refit conclude sigma2_u = 0 --
-# i.e., a genuine boundary, not a numerical artifact.
+# Zero innovations do not imply zero G in MFH3 because u0 is retained.
+# A genuine zero covariance is a legal model boundary, not a bootstrap failure.
 .refvar_zero <- if (.model_fit_failed) FALSE else
-  isTRUE(all(selected_model$fit$refvar == 0))
+  all(abs(sae_mfh_G(diag_model, sae_mfh_theta(selected_model, diag_model))) <= 1e-12)
+.covariance_boundary <- if (.model_fit_failed) NULL else
+  sae_mfh_covariance_boundary(selected_model, diag_model)
+.inference_status <- if (.model_fit_failed) "unavailable" else
+  .covariance_boundary$inference_status
+.inference_warning <- if (identical(.inference_status, "boundary_sensitive"))
+  sae_mfh_boundary_warning() else ""
+.covariance_boundary_reason <- if (is.null(.covariance_boundary)) "fit_unavailable" else
+  .covariance_boundary$reason
+if (nzchar(.inference_warning)) {
+  cat("\n--- MFH CHANGE SIGNIFICANCE IS PROVISIONAL ---\n", .inference_warning, "\n\n", sep = "")
+  warning(.inference_warning, call. = FALSE)
+}
+if (!.model_fit_failed) {
+  selected_model$fit$inference_status <- .inference_status
+  selected_model$fit$covariance_boundary <- .covariance_boundary
+}
 
 # Diagnostic: did the robust optim() fallback get used for any of the
 # candidate models? Surfaced as a small note so the user can see when
@@ -1717,6 +1722,13 @@ saveRDS(
     refvar_alpha = refvar_alpha,
     refvar_zero      = .refvar_zero,
     model_fit_failed = .model_fit_failed,
+    inference_valid = !.model_fit_failed,
+    inference_status = .inference_status,
+    covariance_boundary = .covariance_boundary,
+    covariance_boundary_reason = .covariance_boundary_reason,
+    inference_warning = .inference_warning,
+    sampling_covariance = .sampling_covariance$diagnostics,
+    residual_method = "RPR_standardized",
     fit_skipped      = .fit_skipped,
     var_choice       = var_choice,
     cov_choice       = cov_choice,
@@ -1740,6 +1752,9 @@ if (file.exists(.run_metadata_path)) {
   if (is.list(.run_metadata)) {
     .run_metadata$mfh_requested_model <- diag_model_requested
     .run_metadata$mfh_selected_model <- diag_model
+    .run_metadata$mfh_inference_status <- .inference_status
+    .run_metadata$mfh_covariance_boundary_reason <- .covariance_boundary_reason
+    .run_metadata$mfh_inference_warning <- .inference_warning
     .run_metadata$mfh_variance_structure_selection <- list(
       reason_code = .mfh_variance_selection$reason_code,
       reason = .mfh_variance_selection$reason,
@@ -1851,7 +1866,7 @@ if (isTRUE(.model_fit_failed)) {
   )
 
   .reason <- sprintf(
-    "MFH unavailable: selected model '%s' did not return a valid fit.",
+    "MFH unavailable: selected model '%s' did not pass the REML convergence check.",
     diag_model
   )
   stop(structure(
@@ -1927,6 +1942,23 @@ make_long_model <- function(model_obj, model_name, domain_vec) {
 
   eb  <- as.data.frame(model_obj$eblup)
   mse <- as.data.frame(model_obj$MSE)
+  if (model_name %in% c("MFH1", "MFH2", "MFH3")) {
+    if (!sae_mfh_fit_usable(model_obj, model_name, mfh_formula, vardir_cols, domain_dt)) {
+      mse[,] <- NA_real_
+    }
+    if (isTRUE(log_transform)) {
+      converted <- tryCatch(sae_mfh_estimate_matrix(model_obj, model_name,
+        domain_dt, vardir_cols, back_transform = "log", bias_correction = mfh_bias_correction),
+        error = function(e) matrix(NA_real_, nrow(eb), ncol(eb)))
+      eb[,] <- converted
+      # Selected-model MSE comes from the original-scale joint bootstrap below.
+      mse[,] <- NA_real_
+    }
+  } else if (isTRUE(log_transform)) {
+    # This auxiliary UFH is diagnostic; the EMDI UFH is in the UFH step.
+    eb[,] <- exp(as.matrix(eb))
+    mse[,] <- NA_real_
+  }
   eb_domains <- .mfh_output_domains(eb, model_name, domain_vec, "EBLUP")
   mse_domains <- .mfh_output_domains(mse, model_name, domain_vec, "MSE")
   if (!identical(eb_domains, mse_domains)) {
@@ -1988,6 +2020,12 @@ direct_long <- left_join(direct_long_rate, direct_long_mse, by = c("domain", "ye
   mutate(direct_cv = .safe_cv(direct_mse, direct_rate)) %>%
   select(domain, year, direct_rate, direct_mse, direct_cv)
 
+if (isTRUE(log_transform)) {
+  direct_long <- direct_arith_domain_long %>%
+    transmute(domain, year, direct_rate = direct_arith, direct_mse = SD_arith^2,
+              direct_cv = .safe_cv(direct_mse, direct_rate))
+}
+
 # ---- 4) Combine model-based + direct into one comparison table ----
 # Use full_join so domains excluded from MFH fitting (missing vardir)
 # still appear with direct estimates and NA for model columns.
@@ -2032,74 +2070,21 @@ if (.model_fit_failed) {
 }
 
 
-# Surface a small note whenever the robust optim()-based REML fallback
-# was used (i.e., msae's eblupMFH2 returned refvar = 0 but the constrained
-# optimizer recovered a positive sigma2_u). This tells the user which
-# model's diagnostics are based on the standard msae fit vs. the robust
-# fallback so they can interpret the report accordingly.
+# Report independently checked refits without treating a failed optimizer as evidence.
 .robust_used_models <- names(.robust_used)[.robust_used]
-if (length(.robust_used_models) > 0) {
-  cat(
-    "\n--- NOTE ---\n",
-    "## Robust REML fallback was used\n\n",
-    "For the following model(s), `msae::eblupMFH2()` returned $\\sigma^2_u = 0$ ",
-    "(a known numerical-artifact pattern of its unconstrained Newton-Raphson ",
-    "REML iteration). The robust fallback then refit the variance components ",
-    "via `optim()` over $\\tau = \\log\\sigma^2_u$ and $\\eta = \\mathrm{atanh}(\\rho_u)$, ",
-    "which enforces $\\sigma^2_u > 0$ and $|\\rho_u| < 1$ by construction, ",
-    "and recovered a positive $\\sigma^2_u$:\n\n",
-    paste0("- **", .robust_used_models, "**\n", collapse = ""),
-    "\nAll downstream EBLUPs, MSEs, random-effects diagnostics, and bootstrap ",
-    "MCPE values for these models are based on the robust refit.\n",
-    "\n",
-    sep = ""
-  )
+if (length(.robust_used_models)) {
+  cat("\n## MFH2 REML refit\n\n",
+      "The package fit required a constrained REML refit. Accepted endpoints pass the independent score, curvature and boundary checks. All selected-model predictions and bootstrap refits use the same fitting rule. Models: ",
+      paste(.robust_used_models, collapse = ", "), ".\n\n", sep = "")
 }
 .robust_failed_models <- names(.robust_failed)[.robust_failed]
-if (length(.robust_failed_models) > 0) {
-  cat(
-    "\n--- WARNING ---\n",
-    "## Robust REML fallback also failed\n\n",
-    "For the following model(s), `msae::eblupMFH2()` returned $\\sigma^2_u = 0$ ",
-    "AND the robust `optim()`-based refit was unable to find a positive ",
-    "variance component either:\n\n",
-    paste0("- **", .robust_failed_models, "**\n", collapse = ""),
-    "\nWith two independent optimizers agreeing on $\\sigma^2_u = 0$, the boundary ",
-    "is more likely to reflect a genuine REML solution than a numerical artifact, ",
-    "though near-rank-deficient sampling-error covariance matrices can still drive ",
-    "this. Treat the model output for these variants as a regression-only predictor ",
-    "with no domain-specific shrinkage.\n",
-    "\n",
-    sep = ""
-  )
+if (length(.robust_failed_models)) {
+  cat("\nThe constrained REML refit failed for: ", paste(.robust_failed_models, collapse = ", "),
+      ". Failed fits do not support inference; optimizer failure is not evidence of a zero variance.\n", sep = "")
 }
 
-
 if (.refvar_zero) {
-  cat(
-    "\n--- WARNING ---\n",
-    "## Selected diagnostic model: random-effects variance is zero\n\n",
-    "The REML estimator for the random-effects variance ($\\sigma^2_u$) converged to **zero** ",
-    "for the selected diagnostic model (**", diag_model, "**), even after the robust ",
-    "`optim()`-based refit. All MFH random effects are therefore identically zero, and the ",
-    "MFH EBLUP equals the regression-synthetic predictor with no domain-specific shrinkage.\n\n",
-    "Because two independent optimizers (msae's Newton-Raphson and a constrained `optim()`) ",
-    "both agreed on $\\sigma^2_u = 0$, this is more likely to reflect a true REML boundary ",
-    "for this combination of inputs than an optimizer artifact -- though near-rank-deficient ",
-    "sampling-error covariance matrices (e.g., when the off-diagonal $\\rho$ used to build $R$ ",
-    "is close to $\\pm 1$) can still drive both optimizers there.\n\n",
-    "**Implications:**\n\n",
-    "- Random-effects diagnostics (Q-Q plots, Shapiro--Wilk tests) are not meaningful here.\n",
-    "- The point estimates collapse to a regression-only predictor; reported MSEs reflect ",
-    "regression-synthetic uncertainty, not the full FH shrinkage uncertainty.\n",
-    "- **Recommended sensitivity check:** rerun with a different covariance specification ",
-    "(`cov_choice = \"rho_sm_out\"`, `\"rho_dir\"`, `\"direct\"`, or `\"zero\"`) or a different ",
-    "variance specification (`var_choice = \"sm_out\"`, `\"sm_all\"`, or `\"direct\"`). If any ",
-    "alternative gives $\\sigma^2_u > 0$, the present result should be treated as ",
-    "configuration-specific rather than as evidence of zero between-domain variation.\n",
-    "\n",
-    sep = ""
-  )
+  cat("The selected model has zero random-effect covariance. Synthetic point estimates and benchmarking remain available. Bootstrap uncertainty is computed, but change significance is provisional.\n")
 }
 
 
@@ -2297,7 +2282,7 @@ if (.refvar_zero) {
 bench_result <- NULL
 
 # Skip benchmarking when MFH model was not properly executed
-if (.refvar_zero || .model_fit_failed) {
+if (.model_fit_failed) {
   cat("Grouped benchmarking skipped -- eblupMFH2 did not produce valid random effects.\n")
   do_benchmark <- FALSE
 }
@@ -2389,7 +2374,7 @@ if (do_benchmark && !is.null(region_map)) {
           domain = bench_domains,
           region = bench_region,
           Nd = bench_Nd_mat[, tt],
-          direct = direct_bench_mat[, tt],
+          direct = if (isTRUE(log_transform)) exp(direct_bench_mat[, tt]) else direct_bench_mat[, tt],
           eblup = eblup_sel[, tt]
         ) %>%
           filter(is.finite(direct), is.finite(eblup), is.finite(Nd)) %>%
@@ -2408,20 +2393,6 @@ if (do_benchmark && !is.null(region_map)) {
 
     tictoc::tic("MFH grouped benchmarking")
 
-    # Mean welfare fitted in logs: eblup_sel is ln(welfare), while uploaded
-    # targets are in currency. Comparing the two would multiply the log
-    # estimates by about 1,300 (12,500 / 9.4, say), so the log-scale step
-    # uses the survey's own regional figures (also in logs) and only
-    # supplies the relative precision of the benchmarked estimates. The
-    # point estimates are benchmarked to the uploaded targets on the
-    # currency scale after the back-transform ("Re-benchmark on the
-    # currency scale" below).
-    .log_mean_run <- identical(indicator_type, "mean_welfare") && isTRUE(log_transform)
-    if (.log_mean_run && !is.null(regional_benchmark_mat)) {
-      cat("Mean welfare in logs: the uploaded targets are applied on the currency",
-          "scale after the back-transform.\n")
-    }
-
     bench_result <- bench_regional_mfh(
       eblup_mat  = eblup_sel,
       domain_vec = bench_domains,
@@ -2429,7 +2400,7 @@ if (do_benchmark && !is.null(region_map)) {
       Nd_vec     = bench_Nd,
       Nd_mat     = bench_Nd_mat,
       direct_mat = direct_bench_mat,
-      regional_benchmark_mat = if (.log_mean_run) NULL else regional_benchmark_mat,
+      regional_benchmark_mat = regional_benchmark_mat,
       model_obj  = selected_model,
       model_type = diag_model,   # dispatch DGP + refit by MFH1/MFH2/MFH3
       formula    = mfh_formula,
@@ -2437,20 +2408,36 @@ if (do_benchmark && !is.null(region_map)) {
       data       = domain_dt,
       MSE        = TRUE,
       nB         = bench_nB,
-      seed       = 123
+      seed       = analysis_seed + 2000L,
+      back_transform = if (isTRUE(log_transform)) "log" else "none",
+      bias_correction = mfh_bias_correction
     )
 
     tictoc::toc()
 
     cat("\nBenchmarking complete.\n")
     cat("Failed bootstrap iterations:", bench_result$fails, "/", bench_nB, "\n")
+    saveRDS(bench_result, here::here("outputs", "data", "mfh_benchmark_bootstrap.rds"))
+    write.csv(data.frame(
+      domain = rep(bench_domains, length(years_keep)),
+      year = rep(years_keep, each = length(bench_domains)),
+      mse_mcse = if (is.null(bench_result$mse_mcse)) rep(NA_real_, length(eblup_sel)) else as.vector(bench_result$mse_mcse),
+      requested_replicates = bench_nB,
+      successful_replicates = bench_result$n_success,
+      rejected_refits = bench_result$fails,
+      inference_status = bench_result$inference_status %||% "unavailable",
+      covariance_boundary_count = bench_result$covariance_boundary_count %||% NA_integer_,
+      covariance_boundary_fraction = bench_result$covariance_boundary_fraction %||% NA_real_,
+      variance_zero_count = bench_result$variance_zero_count %||% NA_integer_,
+      correlation_limit_count = bench_result$correlation_limit_count %||% NA_integer_),
+      here::here("outputs", "tables", "mfh_benchmark_precision.csv"), row.names = FALSE)
 
     # ---- Add benchmarked estimates to the comparison table ----
     bench_long <- tibble(
       domain = rep(bench_domains, ncol(eblup_sel)),
       year   = rep(years_keep, each = length(bench_domains)),
       rate_Bench  = as.vector(bench_result$eblup_bench),
-      mse_Bench   = as.vector(bench_result$mse_bench)
+      mse_Bench   = if (is.null(bench_result$mse_bench)) rep(NA_real_, length(eblup_sel)) else as.vector(bench_result$mse_bench)
     ) %>%
       mutate(
         cv_Bench   = .safe_cv(mse_Bench, rate_Bench),
@@ -2468,232 +2455,120 @@ if (!do_benchmark || is.null(bench_result)) {
 
 
 
-# ---- Back-transform from log to original scale (mean welfare only) ----
-# Per-domain-year smearing anchored to the population-weighted arithmetic
-# mean of welfare:
-#   smear_dt = direct_arith_dt / exp(direct_rate_log_dt)
-# This guarantees the exported direct_rate equals svymean(welfare) exactly
-# (matching the UI promise) and applies the same per-domain-year factor
-# to MFH/Bench EBLUPs (standard assumption: within-domain welfare
-# variability is similar between direct and model). Variance is
-# propagated via the delta method: Var(cÂ·exp(Î·)) â‰ˆ (cÂ·exp(Î·))Â² Â· Var(Î·).
-#
-# This chunk MUST run before any plotting/diagnostic chunk that reads
-# db_wide_all, otherwise the rendered HTML displays log-scale values
-# while the exported workbook is on the currency scale.
-if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform)) {
-  if (is.null(direct_arith_domain_long)) {
-    stop("Mean-welfare log-fit back-transform requires direct_arith_domain_long ",
-         "to have been computed during direct estimation. Re-run that chunk first.")
-  }
-  smear_dt <- direct_arith_domain_long %>%
-    inner_join(
-      db_wide_all %>% select(domain, year, .log_direct_rate = direct_rate),
-      by = c("domain", "year")
-    ) %>%
-    mutate(smear = ifelse(
-      is.finite(direct_arith) & is.finite(.log_direct_rate) &
-        abs(.log_direct_rate) < 50,
-      direct_arith / exp(.log_direct_rate),
-      1
-    ))
-  smear_vec <- smear_dt$smear[match(
-    paste(db_wide_all$domain, db_wide_all$year),
-    paste(smear_dt$domain,   smear_dt$year)
-  )]
-  smear_vec[is.na(smear_vec)] <- 1
-  # `smear_full` is the bc_sm (Duan smearing) factor anchored to the
-  # population-weighted arithmetic mean. We always use it for `direct_rate`
-  # so the Direct column equals svymean(welfare) by construction
-  # (matching the UI promise) regardless of the user's bias-correction
-  # choice for the MODEL EBLUPs. The choice only affects MFH/UFH/Bench
-  # estimates: when bias correction is OFF, those rates use a smear
-  # factor of 1 (naive exp(eta)).
-  smear_full  <- smear_vec
-  smear_model <- if (isTRUE(mfh_bias_correction)) smear_vec else rep(1, length(smear_vec))
-
-  rate_cols  <- intersect(c("direct_rate", .ufh_col("rate"), .ufh_col("rate", "_Bench"),
-                            "rate_MFH1", "rate_MFH2", "rate_MFH3", "rate_Bench"),
-                          names(db_wide_all))
-  mse_cols   <- intersect(c("direct_mse", .ufh_col("mse"), .ufh_col("mse", "_Bench"),
-                            "mse_MFH1", "mse_MFH2", "mse_MFH3", "mse_Bench"),
-                          names(db_wide_all))
-  cv_cols    <- intersect(c("direct_cv", .ufh_col("cv"), .ufh_col("cv", "_Bench"),
-                            "cv_MFH1", "cv_MFH2", "cv_MFH3", "cv_Bench"),
-                          names(db_wide_all))
-  # Note `direct_rmse` IS included here so it gets recomputed once
-  # `direct_mse` is overridden with the arithmetic-scale variance below.
-  rmse_cols  <- intersect(c("direct_rmse", .ufh_col("rmse"), .ufh_col("rmse", "_Bench"),
-                            "rmse_MFH1", "rmse_MFH2", "rmse_MFH3", "rmse_Bench"),
-                          names(db_wide_all))
-
-  for (rc in rate_cols) {
-    .smear_for_rc <- if (identical(rc, "direct_rate")) smear_full else smear_model
-    db_wide_all[[rc]] <- .smear_for_rc * exp(db_wide_all[[rc]])
-  }
-  for (mc in mse_cols) {
-    rate_match <- sub("^direct_mse$", "direct_rate",
-                       sub("^mse_", "rate_", mc))
-    if (rate_match %in% names(db_wide_all)) {
-      db_wide_all[[mc]] <- (db_wide_all[[rate_match]])^2 * db_wide_all[[mc]]
-    }
-  }
-  for (cc in cv_cols) {
-    rate_match <- sub("^direct_cv$", "direct_rate",
-                       sub("^cv_", "rate_", cc))
-    mse_match  <- sub("^cv_", "mse_", sub("^direct_cv$", "direct_mse", cc))
-    if (all(c(rate_match, mse_match) %in% names(db_wide_all))) {
-      db_wide_all[[cc]] <- .safe_cv(db_wide_all[[mse_match]],
-                                    db_wide_all[[rate_match]])
-    }
-  }
-  for (rc in rmse_cols) {
-    mse_match <- sub("^rmse_", "mse_", rc)
-    if (mse_match %in% names(db_wide_all)) {
-      db_wide_all[[rc]] <- sqrt(pmax(db_wide_all[[mse_match]], 0))
-    }
-  }
-
-  # Override the Direct column's MSE/CV with the exact arithmetic-scale
-  # variance from svyby(~welfare, ...). Recompute direct_rmse afterwards
-  # so it stays consistent with the overridden direct_mse.
-  if ("direct_mse" %in% names(db_wide_all) &&
-      !is.null(direct_arith_domain_long)) {
-    arith_lookup <- direct_arith_domain_long %>%
-      transmute(domain, year, direct_mse_arith = SD_arith^2)
-    aligned <- arith_lookup$direct_mse_arith[match(
-      paste(db_wide_all$domain, db_wide_all$year),
-      paste(arith_lookup$domain, arith_lookup$year)
-    )]
-    db_wide_all$direct_mse <- ifelse(is.finite(aligned), aligned, db_wide_all$direct_mse)
-    if ("direct_cv" %in% names(db_wide_all)) {
-      db_wide_all$direct_cv <- .safe_cv(db_wide_all$direct_mse,
-                                        db_wide_all$direct_rate)
-    }
-    if ("direct_rmse" %in% names(db_wide_all)) {
-      db_wide_all$direct_rmse <- sqrt(pmax(db_wide_all$direct_mse, 0))
-    }
-  }
-
+# Estimator and benchmark are already on the original scale.
+if (isTRUE(log_transform)) {
   attr(db_wide_all, "log_back_transformed") <- TRUE
-  attr(db_wide_all, "smearing_anchor")       <- "per_domain_year_arithmetic"
-  attr(db_wide_all, "smearing_summary")      <- summary(smear_full[is.finite(smear_full)])
-  attr(db_wide_all, "bias_correction_method") <- if (isTRUE(mfh_bias_correction)) "bc_sm" else "none"
-  if (isTRUE(mfh_bias_correction)) {
-    cat(sprintf(
-      "MFH back-transform applied (bias correction = bc_sm; per-domain-year arithmetic anchor; smear range %.4f - %.4f).\n",
-      min(smear_full[is.finite(smear_full)]), max(smear_full[is.finite(smear_full)])
-    ))
-  } else {
-    cat(sprintf(
-      "MFH back-transform applied (bias correction = none; model rates use naive exp(eta_hat); Direct still uses survey arithmetic mean. Direct-anchor smear range %.4f - %.4f shown for diagnostics.).\n",
-      min(smear_full[is.finite(smear_full)]), max(smear_full[is.finite(smear_full)])
-    ))
-  }
-
-  # ---- Re-benchmark on the currency scale -----------------------------
-  # rate_Bench currently holds smear_d * exp(Î»_log_r * eblup_log) -- a
-  # ratio benchmark applied on the log scale (to the survey's own regional
-  # figures) and then exponentiated. That does not satisfy the regional
-  # aggregation constraint on the currency scale. Override rate_Bench with
-  # a fresh ratio benchmark computed on the back-transformed estimates:
-  # the target is the uploaded regional figure when a Benchmark Target
-  # Database is used (already in the run's prices), otherwise the
-  # population-weighted mean of the survey's arithmetic means. Rescale
-  # mse_Bench / cv_Bench / rmse_Bench by (new / old)Â² so the precision
-  # columns keep the relative precision of the log-scale bootstrap.
-  if ("rate_Bench" %in% names(db_wide_all) &&
-      !is.null(region_map) && exists("bench_Nd_mat")) {
-    eblup_eur_col   <- rate_col            # rate_MFH1/2/3 already back-transformed
-    rate_bench_old  <- db_wide_all$rate_Bench  # log-scale-derived bench in EUR
-    bench_pop_lookup <- as.data.frame(as.table(bench_Nd_mat),
-                                      stringsAsFactors = FALSE)
-    names(bench_pop_lookup) <- c("domain", "year", "Nd")
-    bench_pop_lookup <- bench_pop_lookup %>%
-      mutate(domain = as.character(domain), year = as.integer(year))
-    bench_inputs <- db_wide_all %>%
-      transmute(
-        domain, year,
-        direct_eur = direct_rate,
-        eblup_eur  = .data[[eblup_eur_col]]
-      ) %>%
-      left_join(region_map %>% select(domain, region), by = "domain") %>%
-      left_join(bench_pop_lookup, by = c("domain", "year"))
-    if (exists("regional_benchmark_mat") && !is.null(regional_benchmark_mat)) {
-      region_targets <- as.data.frame(as.table(regional_benchmark_mat),
-                                      stringsAsFactors = FALSE)
-      names(region_targets) <- c("region", "year", "B_eur")
-      region_targets <- region_targets %>%
-        mutate(region = as.character(region), year = as.integer(year))
-      region_lambda_eur <- bench_inputs %>%
-        mutate(region = as.character(region)) %>%
-        filter(is.finite(eblup_eur), is.finite(Nd)) %>%
-        group_by(region, year) %>%
-        summarise(
-          eblup_bar = stats::weighted.mean(eblup_eur, Nd, na.rm = TRUE),
-          .groups = "drop"
-        ) %>%
-        left_join(region_targets, by = c("region", "year")) %>%
-        mutate(lambda_eur = ifelse(is.finite(B_eur) & abs(eblup_bar) > 1e-8,
-                                   B_eur / eblup_bar, 1))
-      cat("MFH benchmarking: currency-scale factors to the uploaded targets:\n")
-      print(as.data.frame(region_lambda_eur))
-      # The uploaded targets describe whole groups; say so when some domains
-      # of a group have no estimate in a year.
-      .bench_ok <- bench_inputs %>%
-        filter(!is.na(region), is.finite(eblup_eur), is.finite(Nd))
-      .no_estimate <- unlist(lapply(unique(.bench_ok$year), function(yy) {
-        miss <- setdiff(unique(as.character(region_map$domain)),
-                        as.character(.bench_ok$domain[.bench_ok$year == yy]))
-        if (length(miss)) paste0(miss, " (", yy, ")") else character(0)
-      }))
-      if (length(.no_estimate)) {
-        cat(sprintf(paste("WARNING: MFH benchmarking: %d domain-year(s) of the benchmark groups",
-                          "have no estimate (%s%s); the uploaded targets are matched by the",
-                          "other domains only. Check that the targets cover the same domains.\n"),
-                    length(.no_estimate), paste(utils::head(.no_estimate, 10), collapse = ", "),
-                    if (length(.no_estimate) > 10) ", ..." else ""))
-      }
-    } else {
-      region_lambda_eur <- bench_inputs %>%
-        filter(is.finite(direct_eur), is.finite(eblup_eur), is.finite(Nd)) %>%
-        group_by(region, year) %>%
-        summarise(
-          B_eur      = stats::weighted.mean(direct_eur, Nd, na.rm = TRUE),
-          eblup_bar  = stats::weighted.mean(eblup_eur,  Nd, na.rm = TRUE),
-          lambda_eur = ifelse(abs(eblup_bar) > 1e-8, B_eur / eblup_bar, 1),
-          .groups    = "drop"
-        )
-    }
-    aligned_lambda <- bench_inputs %>%
-      left_join(region_lambda_eur %>% select(region, year, lambda_eur),
-                by = c("region", "year")) %>%
-      pull(lambda_eur)
-    aligned_lambda[!is.finite(aligned_lambda)] <- 1
-    rate_bench_new <- aligned_lambda * db_wide_all[[eblup_eur_col]]
-    db_wide_all$rate_Bench <- rate_bench_new
-    if ("mse_Bench" %in% names(db_wide_all)) {
-      # Rescale by (rate_bench_new / rate_bench_old)Â² so mse_Bench stays
-      # consistent with the new EUR-scale point estimate. The original
-      # mse_Bench was the delta-method propagation of the log-scale
-      # bootstrap MSE applied to the log-scale-derived bench point.
-      ratio_sq <- (rate_bench_new / pmax(abs(rate_bench_old), 1e-8))^2
-      ratio_sq[!is.finite(ratio_sq)] <- 1
-      db_wide_all$mse_Bench <- db_wide_all$mse_Bench * ratio_sq
-    }
-    if ("cv_Bench" %in% names(db_wide_all) && "mse_Bench" %in% names(db_wide_all)) {
-      db_wide_all$cv_Bench <- .safe_cv(db_wide_all$mse_Bench,
-                                       db_wide_all$rate_Bench)
-    }
-    if ("rmse_Bench" %in% names(db_wide_all) && "mse_Bench" %in% names(db_wide_all)) {
-      db_wide_all$rmse_Bench <- sqrt(pmax(db_wide_all$mse_Bench, 0))
-    }
-    attr(db_wide_all, "bench_scale") <- "EUR"
-    cat("Regional benchmarking re-applied on EUR scale (rate_Bench overwritten; ",
-        "mse/cv/rmse_Bench rescaled).\n", sep = "")
-  }
+  attr(db_wide_all, "bias_correction_method") <-
+    if (mfh_bias_correction) "conditional_lognormal" else "none"
 }
 
+# Skip MCPE bootstrap when MFH model did not produce valid random effects
+if (.model_fit_failed) {
+  cat("MCPE bootstrap skipped -- eblupMFH2 was not properly executed.\n")
+  mcpe_obj     <- NULL
+  mcpemfh2_obj <- NULL
+} else {
+  # MCPE is available for MFH1, MFH2 and MFH3. The dispatcher picks the
+  # right parametric-bootstrap routine based on `diag_model` (and lazily
+  # sources the matching `pbmcpeMFH*_with_existing_eblup.R` wrapper) so
+  # downstream code is agnostic to which variant was chosen.
+  source(here::here("scripts", "pbmcpe_with_existing_dispatch.R"))
+
+  set.seed(analysis_seed + 1000L)
+  tictoc::tic(paste0("pbmcpe (", diag_model, ")"))
+
+  mcpe_obj <- tryCatch(
+    pbmcpe_with_existing(
+      diag_model     = diag_model,
+      formula        = mfh_formula,
+      vardir         = vardir_cols,
+      domain_var     = "domain",
+      existing_model = selected_model,
+      nB             = mcpe_nB,
+      data           = domain_dt,
+      seed           = analysis_seed + 1000L,
+      back_transform = if (isTRUE(log_transform)) "log" else "none",
+      bias_correction = mfh_bias_correction,
+      MAXITER        = 100,
+      PRECISION      = 1e-04
+    ),
+    error = function(e) {
+      cat(
+        "\n**Note:** MCPE bootstrap is not available for this MFH run. ",
+        conditionMessage(e),
+        "\nChange-analysis outputs will be written with NA placeholders.\n\n",
+        sep = ""
+      )
+      NULL
+    }
+  )
+
+  if (!is.null(mcpe_obj)) {
+    # Save with a model-specific filename so multiple runs can coexist on disk.
+    saveRDS(mcpe_obj,
+            here::here("outputs", "data", paste0("mcpe_", tolower(diag_model), "_obj.rds")))
+
+    .finite_summary <- function(x, fun, default = NA_real_) {
+      x <- suppressWarnings(as.numeric(x))
+      x <- x[is.finite(x)]
+      if (!length(x)) default else fun(x)
+    }
+    .relative_mcse <- function(estimate, mcse) {
+      estimate <- suppressWarnings(as.numeric(estimate))
+      mcse <- suppressWarnings(as.numeric(mcse))
+      keep <- is.finite(estimate) & is.finite(mcse) & abs(estimate) > 1e-12
+      if (!any(keep)) numeric() else mcse[keep] / abs(estimate[keep])
+    }
+    .mse_rel_mcse <- .relative_mcse(mcpe_obj$mse, mcpe_obj$mse_mcse)
+    .mcpe_rel_mcse <- .relative_mcse(mcpe_obj$mcpe, mcpe_obj$mcpe_mcse)
+    write.csv(
+      data.frame(
+        model = diag_model,
+        target_replicates = as.integer(mcpe_obj$target_replicates %||% mcpe_nB),
+        successful_replicates = as.integer(mcpe_obj$n_success %||% mcpe_nB),
+        failed_refits = as.integer(mcpe_obj$fails %||% 0L),
+        attempts = as.integer(mcpe_obj$attempts %||%
+                                ((mcpe_obj$n_success %||% mcpe_nB) +
+                                   (mcpe_obj$fails %||% 0L))),
+        near_pd_adjustments = as.integer(mcpe_obj$near_pd_adjustments %||% 0L),
+        seed = as.integer(mcpe_obj$seed %||% (analysis_seed + 1000L)),
+        max_mse_mcse = .finite_summary(mcpe_obj$mse_mcse, max),
+        median_relative_mse_mcse = .finite_summary(.mse_rel_mcse, stats::median),
+        max_mcpe_mcse = .finite_summary(mcpe_obj$mcpe_mcse, max),
+        median_relative_mcpe_mcse = .finite_summary(.mcpe_rel_mcse, stats::median),
+        inference_status = .inference_status,
+        covariance_boundary_reason = .covariance_boundary_reason,
+        covariance_boundary_count = mcpe_obj$covariance_boundary_count,
+        covariance_boundary_fraction = mcpe_obj$covariance_boundary_fraction,
+        variance_zero_count = mcpe_obj$variance_zero_count,
+        correlation_limit_count = mcpe_obj$correlation_limit_count,
+        assurance_status = "run_diagnostics_only_external_method_validation_still_required",
+        stringsAsFactors = FALSE
+      ),
+      here::here("outputs", "tables", "mfh_mcpe_validation.csv"),
+      row.names = FALSE
+    )
+  }
+
+  # Back-compat alias: older code paths referenced `mcpemfh2_obj`
+  mcpemfh2_obj <- mcpe_obj
+
+  tictoc::toc()
+}
+
+# Selected annual MSEs use the same joint bootstrap as changes, including boundary fits.
+# If bootstrap inference is unavailable, do not substitute interior analytic MSEs.
+db_wide_all[[mse_col_diag]] <- NA_real_
+if (!is.null(mcpe_obj)) {
+  for (.tt in seq_along(years_keep)) {
+    .rows <- which(db_wide_all$year == years_keep[.tt])
+    .idx <- match(as.character(db_wide_all$domain[.rows]), as.character(mcpe_obj$domain))
+    db_wide_all[[mse_col_diag]][.rows] <- mcpe_obj$mse[.idx, .tt]
+  }
+}
+db_wide_all[[paste0("cv_", diag_model)]] <-
+  .safe_cv(db_wide_all[[mse_col_diag]], db_wide_all[[rate_col]])
+db_wide_all[[paste0("rmse_", diag_model)]] <- sqrt(db_wide_all[[mse_col_diag]])
 
 if (isTRUE(fit_mfh3_requested) && exists("fit_mfh3") && !fit_mfh3) {
   if (identical(.mfh3_failure_type, "non_convergence")) {
@@ -2751,11 +2626,18 @@ if (length(missing_in_eb) > 0) {
   stop("EBLUP output is missing expected columns: ", paste(missing_in_eb, collapse = ", "))
 }
 
-# Residuals: direct (domain_dt) minus EBLUP (model)
-resids_2 <- cbind(
-  direct_for_eb[[poor_cols[1]]] - eb[[poor_cols[1]]],
-  direct_for_eb[[poor_cols[2]]] - eb[[poor_cols[2]]]
-)
+# Covariance-aware standardization: Var(Direct - EBLUP) = R P R,
+# including fitted fixed effects. Components remain correlated: descriptive QA.
+.residual_check <- sae_mfh_standardized_residuals(
+  selected_model, diag_model, mfh_formula, vardir_cols, domain_dt)
+resids_2 <- .residual_check$standardized
+write.csv(data.frame(domain = rep(domain_vec, length(years_keep)),
+                     year = rep(years_keep, each = length(domain_vec)),
+                     residual = as.vector(.residual_check$raw),
+                     residual_variance = as.vector(.residual_check$variance),
+                     standardized_residual = as.vector(resids_2)),
+          here::here("outputs", "tables", "mfh_standardized_residuals.csv"), row.names = FALSE)
+cat("Residual diagnostics use covariance-standardized residuals. Shapiro-Wilk and residual-fitted regressions are descriptive because residuals remain correlated.\n")
 
 # Two-panel diagnostic plots -- save to file
 png(here::here("outputs", "figures", "mfh_residual_vs_eblup.png"),
@@ -2765,13 +2647,13 @@ plot(
   eb[[poor_cols[1]]], resids_2[, 1],
   pch = 19,
   xlab = paste0("EBLUPs (", poor_cols[1], ")"),
-  ylab = paste0("Residuals (", poor_cols[1], ")")
+  ylab = paste0("Standardized residuals (", poor_cols[1], ")")
 )
 plot(
   eb[[poor_cols[2]]], resids_2[, 2],
   pch = 19,
   xlab = paste0("EBLUPs (", poor_cols[2], ")"),
-  ylab = paste0("Residuals (", poor_cols[2], ")")
+  ylab = paste0("Standardized residuals (", poor_cols[2], ")")
 )
 par(mfrow = c(1, 1))
 dev.off()
@@ -2806,22 +2688,8 @@ summary(lm_resid_fit_y2)
 
 stopifnot(length(poor_cols) == 2)
 
-# Residuals: direct minus EBLUP, aligned by domain key.
-eb_diag <- as.data.frame(selected_model$eblup)
-direct_for_resid <- .mfh_align_direct_rows(eb_diag, diag_model, domain_vec, "EBLUP")
-
-resid_dt <- direct_for_resid %>%
-  select(all_of(poor_cols)) %>%
-  as.data.frame()
-
-# Ensure columns match before subtraction
-missing_in_eb <- setdiff(poor_cols, names(eb_diag))
-if (length(missing_in_eb) > 0) {
-  stop("EBLUP output is missing expected columns: ", paste(missing_in_eb, collapse = ", "))
-}
-
-resid_dt <- resid_dt - eb_diag[, poor_cols, drop = FALSE]
-colnames(resid_dt) <- poor_cols  # keep clear labels
+resid_dt <- as.data.frame(resids_2)
+colnames(resid_dt) <- poor_cols
 
 # ---- Safe Shapiro--Wilk wrapper (guards against constant columns) ----
 safe_shapiro <- function(x) {
@@ -2849,7 +2717,7 @@ resid_shapiro_dt <- data.frame(
 ) %>%
   mutate(label = ifelse(is.na(W),
                         "Shapiro-Wilk skipped",
-                        paste0("W = ", round(W, 3), "\n", "p = ", signif(p_value, 3))))
+                        paste0("Descriptive W = ", round(W, 3), "\n", "p = ", signif(p_value, 3))))
 
 # ---- Histograms ----
 .p_resid_hist <- resid_dt %>%
@@ -2864,7 +2732,7 @@ resid_shapiro_dt <- data.frame(
   ) +
   facet_wrap(~Time, scales = "free") +
   theme_minimal() +
-  labs(title = paste0("Residual histograms by year (Direct - EBLUP, ", diag_model, ")"))
+  labs(title = paste0("Standardized residual histograms by year (", diag_model, ")"))
 ggsave(here::here("outputs", "figures", "mfh_residual_histogram.png"),
        .p_resid_hist, width = 10, height = 6, dpi = 150)
 
@@ -2877,7 +2745,7 @@ ggsave(here::here("outputs", "figures", "mfh_residual_histogram.png"),
   stat_qq_line() +
   facet_wrap(~Time, scales = "free") +
   theme_minimal() +
-  labs(title = paste0("QQ plots of residuals by year (Direct - EBLUP, ", diag_model, ")"))
+  labs(title = paste0("QQ plots of standardized residuals by year (", diag_model, ")"))
 ggsave(here::here("outputs", "figures", "mfh_qq_residual.png"),
        .p_resid_qq, width = 10, height = 6, dpi = 150)
 
@@ -2920,7 +2788,7 @@ re_shapiro_dt <- data.frame(
 ) %>%
   mutate(label = ifelse(is.na(W),
                         "Shapiro-Wilk skipped",
-                        paste0("W = ", round(W, 3), "\n", "p = ", signif(p_value, 3))))
+                        paste0("Descriptive W = ", round(W, 3), "\n", "p = ", signif(p_value, 3))))
 
 # Plot histograms with test annotations
 .p_re_hist <- raneff_dt %>%
@@ -3179,91 +3047,7 @@ ggsave(here::here("outputs", "figures", "mfh_smoothing_diagnostic.png"),
        width = 10, height = 6, dpi = 150)
 
 
-# Skip MCPE bootstrap when MFH model did not produce valid random effects
-if (.refvar_zero || .model_fit_failed) {
-  cat("MCPE bootstrap skipped -- eblupMFH2 was not properly executed.\n")
-  mcpe_obj     <- NULL
-  mcpemfh2_obj <- NULL
-} else {
-  # MCPE is available for MFH1, MFH2 and MFH3. The dispatcher picks the
-  # right parametric-bootstrap routine based on `diag_model` (and lazily
-  # sources the matching `pbmcpeMFH*_with_existing_eblup.R` wrapper) so
-  # downstream code is agnostic to which variant was chosen.
-  source(here::here("scripts", "pbmcpe_with_existing_dispatch.R"))
 
-  set.seed(analysis_seed + 1000L)
-  tictoc::tic(paste0("pbmcpe (", diag_model, ")"))
-
-  mcpe_obj <- tryCatch(
-    pbmcpe_with_existing(
-      diag_model     = diag_model,
-      formula        = mfh_formula,
-      vardir         = vardir_cols,
-      domain_var     = "domain",
-      existing_model = selected_model,
-      nB             = mcpe_nB,
-      data           = domain_dt,
-      seed           = analysis_seed + 1000L,
-      MAXITER        = 100,
-      PRECISION      = 1e-04
-    ),
-    error = function(e) {
-      cat(
-        "\n**Note:** MCPE bootstrap is not available for this MFH run. ",
-        conditionMessage(e),
-        "\nChange-analysis outputs will be written with NA placeholders.\n\n",
-        sep = ""
-      )
-      NULL
-    }
-  )
-
-  if (!is.null(mcpe_obj)) {
-    # Save with a model-specific filename so multiple runs can coexist on disk.
-    saveRDS(mcpe_obj,
-            here::here("outputs", "data", paste0("mcpe_", tolower(diag_model), "_obj.rds")))
-
-    .finite_summary <- function(x, fun, default = NA_real_) {
-      x <- suppressWarnings(as.numeric(x))
-      x <- x[is.finite(x)]
-      if (!length(x)) default else fun(x)
-    }
-    .relative_mcse <- function(estimate, mcse) {
-      estimate <- suppressWarnings(as.numeric(estimate))
-      mcse <- suppressWarnings(as.numeric(mcse))
-      keep <- is.finite(estimate) & is.finite(mcse) & abs(estimate) > 1e-12
-      if (!any(keep)) numeric() else mcse[keep] / abs(estimate[keep])
-    }
-    .mse_rel_mcse <- .relative_mcse(mcpe_obj$mse, mcpe_obj$mse_mcse)
-    .mcpe_rel_mcse <- .relative_mcse(mcpe_obj$mcpe, mcpe_obj$mcpe_mcse)
-    write.csv(
-      data.frame(
-        model = diag_model,
-        target_replicates = as.integer(mcpe_obj$target_replicates %||% mcpe_nB),
-        successful_replicates = as.integer(mcpe_obj$n_success %||% mcpe_nB),
-        failed_refits = as.integer(mcpe_obj$fails %||% 0L),
-        attempts = as.integer(mcpe_obj$attempts %||%
-                                ((mcpe_obj$n_success %||% mcpe_nB) +
-                                   (mcpe_obj$fails %||% 0L))),
-        near_pd_adjustments = as.integer(mcpe_obj$near_pd_adjustments %||% 0L),
-        seed = as.integer(mcpe_obj$seed %||% (analysis_seed + 1000L)),
-        max_mse_mcse = .finite_summary(mcpe_obj$mse_mcse, max),
-        median_relative_mse_mcse = .finite_summary(.mse_rel_mcse, stats::median),
-        max_mcpe_mcse = .finite_summary(mcpe_obj$mcpe_mcse, max),
-        median_relative_mcpe_mcse = .finite_summary(.mcpe_rel_mcse, stats::median),
-        assurance_status = "run_diagnostics_only_external_method_validation_still_required",
-        stringsAsFactors = FALSE
-      ),
-      here::here("outputs", "tables", "mfh_mcpe_validation.csv"),
-      row.names = FALSE
-    )
-  }
-
-  # Back-compat alias: older code paths referenced `mcpemfh2_obj`
-  mcpemfh2_obj <- mcpe_obj
-
-  tictoc::toc()
-}
 
 
 # Objective:
@@ -3315,29 +3099,15 @@ compare_mfh <- function(period_list = c(1, 2),
   }
   
   diff <- eblup_mat[, period_list[2]] - eblup_mat[, period_list[1]]
-  # Variance of the change: MSE_t1 + MSE_t2 - 2Â·MCPE(t1, t2). Bootstrap
-  # noise (especially with small nB) can make the covariance term large
-  # enough to push the result negative; previously this was silently
-  # passed through, producing NaN sqrt() / zero-width CIs / spurious
-  # significance flags. The covariance-adjusted value is used whenever it
-  # is positive, however small (owner's decision of 4 Oct 2026: no 1%
-  # rule); only when it is zero, negative or not a number (a zero-width
-  # interval or an impossible negative variance) is the independence-
-  # assumption MSE used instead, and mse_fallback_used marks the row.
-  # The guard lives here in compare_mfh() so it applies uniformly to
-  # every caller (unbenchmarked comp12_obj, benchmarked comp12_bench_obj,
-  # poverty / mean-welfare / log-mean-welfare runs alike).
-  mse_indep    <- mse_mat[, period_list[1]] + mse_mat[, period_list[2]]
-  mse_with_cov <- mse_indep - 2 * mcpe_mat[, col_chr]
-  use_cov      <- is.finite(mse_with_cov) & mse_with_cov > 0
-  mse          <- ifelse(use_cov, mse_with_cov, mse_indep)
-  n_fallback   <- sum(!use_cov, na.rm = TRUE)
-  if (n_fallback > 0) {
-    message(sprintf(
-      "compare_mfh(): %d of %d domain(s) had a zero or negative covariance-adjusted MSE; falling back to the independence-assumption MSE for those rows. Consider raising the bootstrap nB.",
-      n_fallback, length(use_cov)
-    ))
-  }
+  # All moments come from identical joint bootstrap error draws. Their
+  # difference variance cannot be negative except for floating-point error.
+  .mse1 <- mse_mat[, period_list[1]]
+  .mse2 <- mse_mat[, period_list[2]]
+  .joint <- sae_joint_error_moments(.mse1, .mse2, mcpe_mat[, col_chr])
+  mse_indep <- .mse1 + .mse2
+  mse_with_cov <- .joint$difference
+  use_cov <- .joint$valid & is.finite(mse_with_cov) & mse_with_cov > 0
+  mse <- ifelse(use_cov, mse_with_cov, NA_real_)
 
   df <- tibble::tibble(
     domain = mcpe_obj$domain,  # Added: extract domain from mcpe_obj
@@ -3345,9 +3115,12 @@ compare_mfh <- function(period_list = c(1, 2),
     mse = mse,
     mse_independence = mse_indep,
     mse_covariance_adjusted = mse_with_cov,
-    covariance_estimate = as.numeric(mcpe_mat[, col_chr]),
-    mse_fallback_used = !use_cov,
-    mse_rule = ifelse(use_cov, "covariance_adjusted", "independence_fallback"),
+    covariance_estimate = .joint$mcpe,
+    annual_mse_y1 = .mse1,
+    annual_mse_y2 = .mse2,
+    annual_mcpe = .joint$mcpe,
+    mse_fallback_used = FALSE,
+    mse_rule = ifelse(use_cov, "joint_bootstrap", "unavailable_joint_moments"),
     alpha = rep(alpha, nrow(eblup_mat)),
     zq = qnorm(alpha / 2, lower.tail = FALSE)
   ) |>
@@ -3411,80 +3184,7 @@ if (is.null(mcpe_obj)) {
 } else {
 comp12_obj <- compare_mfh(mcpe_obj = mcpe_obj, year_labels = years_keep)
 
-# For mean_welfare + log_transform we back-transform comp12_obj$df to the
-# EUR scale here, BEFORE the plot and table are printed. Otherwise the
-# rendered HTML shows model-scale (log) diffs and tiny MSEs while the
-# exported CSV is on the currency scale. The back-transform uses
-# db_wide_all (already on EUR scale by this point -- see the
-# `back-transform-mean-welfare` chunk) for the per-year point estimates,
-# and reads per-year MSEs / cross-year MCPE on the log scale directly
-# from `mcpe_obj` since those were the inputs to compare_mfh().
-if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform)) {
-  eblup_eur_lookup <- db_wide_all %>%
-    dplyr::select(domain, year, eblup_eur = dplyr::all_of(rate_col)) %>%
-    tidyr::pivot_wider(names_from = year, values_from = eblup_eur,
-                       names_prefix = "eblup_eur_")
-  comp12_obj$df <- comp12_obj$df %>%
-    dplyr::left_join(eblup_eur_lookup, by = "domain")
-  est_y1_e <- comp12_obj$df[[paste0("eblup_eur_", y1)]]
-  est_y2_e <- comp12_obj$df[[paste0("eblup_eur_", y2)]]
-  mse_mat_log <- as.matrix(mcpe_obj$mse)
-  mcpe_mat_log <- as.matrix(mcpe_obj$mcpe)
-  if (is.null(colnames(mcpe_mat_log)) && ncol(mcpe_mat_log) == 1) {
-    colnames(mcpe_mat_log) <- "(1,2)"
-  }
-  mse_y1_log <- as.numeric(mse_mat_log[, 1])
-  mse_y2_log <- as.numeric(mse_mat_log[, 2])
-  mcpe_log   <- if ("(1,2)" %in% colnames(mcpe_mat_log)) {
-    as.numeric(mcpe_mat_log[, "(1,2)"])
-  } else as.numeric(mcpe_mat_log[, 1])
-  comp12_obj$df$diff <- est_y2_e - est_y1_e
-  mse_indep_e    <- est_y1_e^2 * mse_y1_log + est_y2_e^2 * mse_y2_log
-  mse_with_cov_e <- mse_indep_e - 2 * est_y1_e * est_y2_e * mcpe_log
-  use_cov_e      <- is.finite(mse_with_cov_e) & mse_with_cov_e > 0
-  comp12_obj$df$mse <- ifelse(use_cov_e, mse_with_cov_e, mse_indep_e)
-  comp12_obj$df$mse_fallback_used <- !use_cov_e
-  comp12_obj$df$mse_rule <- ifelse(use_cov_e, "covariance_adjusted", "independence_fallback")
-  zq_vec <- comp12_obj$df$zq
-  se_e   <- sqrt(comp12_obj$df$mse)
-  comp12_obj$df$lb <- comp12_obj$df$diff - zq_vec * se_e
-  comp12_obj$df$ub <- comp12_obj$df$diff + zq_vec * se_e
-  comp12_obj$df$z_stat <- comp12_obj$df$diff / se_e
-  comp12_obj$df$p_value <- 2 * stats::pnorm(abs(comp12_obj$df$z_stat), lower.tail = FALSE)
-  comp12_obj$df$p_value_bh <- stats::p.adjust(comp12_obj$df$p_value, method = "BH")
-  comp12_obj$df$p_value_bonferroni <- stats::p.adjust(comp12_obj$df$p_value, method = "bonferroni")
-  comp12_obj$df$significant_unadjusted <- ifelse(comp12_obj$df$p_value < comp12_obj$df$alpha,
-                                                 "Significant", "Not Significant")
-  comp12_obj$df$significant_bh <- ifelse(comp12_obj$df$p_value_bh < comp12_obj$df$alpha,
-                                         "Significant", "Not Significant")
-  comp12_obj$df$significant_bonferroni <- ifelse(
-    comp12_obj$df$p_value_bonferroni < comp12_obj$df$alpha,
-    "Significant", "Not Significant")
-  comp12_obj$df$significance_rule <- "pointwise_unadjusted"
-  comp12_obj$df$significant <- comp12_obj$df$significant_unadjusted
-  # Rebuild the plot from the EUR-scale data so the displayed figure
-  # matches the table.
-  comp12_obj$plot <- ggplot2::ggplot(
-    comp12_obj$df,
-    ggplot2::aes(x = domain, y = diff, color = significant)
-  ) +
-    ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-    ggplot2::geom_point(size = 2.5, alpha = 0.7) +
-    ggplot2::geom_errorbar(ggplot2::aes(ymin = lb, ymax = ub), width = 0.3, alpha = 0.5) +
-    ggplot2::scale_color_manual(
-      values = c("Significant" = "red", "Not Significant" = "gray60"),
-      name = "Pointwise\nSignificance"
-    ) +
-    ggplot2::labs(
-      title    = paste(pov_lab$short, "Changes Between", years_keep[1], "and", years_keep[2]),
-      subtitle = "With 95% Confidence Intervals (back-transformed to EUR)",
-      x        = "Domain",
-      y        = paste0("Change in ", pov_lab$short, " (", years_keep[2], " - ", years_keep[1], ")"),
-      caption  = "Red points indicate pointwise significance (unadjusted p < 0.05); bars are pointwise 95% confidence intervals"
-    ) +
-    ggplot2::theme_minimal()
-  attr(comp12_obj$df, "log_back_transformed") <- TRUE
-}
+
 
 }
 
@@ -3517,72 +3217,7 @@ if (do_benchmark && !is.null(bench_result) && !is.null(bench_result$mcpe_bench))
     year_labels = years_keep
   )
 
-  # Mirror the unbenchmarked back-transform: rebuild diff/mse/lb/ub/sig
-  # on the EUR scale BEFORE printing, so the rendered HTML and the
-  # exported comparison_final_bench.csv tell the same story.
-  if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform)) {
-    bench_eur_lookup <- db_wide_all %>%
-      dplyr::select(domain, year, bench_eur = rate_Bench) %>%
-      tidyr::pivot_wider(names_from = year, values_from = bench_eur,
-                         names_prefix = "bench_eur_")
-    comp12_bench_obj$df <- comp12_bench_obj$df %>%
-      dplyr::left_join(bench_eur_lookup, by = "domain")
-    est_y1_b <- comp12_bench_obj$df[[paste0("bench_eur_", y1)]]
-    est_y2_b <- comp12_bench_obj$df[[paste0("bench_eur_", y2)]]
-    mse_y1_b_log <- as.numeric(bench_result$mse_bench[, 1])
-    mse_y2_b_log <- as.numeric(bench_result$mse_bench[, 2])
-    mcpe_b_log   <- if (!is.null(bench_result$mcpe_bench)) {
-      as.numeric(bench_result$mcpe_bench[, 1])
-    } else 0
-    comp12_bench_obj$df$diff <- est_y2_b - est_y1_b
-    mse_indep_b    <- est_y1_b^2 * mse_y1_b_log + est_y2_b^2 * mse_y2_b_log
-    mse_with_cov_b <- mse_indep_b - 2 * est_y1_b * est_y2_b * mcpe_b_log
-    use_cov_b      <- is.finite(mse_with_cov_b) & mse_with_cov_b > 0
-    comp12_bench_obj$df$mse <- ifelse(use_cov_b, mse_with_cov_b, mse_indep_b)
-    comp12_bench_obj$df$mse_fallback_used <- !use_cov_b
-    comp12_bench_obj$df$mse_rule <- ifelse(use_cov_b, "covariance_adjusted", "independence_fallback")
-    zq_b <- comp12_bench_obj$df$zq
-    se_b <- sqrt(comp12_bench_obj$df$mse)
-    comp12_bench_obj$df$lb <- comp12_bench_obj$df$diff - zq_b * se_b
-    comp12_bench_obj$df$ub <- comp12_bench_obj$df$diff + zq_b * se_b
-    comp12_bench_obj$df$z_stat <- comp12_bench_obj$df$diff / se_b
-    comp12_bench_obj$df$p_value <- 2 * stats::pnorm(abs(comp12_bench_obj$df$z_stat), lower.tail = FALSE)
-    comp12_bench_obj$df$p_value_bh <- stats::p.adjust(comp12_bench_obj$df$p_value, method = "BH")
-    comp12_bench_obj$df$p_value_bonferroni <- stats::p.adjust(
-      comp12_bench_obj$df$p_value, method = "bonferroni")
-    comp12_bench_obj$df$significant_unadjusted <- ifelse(
-      comp12_bench_obj$df$p_value < comp12_bench_obj$df$alpha,
-      "Significant", "Not Significant")
-    comp12_bench_obj$df$significant_bh <- ifelse(
-      comp12_bench_obj$df$p_value_bh < comp12_bench_obj$df$alpha,
-      "Significant", "Not Significant")
-    comp12_bench_obj$df$significant_bonferroni <- ifelse(
-      comp12_bench_obj$df$p_value_bonferroni < comp12_bench_obj$df$alpha,
-      "Significant", "Not Significant")
-    comp12_bench_obj$df$significance_rule <- "pointwise_unadjusted"
-    comp12_bench_obj$df$significant <- comp12_bench_obj$df$significant_unadjusted
-    comp12_bench_obj$plot <- ggplot2::ggplot(
-      comp12_bench_obj$df,
-      ggplot2::aes(x = domain, y = diff, color = significant)
-    ) +
-      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-      ggplot2::geom_point(size = 2.5, alpha = 0.7) +
-      ggplot2::geom_errorbar(ggplot2::aes(ymin = lb, ymax = ub), width = 0.3, alpha = 0.5) +
-      ggplot2::scale_color_manual(
-        values = c("Significant" = "red", "Not Significant" = "gray60"),
-        name = "Pointwise\nSignificance"
-      ) +
-      ggplot2::labs(
-        title    = paste("Benchmarked", pov_lab$short, "Changes Between",
-                          years_keep[1], "and", years_keep[2]),
-        subtitle = "With 95% Confidence Intervals (back-transformed to EUR)",
-        x        = "Domain",
-        y        = paste0("Change in benchmarked ", pov_lab$short),
-        caption  = "Red points indicate pointwise significance (unadjusted p < 0.05); bars are pointwise 95% confidence intervals"
-      ) +
-      ggplot2::theme_minimal()
-    attr(comp12_bench_obj$df, "log_back_transformed") <- TRUE
-  }
+
 
   cat("### Benchmarked ", diag_model, " Change Analysis\n\n", sep = "")
   .bench_plot <- comp12_bench_obj$plot +
@@ -3925,13 +3560,8 @@ if (exists("comp12_obj") && !is.null(comp12_obj) && is.data.frame(comp12_obj$df)
   # The MCPE-based change analysis (`comp12_obj`) is not available. Explain
   # the actual condition rather than assuming that every absence was caused
   # by direct variances or by MFH2.
-  .mcpe_unavailable_reason <- if (isTRUE(.refvar_zero)) {
-    sprintf(
-      "the selected %s model reached the zero random-effect-variance boundary, so its parametric MCPE bootstrap is not applicable",
-      diag_model
-    )
-  } else if (isTRUE(.model_fit_failed)) {
-    sprintf("the selected %s model did not produce a usable fit", diag_model)
+  .mcpe_unavailable_reason <- if (isTRUE(.model_fit_failed)) {
+    sprintf("the selected %s model did not pass the REML convergence check", diag_model)
   } else if (identical(var_choice, "direct")) {
     sprintf(
       "the %s parametric bootstrap did not produce usable MCPE results with raw direct sampling variances",
@@ -3970,213 +3600,25 @@ if (do_benchmark && !is.null(bench_result) && "rate_Bench" %in% colnames(db_wide
     left_join(bench_wide, by = "domain")
 }
 
-# ---- Back-transform diff and mse for mean-welfare-with-log ----
-# comp12_obj$df reports diff = eblup_y2 - eblup_y1 and mse = MSE(diff)
-# on the log scale. We re-express on the original scale using the
-# back-transformed rate columns (already in db_wide_all by now) and
-# the delta method:
-#   diff_orig = est_y2 - est_y1
-#   mse_orig  = est_y1^2 * mse_y1_log + est_y2^2 * mse_y2_log
-#               - 2 * est_y1 * est_y2 * mcpe_log(y1, y2)
-# When MCPE between years is unavailable we fall back to the
-# independence approximation (cov = 0).
-if (identical(indicator_type, "mean_welfare") && isTRUE(log_transform) &&
-    "diff" %in% names(comparison_final) &&
-    # Skip if the change-analysis chunk earlier already back-transformed
-    # comp12_obj$df (and therefore comparison_final inherits EUR values).
-    exists("comp12_obj") && !is.null(comp12_obj) &&
-    !isTRUE(attr(comp12_obj$df, "log_back_transformed"))) {
-  rate_y1_col <- paste0(tolower(diag_model), "_", y1)
-  rate_y2_col <- paste0(tolower(diag_model), "_", y2)
-  if (all(c(rate_y1_col, rate_y2_col) %in% names(comparison_final))) {
-    est_y1 <- comparison_final[[rate_y1_col]]
-    est_y2 <- comparison_final[[rate_y2_col]]
-    # MSE columns (log scale) -- read back from db_wide_all if cached
-    mse_lookup <- db_wide_all %>%
-      select(domain, year, any_of(c("mse_MFH1", "mse_MFH2", "mse_MFH3"))) %>%
-      pivot_longer(starts_with("mse_"), names_to = "model", values_to = "mse") %>%
-      filter(model == paste0("mse_", diag_model))
-    # Already back-transformed in db_wide_all, so we need to "unback" to log scale
-    # by dividing by est^2. This is the inverse of the delta method we applied above.
-    est_lookup <- db_wide_all %>%
-      select(domain, year, all_of(rate_col))
-    log_mse <- mse_lookup %>% left_join(est_lookup, by = c("domain", "year")) %>%
-      mutate(mse_log = mse / pmax(.data[[rate_col]]^2, 1e-12)) %>%
-      select(domain, year, mse_log) %>%
-      pivot_wider(names_from = year, values_from = mse_log,
-                  names_prefix = "mse_log_")
-    comparison_final <- comparison_final %>% left_join(log_mse, by = "domain")
-    mse_y1_log <- comparison_final[[paste0("mse_log_", y1)]]
-    mse_y2_log <- comparison_final[[paste0("mse_log_", y2)]]
-    # Cross-year MCPE on the LOG scale, taken straight from the
-    # unbenchmarked bootstrap output so the back-transformed MSE of the
-    # change is consistent with how `compare_mfh()` builds it on the log
-    # scale (mse = mse_y1 + mse_y2 - 2*MCPE). Without this, the back-
-    # transformed unbenchmarked MFH MSE silently treats the two years
-    # as independent and is inflated relative to the benchmarked path,
-    # which does carry the MCPE through. Match the column name to whatever
-    # `mcpe_obj$mcpe` exposes (typically "(1,2)" but compare_mfh() also
-    # accepts a single unnamed column).
-    mcpe_y1y2_log <- if (exists("mcpe_obj") && !is.null(mcpe_obj$mcpe)) {
-      mcpe_mat_unbench <- as.matrix(mcpe_obj$mcpe)
-      target_col <- paste0("(", 1, ",", 2, ")")
-      if (target_col %in% colnames(mcpe_mat_unbench)) {
-        as.numeric(mcpe_mat_unbench[, target_col])
-      } else if (ncol(mcpe_mat_unbench) == 1) {
-        as.numeric(mcpe_mat_unbench[, 1])
-      } else {
-        rep(0, nrow(comparison_final))
-      }
-    } else {
-      rep(0, nrow(comparison_final))
-    }
-    comparison_final$diff <- est_y2 - est_y1
-    # Delta-method MSE of the change. When the MCPE term overshoots the
-    # diagonal (sampling noise in the bootstrap, especially with a small
-    # nB) the formula can return a negative or implausibly small value.
-    # Previously we clamped to 0, which produced zero-width CIs and
-    # spurious "significant" flags whenever diff was non-zero. Instead
-    # we fall back to the independence-assumption MSE (cov = 0) only
-    # when the covariance-adjusted value is zero, negative or not a
-    # number; any positive value is used, however small (owner's
-    # decision of 4 Oct 2026: no 1% rule).
-    mse_indep    <- est_y1^2 * mse_y1_log + est_y2^2 * mse_y2_log
-    mse_with_cov <- mse_indep - 2 * est_y1 * est_y2 * mcpe_y1y2_log
-    use_cov      <- is.finite(mse_with_cov) & mse_with_cov > 0
-    comparison_final$mse <- ifelse(use_cov, mse_with_cov, mse_indep)
-    comparison_final$mse_fallback_used <- !use_cov
-    comparison_final$mse_rule <- ifelse(use_cov, "covariance_adjusted", "independence_fallback")
-    n_fallback <- sum(!use_cov, na.rm = TRUE)
-    if (n_fallback > 0) {
-      cat(sprintf(
-        "Note: %d of %d domain(s) had a zero or negative ",
-        n_fallback, length(use_cov)
-      ))
-      cat("delta-method MSE for the change (likely bootstrap MCPE noise); ")
-      cat("fell back to the independence-assumption MSE for those rows.\n")
-    }
-    if (all(c("lb", "ub") %in% names(comparison_final))) {
-      se <- sqrt(comparison_final$mse)
-      alpha_vec <- if ("alpha" %in% names(comparison_final)) {
-        suppressWarnings(as.numeric(comparison_final$alpha))
-      } else {
-        rep(0.05, nrow(comparison_final))
-      }
-      alpha_vec[!is.finite(alpha_vec) | alpha_vec <= 0 | alpha_vec >= 1] <- 0.05
-      zq_vec <- qnorm(alpha_vec / 2, lower.tail = FALSE)
-      comparison_final$lb <- comparison_final$diff - zq_vec * se
-      comparison_final$ub <- comparison_final$diff + zq_vec * se
-      comparison_final$z_stat <- comparison_final$diff / se
-      comparison_final$p_value <- 2 * stats::pnorm(
-        abs(comparison_final$z_stat), lower.tail = FALSE
-      )
-      comparison_final$p_value_bh <- stats::p.adjust(
-        comparison_final$p_value, method = "BH"
-      )
-      comparison_final$p_value_bonferroni <- stats::p.adjust(
-        comparison_final$p_value, method = "bonferroni"
-      )
-      comparison_final$significant_unadjusted <- ifelse(
-        comparison_final$p_value < alpha_vec,
-        "Significant", "Not Significant"
-      )
-      comparison_final$significant_bh <- ifelse(
-        comparison_final$p_value_bh < alpha_vec,
-        "Significant", "Not Significant"
-      )
-      comparison_final$significant_bonferroni <- ifelse(
-        comparison_final$p_value_bonferroni < alpha_vec,
-        "Significant", "Not Significant"
-      )
-      comparison_final$significance_rule <- "pointwise_unadjusted"
-      comparison_final$significant <- comparison_final$significant_unadjusted
-    }
-    attr(comparison_final, "log_back_transformed") <- TRUE
-  }
-}
+
 
 # ---- Export results ----
+comparison_final$inference_status <- .inference_status
+comparison_final$covariance_boundary_reason <- .covariance_boundary_reason
+comparison_final$inference_warning <- .inference_warning
 write.csv(
   comparison_final,
   file = here::here("outputs", "tables", "comparison_final.csv"),
   row.names = FALSE
 )
 
-# Back-transform the benchmarked change analysis from log scale to the
-# original currency scale (mean welfare with log_transform only). This
-# mirrors the back-transform applied to comparison_final above. Without
-# this step, comparison_final_bench.csv stays on the log scale while
-# comparison_final.csv is in EUR -- leading to a spurious "MFH Benchmarked
-# has many significant changes" pattern in the Comparison report
-# because tiny log-scale `diff` values can clear the change-significance
-# threshold while large EUR-scale `diff` values do not.
-if (exists("comp12_bench_obj") && !is.null(comp12_bench_obj) &&
-    identical(indicator_type, "mean_welfare") && isTRUE(log_transform) &&
-    # Skip if the bench-change-analysis chunk earlier already
-    # back-transformed comp12_bench_obj$df.
-    !isTRUE(attr(comp12_bench_obj$df, "log_back_transformed"))) {
-  bench_rate_wide <- db_wide_all %>%
-    select(domain, year, rate_Bench) %>%
-    pivot_wider(names_from = year, values_from = rate_Bench,
-                names_prefix = "bench_eur_")
-  comp12_bench_obj$df <- comp12_bench_obj$df %>%
-    left_join(bench_rate_wide, by = "domain")
-  est_y1_eur <- comp12_bench_obj$df[[paste0("bench_eur_", y1)]]
-  est_y2_eur <- comp12_bench_obj$df[[paste0("bench_eur_", y2)]]
-  # Per-year log-scale MSE and the cross-year MCPE come straight from
-  # the parametric bootstrap output (bench_result$* are log-scale because
-  # the model was fitted on log(welfare); the back-transform earlier
-  # touched db_wide_all, not bench_result).
-  mse_y1_log  <- as.numeric(bench_result$mse_bench[, 1])
-  mse_y2_log  <- as.numeric(bench_result$mse_bench[, 2])
-  mcpe_log    <- if (!is.null(bench_result$mcpe_bench)) {
-    as.numeric(bench_result$mcpe_bench[, 1])
-  } else 0
-  comp12_bench_obj$df$diff <- est_y2_eur - est_y1_eur
-  # Same negative-variance guard as the unbenchmarked path: fall back to
-  # the independence MSE only when the covariance-adjusted value is zero,
-  # negative or not a number, rather than clamping to 0 (which would
-  # create zero-width CIs and false significance). Any positive value is
-  # used, however small (owner's decision of 4 Oct 2026: no 1% rule).
-  mse_indep_b    <- est_y1_eur^2 * mse_y1_log + est_y2_eur^2 * mse_y2_log
-  mse_with_cov_b <- mse_indep_b - 2 * est_y1_eur * est_y2_eur * mcpe_log
-  use_cov_b      <- is.finite(mse_with_cov_b) & mse_with_cov_b > 0
-  comp12_bench_obj$df$mse <- ifelse(use_cov_b, mse_with_cov_b, mse_indep_b)
-  comp12_bench_obj$df$mse_fallback_used <- !use_cov_b
-  comp12_bench_obj$df$mse_rule <- ifelse(use_cov_b, "covariance_adjusted", "independence_fallback")
-  n_fb_bench <- sum(!use_cov_b, na.rm = TRUE)
-  if (n_fb_bench > 0) {
-    cat(sprintf(
-      "Note: %d of %d benchmarked-change row(s) fell back to the independence-MSE (zero or negative covariance-adjusted variance).\n",
-      n_fb_bench, length(use_cov_b)
-    ))
-  }
-  se <- sqrt(comp12_bench_obj$df$mse)
-  zq <- comp12_bench_obj$df$zq
-  comp12_bench_obj$df$lb <- comp12_bench_obj$df$diff - zq * se
-  comp12_bench_obj$df$ub <- comp12_bench_obj$df$diff + zq * se
-  comp12_bench_obj$df$z_stat <- comp12_bench_obj$df$diff / se
-  comp12_bench_obj$df$p_value <- 2 * stats::pnorm(abs(comp12_bench_obj$df$z_stat), lower.tail = FALSE)
-  comp12_bench_obj$df$p_value_bh <- stats::p.adjust(comp12_bench_obj$df$p_value, method = "BH")
-  comp12_bench_obj$df$p_value_bonferroni <- stats::p.adjust(
-    comp12_bench_obj$df$p_value, method = "bonferroni")
-  comp12_bench_obj$df$significant_unadjusted <- ifelse(
-    comp12_bench_obj$df$p_value < comp12_bench_obj$df$alpha,
-    "Significant", "Not Significant")
-  comp12_bench_obj$df$significant_bh <- ifelse(
-    comp12_bench_obj$df$p_value_bh < comp12_bench_obj$df$alpha,
-    "Significant", "Not Significant")
-  comp12_bench_obj$df$significant_bonferroni <- ifelse(
-    comp12_bench_obj$df$p_value_bonferroni < comp12_bench_obj$df$alpha,
-    "Significant", "Not Significant")
-  comp12_bench_obj$df$significance_rule <- "pointwise_unadjusted"
-  comp12_bench_obj$df$significant <- comp12_bench_obj$df$significant_unadjusted
-  attr(comp12_bench_obj$df, "log_back_transformed") <- TRUE
-  cat("Benchmarked-change CSV back-transformed to EUR scale.\n")
-}
+
 
 # Export benchmarked change analysis if available
 if (exists("comp12_bench_obj") && !is.null(comp12_bench_obj)) {
+  comp12_bench_obj$df$inference_status <- .inference_status
+  comp12_bench_obj$df$covariance_boundary_reason <- .covariance_boundary_reason
+  comp12_bench_obj$df$inference_warning <- .inference_warning
   write.csv(
     comp12_bench_obj$df,
     file = here::here("outputs", "tables", "comparison_final_bench.csv"),
@@ -4214,6 +3656,9 @@ if (exists("comp12_bench_obj") && !is.null(comp12_bench_obj)) {
 .drop_mfh_cols <- setdiff(.all_mfh_cols, .selected_mfh_cols)
 .mfh_export <- db_wide_all %>%
   select(-any_of(.drop_mfh_cols))
+.mfh_export$mfh_inference_status <- .inference_status
+.mfh_export$mfh_covariance_boundary_reason <- .covariance_boundary_reason
+.mfh_export$mfh_inference_warning <- .inference_warning
 .benchmark_export_enabled <- isTRUE(do_benchmark) &&
   exists("bench_result") &&
   !is.null(bench_result)
