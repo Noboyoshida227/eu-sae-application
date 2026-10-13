@@ -19,14 +19,16 @@ What it changes
   2. Every tracked text file that contains the old version, in either form
      ("5.2.0-rc.6-wizard.3-pointwise" or "5_2_0_rc_6_wizard_3_pointwise").
      docs/CHANGELOG.md is deliberately excluded: it is history.
-  3. Renames docs/instructions/*_<old token>.pdf / .pptx to the new token.
-  4. Rewrites the version text inside the slide deck (.pptx) and the
-     guidelines note (.docx) - these are ZIP files of XML underneath.
+  3. Renames docs/instructions/EU_SAE_Download_Instructions_<old token>.pdf
+     to the new token.
+  4. Rewrites the version text inside the guidelines note (.docx) and the
+     release name inside the three Workbench guides (.pptx) - these are ZIP
+     files of XML underneath. Re-export the guides' PDFs if a guide changed.
   5. Regenerates the download-instructions PDF via tools/build_instruction_pdf.py
      (skip with --skip-pdf if reportlab is unavailable here; regenerate later).
   6. With --release-name, writes RELEASE_NAME and replaces the old release
      name (e.g. EU_SAE_520_w5h) with the new one in the same text files and
-     inside the slide deck and guidelines note.
+     inside the guides and the guidelines note.
   Folders in SKIP_DIRS (dist, tmp, outputs, app_runs, "Claude outputs", ...)
   are never touched.
 
@@ -48,12 +50,16 @@ SKIP_DIRS = {".git", "dist", "tmp", "outputs", "app_runs", "r_local_library",
 SKIP_FILES = {"docs/CHANGELOG.md",           # history - never rewritten
               "tools/bump_version.py"}       # this file quotes versions as examples
 OFFICE_TARGETS = [                            # (path pattern, XML parts to patch)
-    ("docs/instructions/EU_SAE_User_Guide_{tok}.pptx", r"ppt/slides/slide\d+\.xml"),
     ("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx", r"word/document\.xml"),
+]
+# The three Workbench guides (w5o) have no version in their file names; the
+# release name inside them (e.g. the ZIP name in Guide 1) is updated when
+# present. Their PDFs are exported from the decks, so re-export after a change.
+OPTIONAL_OFFICE_GLOBS = [
+    ("docs/instructions/EU_SAE_Workbench_Guide_*.pptx", r"ppt/slides/slide\d+\.xml"),
 ]
 RENAME_TARGETS = [
     "docs/instructions/EU_SAE_Download_Instructions_{tok}.pdf",
-    "docs/instructions/EU_SAE_User_Guide_{tok}.pptx",
 ]
 
 def token(v):  return re.sub(r"[.-]", "_", v)
@@ -149,8 +155,10 @@ def main():
 
     # ---- 4. office documents ----------------------------------------------
     say("\nOffice documents (text inside the file):")
-    for pat, part in OFFICE_TARGETS:
-        p = pat.format(tok=old_tok)
+    office = [(pat.format(tok=old_tok), part) for pat, part in OFFICE_TARGETS]
+    for pat, part in OPTIONAL_OFFICE_GLOBS:
+        office += [(p.as_posix(), part) for p in sorted(Path(".").glob(pat))]
+    for p, part in office:
         n = patch_office_zip(p, part, old, new, dry)
         if swap_short:
             n += patch_office_zip(p, part, old_short, short_name, dry)

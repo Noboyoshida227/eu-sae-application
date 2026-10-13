@@ -3,6 +3,14 @@
 Date: 2026-10-10. w5n pre-release (QER candidate); see `QER/VALIDATION_RECEIPT.md`
 for validation evidence and the scope of the candidate build.
 
+w5o (5.2.0-rc.6-wizard.5.15, 13 October 2026) keeps the estimation methods reviewed here. It
+changes the interface (now the EU SAE Workbench), corrects the population weights of survey files
+with one row per person (a new survey-unit setting; such files previously needed a household size
+of 1) and stops runs in which a domain belongs to more than one benchmark group. With
+household-level data its estimates are the same as w5n: in the Spain example check, all 117 output
+tables were identical. In w5o the 57-slide guide and its Polish and Greek versions are replaced by
+three short guides in English, Polish and Greek; see `CHANGELOG.md`.
+
 The methodological references are Molina and Romero, *Comparable Small Area Estimates over Time*
 (the 29 January 2025 manuscript supplied by the maintainer), and Harmening
 and coauthors, *A Framework for Producing Small Area Estimates Based on

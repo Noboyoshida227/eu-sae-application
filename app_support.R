@@ -309,6 +309,10 @@ validate_mapped_input_columns <- function(survey_raw, rhs_raw, var_map, rhs_doma
                                           povline_type = "column",
                                           indicator_type = "poverty") {
   required_roles <- c("year", "domain", "psu", "weight", "hh_size", "welfare")
+  # With one row per person (w5o) household size is not used.
+  if (identical(sae_survey_unit(var_map$survey_unit), "person")) {
+    required_roles <- setdiff(required_roles, "hh_size")
+  }
   if (identical(indicator_type, "poverty") && identical(povline_type, "column")) {
     required_roles <- c(required_roles, "povline")
   }
@@ -328,6 +332,9 @@ validate_mapped_input_columns <- function(survey_raw, rhs_raw, var_map, rhs_doma
   strata <- var_map$strata
   if (is.character(strata) && length(strata) == 1L && !is.na(strata) && nzchar(trimws(strata))) {
     survey_required <- c(survey_required, strata = strata)
+  }
+  if (sae_has_mapping(var_map$hh_id)) {
+    survey_required <- c(survey_required, hh_id = var_map$hh_id)
   }
   missing_survey <- survey_required[!survey_required %in% names(survey_raw)]
 
@@ -384,9 +391,11 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
     strata_var <- trimws(as.character(var_map$strata %||% ""))
     length(strata_var) == 1 && !is.na(strata_var) && nzchar(strata_var)
   })
+  survey_unit <- sae_survey_unit(var_map$survey_unit)
   rename_vec <- c(
     year = var_map$year, domain = var_map$domain, psu = var_map$psu,
-    welfare = var_map$welfare, weight = var_map$weight, hh_size = var_map$hh_size
+    welfare = var_map$welfare, weight = var_map$weight,
+    sae_unit_rename_cols(var_map, names(survey_raw), survey_unit)
   )
   if (use_strata) rename_vec <- c(rename_vec, strata = var_map$strata)
   benchmark_level_var <- trimws(as.character(
@@ -404,6 +413,9 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
     )
   )
   if (!use_strata && "strata" %in% names(survey_data)) survey_data$strata <- NULL
+  harmonize_notes <- c(harmonize_notes, utils::capture.output(
+    survey_data <- sae_apply_survey_unit(survey_data, survey_unit, "Data Readiness")
+  ))
 
   # When the poverty line is numeric, create the column. The value may be
   # a legacy scalar or a named year-to-line map.

@@ -1354,3 +1354,207 @@ sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05,
     stringsAsFactors = FALSE
   )
 }
+
+# ---- Survey unit: one row per household or one row per person (w5o) --------
+# The direct estimators weight each survey row by population_weight =
+# weight * household size, which is right when each row is a household. Some
+# national files (for example EU-SILC personal files) have one row per person
+# and already carry a person weight; multiplying by household size would count
+# each person as many times as there are members in the household. With
+# survey_unit = "person" the household size is set to 1, so population_weight
+# equals the survey weight.
+sae_survey_unit <- function(x) {
+  x <- tolower(trimws(as.character(x %||% "household")[1]))
+  if (is.na(x) || !x %in% c("household", "person")) "household" else x
+}
+
+sae_has_mapping <- function(x) {
+  length(x) == 1L && !is.na(x) && nzchar(trimws(as.character(x)))
+}
+
+# Rename map for the survey roles that depend on the survey unit: household
+# size is used only when rows are households; the household ID is optional and
+# only feeds the row-type check.
+sae_unit_rename_cols <- function(var_map, survey_names, survey_unit = "household") {
+  out <- character()
+  if (!identical(sae_survey_unit(survey_unit), "person") && sae_has_mapping(var_map$hh_size)) {
+    out <- c(out, hh_size = var_map$hh_size)
+  }
+  if (sae_has_mapping(var_map$hh_id) && var_map$hh_id %in% survey_names) {
+    out <- c(out, hh_id = var_map$hh_id)
+  }
+  out
+}
+
+sae_apply_survey_unit <- function(df, survey_unit = "household", context = "") {
+  if (identical(sae_survey_unit(survey_unit), "person")) {
+    df$hh_size <- 1
+    cat(sprintf("Survey rows are persons%s: household size is not used; population_weight = weight.\n",
+                if (nzchar(context)) paste0(" [", context, "]") else ""))
+  }
+  df
+}
+
+# Checks the declared survey unit against the data when a household ID is
+# mapped. Returns list(status = "ok" | "warning" | "error", message).
+sae_check_survey_unit <- function(df, survey_unit = "household",
+                                  hh_id_col = "hh_id", hh_size_col = "hh_size",
+                                  year_col = "year") {
+  unit <- sae_survey_unit(survey_unit)
+  ok <- list(status = "ok", message = character())
+  if (!hh_id_col %in% names(df)) return(ok)
+  ids <- as.character(df[[hh_id_col]])
+  yrs <- if (year_col %in% names(df)) as.character(df[[year_col]]) else rep("all", nrow(df))
+  keep <- !is.na(ids) & nzchar(ids)
+  if (!any(keep)) return(ok)
+  key <- paste(yrs[keep], ids[keep], sep = "\r")
+  rows_per_hh <- as.integer(table(key))
+  n_hh <- length(rows_per_hh)
+  share_multi <- mean(rows_per_hh > 1L)
+  size <- if (hh_size_col %in% names(df)) {
+    s <- suppressWarnings(as.numeric(df[[hh_size_col]][keep]))
+    tapply(s, key, function(v) v[1])
+  } else NULL
+  if (identical(unit, "household")) {
+    if (share_multi <= 0.05) return(ok)
+    matches_size <- if (!is.null(size)) {
+      mean(rows_per_hh == as.integer(round(size[names(table(key))])), na.rm = TRUE)
+    } else NA_real_
+    looks_person <- is.finite(matches_size) && matches_size >= 0.8
+    msg <- sprintf(paste0(
+      "The survey file has more than one row for %.0f%% of household IDs (%d households, %d rows). ",
+      if (looks_person) "In %.0f%% of households the number of rows equals the household size, so the file appears to have one row per person. " else "%s",
+      "Choose 'a person' for 'Each row of the survey file is', or use a file with one row per household; ",
+      "otherwise each person is counted as many times as there are members in the household."),
+      100 * share_multi, n_hh, sum(rows_per_hh),
+      if (looks_person) 100 * matches_size else "")
+    return(list(status = if (looks_person) "error" else "warning", message = msg))
+  }
+  # unit == "person": one row per household ID everywhere suggests a household
+  # file. (Household size is not informative here: with person rows it is not
+  # mapped, or already set to 1.)
+  if (share_multi == 0 && n_hh >= 20L) {
+    return(list(status = "warning", message = paste0(
+      "Every household ID appears in only one row (", n_hh, " households), so the survey file may have one row per household. ",
+      "If so, choose 'a household' for 'Each row of the survey file is' and map the household size.")))
+  }
+  ok
+}
+
+# ---- Benchmark groups: each domain must belong to exactly one group (w5o) --
+# Returns one row per conflicting domain/group/year with the number of survey
+# rows, or a zero-row data frame when every domain maps to one group.
+sae_benchmark_group_conflicts <- function(df, domain_col = "domain", group_col = "region",
+                                          year_col = "year") {
+  empty <- data.frame(domain = character(), group = character(), year = character(),
+                      rows = integer(), stringsAsFactors = FALSE)
+  if (!all(c(domain_col, group_col) %in% names(df))) return(empty)
+  d <- trimws(as.character(df[[domain_col]]))
+  g <- trimws(as.character(df[[group_col]]))
+  # A missing group code is reported as its own value.
+  g[is.na(g) | !nzchar(g)] <- "(missing)"
+  y <- if (year_col %in% names(df)) as.character(df[[year_col]]) else rep("", length(d))
+  ok <- !is.na(d) & nzchar(d)
+  d <- d[ok]; g <- g[ok]; y <- y[ok]
+  groups_per_domain <- tapply(g, d, function(v) length(unique(v)))
+  bad <- names(groups_per_domain)[groups_per_domain > 1L]
+  if (!length(bad)) return(empty)
+  sel <- d %in% bad
+  tab <- as.data.frame(table(domain = d[sel], group = g[sel], year = y[sel]),
+                       stringsAsFactors = FALSE)
+  tab <- tab[tab$Freq > 0, , drop = FALSE]
+  names(tab)[names(tab) == "Freq"] <- "rows"
+  tab[order(tab$domain, -tab$rows, tab$year), , drop = FALSE]
+}
+
+sae_benchmark_group_message <- function(conflicts, group_label = "benchmark group",
+                                        max_domains = 5L, max_groups = 4L) {
+  if (!nrow(conflicts)) return(character())
+  by_domain <- split(conflicts, conflicts$domain)
+  n_domains <- length(by_domain)
+  parts <- vapply(utils::head(by_domain, max_domains), function(x) {
+    # Largest group first: the odd code is usually the group with few rows.
+    totals <- tapply(x$rows, x$group, sum)
+    groups <- split(x, factor(x$group, levels = names(sort(totals, decreasing = TRUE))))
+    n_groups <- length(groups)
+    by_group <- vapply(utils::head(groups, max_groups), function(z) {
+      z <- z[order(z$year), , drop = FALSE]
+      yrs <- paste(sprintf("%s: %d %s", z$year, z$rows, ifelse(z$rows == 1L, "row", "rows")), collapse = ", ")
+      sprintf("%s (%s)", z$group[1], yrs)
+    }, character(1))
+    more <- if (n_groups > max_groups) sprintf(" and %d other values", n_groups - max_groups) else ""
+    sprintf("%s in %s%s", x$domain[1], paste(by_group, collapse = " and "), more)
+  }, character(1))
+  more_domains <- if (n_domains > max_domains) sprintf("; and %d more domain(s)", n_domains - max_domains) else ""
+  paste0(
+    "Benchmarking needs each domain in exactly one ", group_label, ", but ",
+    n_domains, " domain(s) have more than one value: ", paste(parts, collapse = "; "), more_domains, ". ",
+    "Correct the survey file before running (check which code is wrong: the domain code or the group code), ",
+    "or use national benchmarking.")
+}
+
+sae_stop_on_benchmark_group_conflicts <- function(df, group_label = "benchmark group",
+                                                  context = "") {
+  conflicts <- sae_benchmark_group_conflicts(df)
+  if (nrow(conflicts)) {
+    stop(if (nzchar(context)) paste0(context, ": ") else "",
+         sae_benchmark_group_message(conflicts, group_label), call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+# ---- Data overview for logs without record values (w5o) --------------------
+# Replaces glimpse(), which printed the first values of every column (survey
+# records) into the step logs.
+sae_log_data_overview <- function(df, label = "Data") {
+  df <- as.data.frame(df)
+  geom <- vapply(df, function(x) inherits(x, "sfc"), logical(1))
+  cls <- vapply(df, function(x) class(x)[1], character(1))
+  cat(sprintf("%s: %d rows, %d columns\n", label, nrow(df), ncol(df)))
+  cat(strwrap(paste(sprintf("%s <%s>", names(df), cls), collapse = ", "),
+              width = 100, prefix = "  "), sep = "\n")
+  invisible(NULL)
+}
+
+# Data Readiness messages for the survey unit (Test 0f) and benchmark groups
+# (Test 0g) (w5o). Test 0e is the log mean-welfare check in R/validation_checks.R.
+# "ERROR" in a message blocks the run, as for the other readiness tests.
+sae_readiness_unit_messages <- function(survey, survey_unit = "household", years = NULL) {
+  unit <- sae_survey_unit(survey_unit)
+  if (!is.null(years) && "year" %in% names(survey)) {
+    survey <- survey[as.integer(as.character(survey$year)) %in% as.integer(years), , drop = FALSE]
+  }
+  msgs <- character()
+  if (all(c("weight", "hh_size") %in% names(survey))) {
+    pw <- suppressWarnings(as.numeric(survey$weight) * as.numeric(survey$hh_size))
+    yr <- if ("year" %in% names(survey)) as.character(survey$year) else rep("all", nrow(survey))
+    tot <- tapply(pw, yr, sum, na.rm = TRUE)
+    totals <- paste(sprintf("%s in %s", format(round(tot), big.mark = ",", scientific = FALSE),
+                            names(tot)), collapse = " and ")
+    msgs <- c(msgs, sprintf(
+      "Test 0f: Each survey row is %s; population_weight = %s. The weighted survey represents %s persons. Compare with the population of the country: a total several times too large usually means a file with one row per person analysed as households.",
+      if (identical(unit, "person")) "a person" else "a household",
+      if (identical(unit, "person")) "weight" else "weight * household size",
+      totals))
+  }
+  chk <- sae_check_survey_unit(survey, unit)
+  if (identical(chk$status, "error")) msgs <- c(msgs, paste("Test 0f: ERROR --", chk$message))
+  if (identical(chk$status, "warning")) msgs <- c(msgs, paste("Test 0f: WARNING --", chk$message))
+  if (!"hh_id" %in% names(survey)) {
+    msgs <- c(msgs, "Test 0f: No household ID is mapped, so the app cannot check that the survey rows match the selected survey unit. Map the household ID (optional) to enable this check.")
+  }
+  msgs
+}
+
+sae_readiness_benchmark_group_messages <- function(survey, group_label = "benchmark group",
+                                                   years = NULL) {
+  if (!"region" %in% names(survey)) return(character())
+  if (!is.null(years) && "year" %in% names(survey)) {
+    survey <- survey[as.integer(as.character(survey$year)) %in% as.integer(years), , drop = FALSE]
+  }
+  conflicts <- sae_benchmark_group_conflicts(survey)
+  if (!nrow(conflicts)) {
+    return(sprintf("Test 0g: Each domain belongs to exactly one %s.", group_label))
+  }
+  paste("Test 0g: ERROR --", sae_benchmark_group_message(conflicts, group_label))
+}

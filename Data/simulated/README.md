@@ -1,7 +1,7 @@
 # Example datasets
 
-Three fully **synthetic** input files for trying the EU SAE Application
-Package end to end, plus the script that generated them.
+Three fully **synthetic** input files for trying the EU SAE Workbench
+end to end, plus the script that generated them.
 
 | File | What it is | Where to select it |
 |---|---|---|
@@ -12,23 +12,27 @@ Package end to end, plus the script that generated them.
 
 ## Quick start
 
-1. In Step 1 (Data) — or the dashboard sidebar — select the three files above
-   and set the **two analysis years to 2022 and 2023**. The year inputs do not
-   follow the data automatically: left at their defaults (2012, 2013), the
-   readiness check reports *"Requested analysis years (2012, 2013) are not
-   available"*, the domain counts show 0, and a join error
+1. In Step 1 (Input data) of the guided version — or the classic dashboard's
+   sidebar — select the three files above.
+2. In Step 2 (Map variables), assign the columns as in the table below. Each
+   row of the survey file is **a household**.
+3. In Step 3 (Configure analysis), set the **two analysis years to 2022 and
+   2023**. They are not chosen automatically: left at their defaults (2012,
+   2013), Step 3 notes that they are not in the survey file, the readiness check
+   reports *"Requested analysis years (2012, 2013) are not available"*, the
+   domain counts show 0, and a join error
    (*"'by' must specify uniquely valid columns"*) follows — all three are the
    same problem.
-2. In Step 2 (Mapping), assign the columns as in the table below.
-3. Answer **yes** to the PSU-consistency question, then run
-   **Check Data Readiness** again; all tests should pass.
+4. In Step 4 (Configure model), answer **yes** to the PSU-consistency
+   question. Then press **Check data readiness** in Step 6 (Review
+   configuration); all tests should pass.
 
 A second example -- real Spanish province geography and the dataset used in
 the guidance notes -- ships in `Data/Spain/`. It carries third-party licence terms
 (GPL-2); see `Data/Spain/README.md`. Use the synthetic files here for anything you
 intend to pass on.
 
-## Suggested variable mapping (Step 2)
+## Suggested variable mapping
 
 | App field | Column |
 |---|---|
@@ -37,10 +41,11 @@ intend to pass on.
 | psu | `psu` |
 | strata (optional) | `strata` |
 | weight | `weight` |
+| each row of the survey file is | a household |
 | household size | `hhsize` |
 | welfare | `income` |
-| poverty line (column) | `povline` |
-| benchmark level (grouped) | `region` |
+| poverty line (column, Step 3) | `povline` |
+| benchmark level (grouped, Step 4) | `region` |
 | auxiliary / geometry join key | `domain` |
 
 PSU identifiers are consistent across the two years (answer **yes** to the PSU

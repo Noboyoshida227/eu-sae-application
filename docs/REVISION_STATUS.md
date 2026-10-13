@@ -1,6 +1,6 @@
 # Revision status against the merged issue register
 
-Baseline: EU SAE application package v5.1.0. Current pre-release (QER candidate): 5.2.0-rc.6-wizard.5.14 (w5n).
+Baseline: EU SAE application package v5.1.0. Current pre-release: 5.2.0-rc.6-wizard.5.15 (w5o), built on the QER candidate 5.2.0-rc.6-wizard.5.14 (w5n).
 
 The older issue register is retained below. The current technical disposition and evidence are in [QER review note](QER/QER_README.md) and [methodology alignment](METHODOLOGY_ALIGNMENT.md); open institutional approvals are not software defects that a local revision can close.
 
@@ -39,12 +39,12 @@ closure is claimed.
 | H18 | Implemented with limits | Guarded inversions, constrained marginal-variance REML refits, zero-G and correlation-limit fixtures, non-inferior likelihood checks and standardized residual diagnostics pass. Selected uncertainty uses joint bootstrap; a valid optimization endpoint alone does not guarantee nominal interval coverage. |
 | H19 | Open | Remote branches/tags and publication workflow require repository-owner action. |
 | H20 | Implemented | Added VERSION/changelog and replaced country-specific labels. |
-| H21 | Implemented | English guidelines, four technical notes, 57-slide guide, download PDF and help/report prose revised for w5n. Historical figures are labeled illustrative. Older translated guides remain excluded pending revision. |
+| H21 | Implemented | English guidelines, four technical notes, 57-slide guide, download PDF and help/report prose revised for w5n. In w5o the guidelines note, download PDF and READMEs follow the EU SAE Workbench interface, and three short guides, in English, Polish and Greek, replace the 57-slide guide and its Polish and Greek versions. Historical figures are labeled illustrative. |
 | H22 | Partial | The canonical repository (eu-sae-application) was started with a fresh history that contains none of the prohibited binaries; the previous repository was deleted on 27 Sep 2026. Older repositories that predate the fresh start still need review (`docs/HISTORY_REMEDIATION.md`). |
 | M1 | Partial | Numerical/package/oracle checks and 2,100 MFH2 outer simulations completed. Complex-survey, selection, benchmarking and large MFH1/MFH3 coverage studies remain open. |
 | M2 | Implemented | User-authorized MFH2 default retained; users can explicitly choose MFH3-first, with documented selection/fallback rules. |
 | M3 | Implemented | Clean exports omit run histories and input-file copies. |
-| M4 | Implemented | Convenience setup copies are made only by the explicit **Save Current Setup** action and are excluded from clean exports. |
+| M4 | Implemented | Convenience copies of browsed input files are made only when a configuration is saved (**Save configuration**, and the configuration each model run records) and are excluded from clean exports. |
 | M5 | Partial | Added R-object/type, duplicate-column and ZIP-isolation checks; a full adversarial input review remains open. |
 | M6 | Open | No substantive closure is claimed; requires owner decision and validation. |
 | M7 | Open | No substantive closure is claimed; requires owner decision and validation. |

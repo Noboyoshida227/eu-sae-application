@@ -287,7 +287,9 @@ var_map <- list(
   povline  = "povline",   # poverty line
   poor     = "poor",      # poverty indicator (if exists)
   benchmark_level = "",    # optional higher-level unit for grouped benchmarking
-  region   = ""            # legacy alias; internally normalized to benchmark_level
+  region   = "",           # legacy alias; internally normalized to benchmark_level
+  hh_id    = "",           # optional household ID, used only to check the survey unit
+  survey_unit = "household" # "household" or "person" rows (w5o)
 )
 
 if (!is.null(mfh_cfg$var_map)) {
@@ -334,9 +336,13 @@ if (benchmark_level %in% c("custom", "region")) {
 }
 
 # ---- Harmonize variable names ----
+# Survey unit (w5o): with one row per person, household size is not used and
+# population_weight equals the survey weight (sae_apply_survey_unit()).
+survey_unit <- sae_survey_unit(var_map$survey_unit)
 rename_cols_mfh <- c(
   year = var_map$year, domain = var_map$domain, psu = var_map$psu,
-  weight = var_map$weight, welfare = var_map$welfare, hh_size = var_map$hh_size
+  weight = var_map$weight, welfare = var_map$welfare,
+  sae_unit_rename_cols(var_map, names(survey_raw), survey_unit)
 )
 if (use_strata) rename_cols_mfh <- c(rename_cols_mfh, strata = var_map$strata)
 if (!is.null(var_map$benchmark_level) && nzchar(var_map$benchmark_level) &&
@@ -381,6 +387,13 @@ if (povline_type == "numeric") {
     output_col = "povline"
   )
 }
+survey_dt <- sae_apply_survey_unit(survey_dt, survey_unit, "MFH")
+# Check the analysis years only, as Data Readiness does.
+.unit_years <- as.integer(unlist(cfg_or_default(mfh_cfg$years_keep, c(2012L, 2013L))))
+.unit_check <- sae_check_survey_unit(
+  survey_dt[as.integer(as.character(survey_dt$year)) %in% .unit_years, , drop = FALSE], survey_unit)
+if (identical(.unit_check$status, "error")) stop(.unit_check$message, call. = FALSE)
+if (identical(.unit_check$status, "warning")) cat("WARNING:", .unit_check$message, "\n")
 survey_dt <- sae_add_population_weight(
   survey_dt,
   weight_col = "weight",
@@ -388,7 +401,11 @@ survey_dt <- sae_add_population_weight(
   output_col = "population_weight",
   context = "MFH direct estimation"
 )
-cat("MFH direct estimates use population_weight = weight * hh_size.\n")
+cat(if (identical(survey_unit, "person")) {
+  "MFH direct estimates use population_weight = weight (one row per person).\n"
+} else {
+  "MFH direct estimates use population_weight = weight * hh_size.\n"
+})
 survey_dt <- survey_dt %>%
   mutate(domain = trimws(as.character(domain)))
 
@@ -585,7 +602,11 @@ if (do_benchmark) {
       distinct() %>%
       mutate(region = "national")
   } else if ("region" %in% colnames(survey_dt)) {
-    region_map <- survey_dt %>%
+    # Each domain must belong to exactly one benchmark group (w5o).
+    .bench_rows <- survey_dt[as.integer(as.character(survey_dt$year)) %in% years_keep, , drop = FALSE]
+    sae_stop_on_benchmark_group_conflicts(
+      .bench_rows, paste(var_map$benchmark_level, "group"), "MFH benchmarking")
+    region_map <- .bench_rows %>%
       select(domain, region) %>%
       distinct()
   } else {
@@ -612,13 +633,10 @@ source(here::here("scripts", "bench_regional_mfh.R"))
 
 
 
-survey_dt |> glimpse()
-
-
-rhs_dt |> glimpse()
-
-
-shp_dt |> glimpse()
+# Column overview only: no record values in the step log (w5o).
+sae_log_data_overview(survey_dt, "Survey data")
+sae_log_data_overview(rhs_dt, "Auxiliary data")
+sae_log_data_overview(shp_dt, "Geometry data")
 
 
 

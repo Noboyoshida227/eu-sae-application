@@ -176,6 +176,137 @@
 <h1 class="title">EU SAE Changelog</h1>
 </header>
 <h1 id="changelog">Changelog</h1>
+<h2 id="rc.6-wizard.5.15---2026-10-13">5.2.0-rc.6-wizard.5.15 -
+2026-10-13</h2>
+<p>Pre-release w5o (<code>EU_SAE_520_w5o</code>) for the review
+meeting.</p>
+<ul>
+<li><strong>New name and guided set-up.</strong> The application is now
+called <strong>EU SAE Workbench</strong> (small area estimation of
+poverty and welfare). The guided version has seven steps: Input data,
+Map variables, Configure analysis, Configure model, Add AI assistant
+(optional), Review configuration and Run model. Required fields carry a
+red asterisk, the fields of each step are set out in up to three
+columns, the analysis years are chosen from the years found in the
+survey file, and the text is larger with darker headings. The classic
+dashboard keeps its layout and uses the new name and terms.</li>
+<li><strong>Front page.</strong> Two choices: <strong>New model
+run</strong> (default settings) and <strong>Load saved
+configuration</strong> (the last saved configuration, or a configuration
+file). The last configuration is no longer applied silently at
+start-up.</li>
+<li><strong>Model run configuration</strong> (formerly “dashboard
+setup”): <strong>Save configuration</strong>, <strong>Load
+configuration</strong> (last saved, or from a file) and <strong>Reset to
+defaults</strong>. Each run stores
+<code>model_run_configuration.yml</code> in its folder under
+<code>app_runs/</code>; it can be loaded later. A configuration file
+must contain an <code>inputs</code> section. After loading, the guided
+version opens Step 6, Review configuration.</li>
+<li><strong>Run progress and result.</strong> Step 7 (and the Status tab
+of the classic dashboard) shows the stages of the run with a progress
+bar, then the result, with buttons to open the report, the output folder
+or the run folder, and to view the configuration. The run log is in a
+collapsible section. Step 6 shows whether data readiness has been
+checked for the current configuration.</li>
+<li><strong>Guides and About.</strong> A <strong>Guides and
+notes</strong> menu opens the three guides (Guide 1, Install and start;
+Guide 2, Running the Workbench; Guide 3, Estimating poverty and
+welfare) in English, Polish and Greek, the download instructions, the guidelines note, the
+methodology mapping, the validation status and this changelog.
+<strong>About</strong> gives the version, the methods and where to find
+the licence notices. Logos placed in <code>www/logos/</code> appear on
+the front page and in About; none are shipped yet.</li>
+<li><strong>Fix: survey unit.</strong> New setting <strong>Each row of
+the survey file is: a household / a person</strong>. With person rows,
+household size is not used and population_weight = weight. Before, a
+person-level file was weighted by weight × household size, so each
+person counted as many times as there are members in the household:
+population totals were inflated and large households were given too much
+weight in the direct estimates and in survey-based benchmark targets. An
+optional <strong>household ID</strong> lets the app check the rows: Data
+Readiness (Test 0f) reports the weighted population total and stops when
+the file has one row per person but “a household” is selected; the UFH
+and MFH steps apply the same check. Household-level files give the same
+results as before.</li>
+<li><strong>Fix: benchmark groups.</strong> With grouped benchmarking,
+each domain must belong to exactly one group in the analysis years. Data
+Readiness (Test 0g) and the UFH and MFH steps now stop with a message
+that names the domain, its groups, the years and the number of rows,
+instead of failing later with a technical error. Group membership is
+taken from the analysis years only.</li>
+<li><strong>Fix: loading a configuration restores the column
+mapping.</strong> When a configuration was loaded with its data files,
+the column lists were refreshed before the browser had applied the
+restored mapping, so fields such as domain, PSU and the join keys went
+back to their default names (in w5n this happened when the saved setup
+was applied at start-up; the readiness check then reported columns that
+were not in the file). The restored values are now kept until the
+browser confirms them.</li>
+<li><strong>Readiness after price changes.</strong> Changing how mean
+welfare is converted to constant prices (the price settings, the index
+values or the CPI file) now asks for a new data readiness check, like
+changes to the data, mapping, years and indicator.</li>
+<li><strong>Map legends for mean welfare</strong> show whole currency
+amounts with a thousands separator; the two-decimal labels ran
+together.</li>
+<li><strong>Significance plots in the report</strong> (final_report.html
+and .docx): a change whose pointwise 95% confidence interval excludes zero
+is drawn with a solid, thicker red interval line on top of the others
+(light grey); before, all intervals were faint. The domain order is kept.
+The caption and the report text state that the 95% intervals, BH and
+Bonferroni results are reported.</li>
+<li><strong>Documentation.</strong>
+<ul>
+<li><strong>Three short guides</strong> in
+<code>docs/instructions</code> (PowerPoint and PDF, simulated example
+data): Guide 1, Install and start (10 slides); Guide 2, Running the
+Workbench (19 slides); Guide 3, Estimating poverty and welfare (21
+slides; year-specific and anchored poverty lines and mean welfare, with
+results from runs on the simulated data), each in English, Polish
+(<code>_PL</code>) and Greek (<code>_GR</code>). They replace the
+57-slide user guide and its Polish and Greek versions.</li>
+<li><strong>Guidelines note</strong>
+(<code>docs/guidance/guidelines_v5_2_0_rc6_wizard.docx</code> and PDF):
+the new name; Section 11 rewritten for the seven steps, model run
+configurations, the readiness reset and the Step 7 progress panel, with
+new screenshots (Figures 10-16b, simulated data); the survey unit in
+Sections 3.2, 3.7, 4.5, 4.6, 4.10, 6.2, 11.12 and G.1; benchmark groups
+in 3.8, 3.9, 7.12 and 11.6; worked examples, Annexes B, C, E and F (four
+new troubleshooting rows) updated; a “Workbench 5.15 update”
+paragraph. The front-page image on the cover is larger.</li>
+<li><strong>Download instructions PDF</strong>, <code>README.md</code>,
+<code>Start_Here/README.md</code>, <code>docs/README_WIZARD.md</code>,
+<code>Data/simulated/README.md</code>, the release notices and the
+launcher window titles use the new name and steps. App help texts on
+domain populations and survey-based targets cover person rows.</li>
+<li><code>tools/bump_version.py</code> no longer expects the 57-slide
+guide; it updates the release name inside the guides and their
+translations.</li>
+<li><code>docs/</code> tidied: the draft guide decks (Four_Parts,
+Workflows_Review, Wizard_Then_Examples and their image asset), the
+earlier revisions of the guidelines note (<code>_revised</code>,
+<code>_v2</code> to <code>_v7</code>) and the 5.12 and 5.13
+download-instruction PDFs are removed from the repository (none was in
+the release package; they remain in the git history).
+<code>docs/instructions</code> now holds the three guides in English,
+Polish and Greek and the current download instructions;
+<code>docs/guidance</code> the English guidelines note and the technical
+notes.</li>
+</ul></li>
+<li><strong>Logs without record values.</strong> The UFH and MFH logs
+list the number of rows and the names and types of the columns of the
+input data; they no longer print the first values of each column.</li>
+<li><strong>Report:</strong> the date is written as YYYY-MM-DD and the
+author line reads EU SAE Workbench.</li>
+<li><strong>Continuous integration:</strong> the GitHub “quality”
+workflow installs the system libraries needed by sf and units.</li>
+<li><strong>Tests:</strong> new
+<code>tests/test_survey_unit_groups.R</code> (synthetic household and
+person files, benchmark-group conflicts, value-free logs) and new cases
+in <code>tests/test_readiness_mapping.R</code>;
+<code>tools/check_ui_parity.R</code> covers the seven steps.</li>
+</ul>
 <h2 id="rc.6-wizard.5.14---2026-10-11">5.2.0-rc.6-wizard.5.14 -
 2026-10-11</h2>
 <ul>

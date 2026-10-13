@@ -1340,6 +1340,17 @@ for (.yr in years_keep) {
 }
 
 
+# Map legend labels (w5o): rates with two decimals; currency amounts (mean
+# welfare levels and their RMSE) as whole numbers with a thousands separator,
+# so that the colour-bar labels do not run together.
+.map_label <- function(kind = c("rate", "rmse")) {
+  kind <- match.arg(kind)
+  if (identical(indicator_type, "mean_welfare")) {
+    return(label_number(accuracy = 1, big.mark = ","))
+  }
+  label_number(accuracy = if (kind == "rmse") 0.001 else 0.01)
+}
+
 plot_poverty_map <- function(col_name, method_label, year_val) {
   map_sf <- shp_dt %>%
     left_join(
@@ -1350,7 +1361,7 @@ plot_poverty_map <- function(col_name, method_label, year_val) {
     geom_sf(aes(fill = value), color = NA) +
     # Shared level scale (R/map_style.R): light = low rate, dark = high rate,
     # same value range on every poverty map (.map_level_limits).
-    sae_fill_level(labels = label_number(accuracy = 0.01),
+    sae_fill_level(labels = .map_label("rate"),
                    limits = if (exists(".map_level_limits")) .map_level_limits else NULL,
                    oob = scales::squish) +
     labs(caption = sae_map_caption(.map_attribution), 
@@ -1379,7 +1390,7 @@ plot_rmse_map <- function(col_name, method_label, year_val) {
     )
   ggplot(map_sf) +
     geom_sf(aes(fill = value), color = NA) +
-    sae_fill_level(labels = label_number(accuracy = 0.001),
+    sae_fill_level(labels = .map_label("rmse"),
                    limits = if (exists(".map_rmse_limits")) .map_rmse_limits else NULL,
                    oob = scales::squish) +
     labs(caption = sae_map_caption(.map_attribution), 
@@ -1455,7 +1466,7 @@ plot_map_grid <- function(specs, kind = c("rate", "rmse"), title = NULL) {
     geom_sf(aes(fill = value), color = NA) +
     sae_fill_level(
       name   = if (kind == "rmse") "RMSE" else pov_lab$short,
-      labels = label_number(accuracy = if (kind == "rmse") 0.001 else 0.01),
+      labels = .map_label(kind),
       limits = limits,
       oob    = scales::squish,
       guide  = guide_colourbar(barwidth = grid::unit(16, "lines"),
@@ -1835,11 +1846,20 @@ plot_significance <- function(data, method_name) {
   df <- data %>% filter(method == method_name)
   df$domain_axis <- factor(as.character(df$domain),
                            levels = .domain_axis_levels(df$domain))
+  # Significant changes (the pointwise 95% CI excludes zero) are drawn on top,
+  # with solid, thicker red interval lines; the others stay light gray.
+  .sig_rows <- df$significant_label %in% c("Significant", "Provisional: p < 0.05")
   ggplot(df, aes(x = domain_axis, y = diff, color = significant_label)) +
+    # Keep the domain order when the two layers hold different domains.
+    scale_x_discrete(limits = levels(droplevels(df$domain_axis))) +
     scale_y_continuous(labels = label_number(scale = .change_display_scale, accuracy = .change_label_accuracy)) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-    geom_point(size = 2.5, alpha = 0.8) +
-    geom_errorbar(aes(ymin = lb, ymax = ub), width = 0.25, alpha = 0.5) +
+    geom_errorbar(data = df[!.sig_rows, , drop = FALSE], aes(ymin = lb, ymax = ub),
+                  width = 0.25, linewidth = 0.5, alpha = 0.6) +
+    geom_point(data = df[!.sig_rows, , drop = FALSE], size = 2.5, alpha = 0.8) +
+    geom_errorbar(data = df[.sig_rows, , drop = FALSE], aes(ymin = lb, ymax = ub),
+                  width = 0.4, linewidth = 1.2) +
+    geom_point(data = df[.sig_rows, , drop = FALSE], size = 3) +
     scale_color_manual(values = c("Not Significant" = "gray60", "Significant" = "red",
                                   "Provisional: p < 0.05" = "#A65F00", "Provisional: p >= 0.05" = "gray60")) +
     labs(
@@ -1852,10 +1872,10 @@ plot_significance <- function(data, method_name) {
       },
       x = "Domain",
       y = paste0("Estimated change", .change_unit_suffix),
-      color = "Pointwise status",
+      color = "Pointwise 95% CI",
       caption = if (any(df$inference_status == "boundary_sensitive", na.rm = TRUE))
         "Provisional MFH inference: covariance boundary; nominal 95% intervals can understate uncertainty.\nLarger bootstrap counts alone do not resolve this limitation." else
-        "Red points indicate pointwise significance (unadjusted p < 0.05); bars are pointwise 95% confidence intervals"
+        "Red: the pointwise 95% confidence interval excludes zero (statistically significant, unadjusted p < 0.05).\nBH- and Bonferroni-adjusted results are in the significance table."
     ) +
     theme_minimal(base_size = 14) +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
@@ -2239,7 +2259,6 @@ message("Exporting map grids ...")
   out_dir <- file.path(figures_root, folder, "grid_panels")
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
   limits   <- if (kind == "rmse") .map_rmse_limits else .map_level_limits
-  accuracy <- if (kind == "rmse") 0.001 else 0.01
   panel_w  <- 4
   panel_h  <- panel_w / .map_panel_aspect(shp_dt)
   rows <- list()
@@ -2275,7 +2294,7 @@ message("Exporting map grids ...")
       geom_raster() +
       sae_fill_level(limits = limits, guide = "none") +
       scale_x_continuous(name = if (kind == "rmse") "RMSE" else pov_lab$short,
-                         labels = label_number(accuracy = accuracy),
+                         labels = .map_label(kind),
                          expand = c(0, 0)) +
       scale_y_continuous(expand = c(0, 0)) +
       theme_minimal(base_size = 13) +

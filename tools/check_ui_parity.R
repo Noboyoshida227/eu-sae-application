@@ -1,7 +1,7 @@
 # Verification: render app.R's original UI and the wizard UI side by
 # side (no pipeline packages required) and prove the two contain exactly
-# the same set of element IDs -- i.e. the regrouping into six steps
-# dropped nothing and duplicated nothing.
+# the same set of element IDs -- i.e. the regrouping into seven steps
+# dropped nothing and duplicated nothing. The wizard may add ids of its own.
 suppressMessages(library(shiny))
 options(encoding = "UTF-8")
 `%||%` <- function(a, b) if (is.null(a)) b else a
@@ -10,13 +10,15 @@ supported_languages <- function() c(English = "en", French = "fr")
 # Run from the package root:  Rscript tools/check_ui_parity.R
 root <- if (basename(getwd()) == "tools") ".." else "."
 core <- file.path(root, "app.R")
+.app_dir <- .wiz_app_dir <- normalizePath(root, winslash = "/")
+source(file.path(root, "R", "workbench_ui.R"))
 source(file.path(root, "R", "landing_page.R"))
 
 # Pull only the UI helpers and the `ui` object out of app.R.
 for (e in as.list(parse(core, keep.source = FALSE, encoding = "UTF-8"))) {
   if (is.call(e) && as.character(e[[1]])[1] %in% c("<-", "=") &&
       as.character(e[[2]])[1] %in% c("tip_label", "mapping_selectize",
-                                     "ic_criterion_input", "price_index_inputs",
+                                     "ic_criterion_input", "price_index_inputs", "survey_unit_input",
                                      "ui")) {
     eval(e, envir = globalenv())
   }
@@ -26,7 +28,7 @@ ui_core <- ui
 for (e in as.list(parse(file.path(root, "app_wizard.R"), keep.source = FALSE,
                         encoding = "UTF-8"))) {
   if (is.call(e) && as.character(e[[1]])[1] %in% c("<-", "=") &&
-      as.character(e[[2]])[1] %in% c("WIZ_STEPS", "WIZ_IDS", "wiz_step_header",
+      as.character(e[[2]])[1] %in% c("WIZ_STEPS", "WIZ_IDS", "wiz_req", "wiz_step_header",
                                      "wiz_nav", "wiz_panel", "wiz_head", "ui")) {
     eval(e, envir = globalenv())
   }

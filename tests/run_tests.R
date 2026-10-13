@@ -17,7 +17,7 @@ parse_ok <- vapply(r_files, function(path) {
 check(all(parse_ok), "all R sources parse")
 check(identical(trimws(readLines("VERSION", warn = FALSE)[1]), "5.2.0-rc.6"), "VERSION is the candidate version")
 check(identical(trimws(readLines("WIZARD_VERSION", warn = FALSE)[1]),
-                "5.2.0-rc.6-wizard.5.14"),
+                "5.2.0-rc.6-wizard.5.15"),
       "WIZARD_VERSION identifies the rc.6 wizard overlay")
 wizard_version <- trimws(readLines("WIZARD_VERSION", warn = FALSE)[1])
 changelog_text <- read_all("docs/CHANGELOG.md")
@@ -68,8 +68,10 @@ check(grepl('significance_rule = "pointwise_unadjusted"', mfh_text, fixed = TRUE
         grepl("significant_bonferroni", mfh_text, fixed = TRUE) &&
         grepl("sae_joint_error_moments", mfh_text, fixed = TRUE),
       "MFH keeps pointwise significance primary and reports BH/Bonferroni sensitivities")
-check(grepl("bars are pointwise 95% confidence intervals", comparison_text, fixed = TRUE),
-      "comparison figures disclose the pointwise significance rule")
+check(grepl("the pointwise 95% confidence interval excludes zero", comparison_text, fixed = TRUE) &&
+        grepl("BH- and Bonferroni-adjusted results are in the significance table", comparison_text, fixed = TRUE) &&
+        grepl("linewidth = 1.2", comparison_text, fixed = TRUE),
+      "comparison figures disclose the pointwise significance rule and draw significant 95% intervals in bold red")
 check(grepl("p_value = p_raw", comparison_text, fixed = TRUE) &&
         grepl("p_value_bh = p_bh", comparison_text, fixed = TRUE) &&
         grepl("p_value_bonferroni = p_bonferroni", comparison_text, fixed = TRUE) &&
@@ -116,17 +118,31 @@ check(all(c("Data/Spain/survey.rds", "Data/Spain/auxiliary.rds", "Data/Spain/sha
       "release inventory contains approved examples and excludes internal/generated/literature files")
 check(grepl("sae_write_release_manifest", wizard_manifest_text, fixed = TRUE),
       "wizard manifest delegates to the shared inventory implementation")
+# Guides are listed by the shared "Guides and notes" menu (R/workbench_ui.R,
+# w5o), which picks the newest shipped version of each guide.
+source("R/workbench_ui.R", local = TRUE)
+.res_links <- vapply(sae_resource_links("."), function(l) l$href, character(1))
 wizard_resources <- c(
-  "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx",
-  "docs/MCPE_VALIDATION_STATUS.md",
-  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_14.pdf",
-  "docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_14.pptx"
+  "docs/guidance/guidelines_v5_2_0_rc6_wizard.pdf",
+  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_15.pdf",
+  "docs/instructions/EU_SAE_Workbench_Guide_1_Install_and_Start.pdf",
+  "docs/instructions/EU_SAE_Workbench_Guide_2_Running_the_Workbench.pdf",
+  "docs/instructions/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare.pdf",
+  # Polish (_PL) and Greek (_GR) versions of the three guides
+  paste0("docs/instructions/EU_SAE_Workbench_Guide_",
+         rep(c("1_Install_and_Start", "2_Running_the_Workbench",
+               "3_Estimating_Poverty_and_Welfare"), each = 2),
+         c("_PL", "_GR"), ".pdf")
 )
 check(all(vapply(wizard_resources, file.exists, logical(1))) &&
-        all(vapply(wizard_resources, grepl, logical(1), x = wizard_text,
-                   fixed = TRUE)) &&
-        !grepl("v5_1_0", wizard_text, fixed = TRUE),
-      "wizard resources reference only shipped rc.6 guidance")
+        all(wizard_resources %in% inventory) &&
+        all(paste0("eusae-", wizard_resources) %in% .res_links) &&
+        grepl("sae_resource_menu(.wiz_app_dir", wizard_text, fixed = TRUE) &&
+        !grepl("v5_1_0", wizard_text, fixed = TRUE) &&
+        !any(grepl("EU_SAE_User_Guide_", c(inventory, .res_links), fixed = TRUE)),
+      "wizard resources reference only shipped guidance (the three guides in English, Polish and Greek; no 57-slide guide)")
+check(identical(sae_natural_key(c("a_5_9.pdf", "a_5_14.pdf"))[2] > sae_natural_key(c("a_5_9.pdf", "a_5_14.pdf"))[1], TRUE),
+      "guide menu orders version numbers numerically")
 brief_text <- read_all("R/brief_generator.R")
 check(!grepl('country\\s*=\\s*"Greece"', paste(app_text, brief_text)), "no hard-coded Greece report country")
 check(!grepl("nB\\s*=\\s*50([,)]|\\s)", mfh_text), "MCPE is not hard-coded to 50")
@@ -547,6 +563,7 @@ readiness_collision_ok <- local({
 check(all(readiness_collision_ok),
       "Data Readiness uses the mapped poverty line when another column is already named povline")
 source("tests/test_readiness_mapping.R")
+source("tests/test_survey_unit_groups.R")
 
 ess_boundary <- sae_effective_sample_size(
   sample_size = c(12, 20, 30),

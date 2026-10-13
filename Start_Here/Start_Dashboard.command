@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-#  EU SAE Dashboard - One-click launcher (macOS / Linux)
+#  EU SAE Workbench (classic dashboard) - One-click launcher (macOS / Linux)
 #
 #  macOS:  double-click this file. Terminal opens and the app starts.
 #          Your default web browser opens automatically.
@@ -80,7 +80,7 @@ if [ -n "$MISSING" ]; then
 fi
 
 echo "============================================"
-echo "   EU SAE Application - Classic Dashboard"
+echo "   EU SAE Workbench - Classic dashboard"
 echo "============================================"
 echo ""
 echo "Starting up..."

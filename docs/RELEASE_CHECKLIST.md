@@ -4,7 +4,10 @@ A release manager must record evidence for every item before changing the
 candidate label to a production version.
 
 For the w5n pre-release (QER candidate), completed Windows checks and their scope are
-recorded in [the validation receipt](QER/VALIDATION_RECEIPT.md). The production
+recorded in [the validation receipt](QER/VALIDATION_RECEIPT.md). The w5o pre-release
+changes the interface and adds the survey-unit and benchmark-group checks; its
+tests and the Spain example check (household-level data, estimates identical to
+w5n) are listed in the w5o entry of [the changelog](CHANGELOG.md). The production
 release gates below remain separate from that candidate review.
 
 - [ ] Method owner approves the variance-smoothing policy and simulations.

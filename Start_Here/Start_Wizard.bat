@@ -1,15 +1,15 @@
 @echo off
 setlocal DisableDelayedExpansion
 REM ============================================================
-REM  EU SAE Dashboard 5.2.0-rc.6-wizard.5.14 - One-click launcher (Windows)
+REM  EU SAE Workbench 5.2.0-rc.6-wizard.5.15 - One-click launcher (Windows)
 REM
-REM  Double-click this file to start the step-by-step (wizard) dashboard.
-REM  Your default web browser will open with the dashboard.
-REM  Keep this window open while using the dashboard.
-REM  Close this window to stop the dashboard.
+REM  Double-click this file to start the guided version of the Workbench.
+REM  Your default web browser will open with the Workbench.
+REM  Keep this window open while using the Workbench.
+REM  Close this window to stop the Workbench.
 REM ============================================================
 
-title EU SAE Dashboard - Wizard
+title EU SAE Workbench - Guided version
 REM Start_Here must remain directly inside the extracted package folder.
 cd /d "%~dp0.." || (
   echo ERROR: Cannot open the package folder above Start_Here.
@@ -28,15 +28,15 @@ for %%F in ("app.R" "app_support.R" "install_packages.R" "report.Rmd" "R\input_r
 )
 
 echo ============================================
-echo    EU SAE Dashboard - Guided Setup
+echo    EU SAE Workbench - Guided version
 echo ============================================
 echo.
 echo Starting up...
 echo Your web browser will open automatically in a few moments.
 echo (First run may take several minutes while packages install.)
 echo.
-echo IMPORTANT: Keep this window open while using the dashboard.
-echo Close this window to stop the dashboard.
+echo IMPORTANT: Keep this window open while using the Workbench.
+echo Close this window to stop the Workbench.
 echo.
 echo --------------------------------------------
 echo.

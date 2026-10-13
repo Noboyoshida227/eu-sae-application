@@ -1,4 +1,4 @@
-# Start the application
+# Start the EU SAE Workbench
 
 Download the application zip from
 <https://github.com/Noboyoshida227/eu-sae-application/releases> (under **Assets**; not the
@@ -6,15 +6,18 @@ Download the application zip from
 launcher for your computer. Keep `Start_Here` directly inside the package
 folder — the launchers use the folder above as their working directory.
 
-| Your computer | Guided interface (recommended) | Classic dashboard |
+| Your computer | Guided version (recommended) | Classic dashboard |
 |---|---|---|
 | **Windows** | `Start_Wizard.bat` | `Start_Dashboard.bat` |
 | **macOS** | `Start_Wizard.command` | `Start_Dashboard.command` |
 | **Linux** | `bash Start_Wizard.command` | `bash Start_Dashboard.command` |
 
 Double-click the launcher. A terminal window opens, R starts, and your web
-browser opens with the application. **Keep that window open while you work** —
-closing it stops the application.
+browser opens with the EU SAE Workbench. **Keep that window open while you work** —
+closing it stops the Workbench. On the front page, choose **New model run** to
+start from the default settings, or **Load saved configuration** to continue from
+a saved one. The guided version takes you through seven steps; the classic
+dashboard has the same settings on one page.
 
 The first run takes several minutes while R packages install, and needs an
 internet connection. Later runs start much faster.
@@ -104,11 +107,12 @@ On Windows the equivalent is `setx EU_SAE_RSCRIPT "C:\Program Files\R\R-4.5.2\bi
 
 ## During and after a run
 
-While an analysis runs, the page stays usable and the log updates live.
-**Stop**, next to **Run Analysis**, ends the run; it then finishes as *Stopped
+While a model runs, the page stays usable and shows the progress of each stage.
+**Stop**, next to **Run model**, ends the run; it then finishes as *Stopped
 by user*. Press **Stop** before closing the terminal window.
 
-After a run, open `../outputs/final_report.html` in a browser, or
+After a run, use **Open the report** (Step 7 of the guided version), or open
+`../outputs/final_report.html` in a browser, or
 `../outputs/final_report.docx` in Word (paths relative to this folder). The Word
 text and tables are editable and the figures are embedded — save a separate copy
 before editing. If only the HTML appears, check the run log for a

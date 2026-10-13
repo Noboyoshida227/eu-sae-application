@@ -28,6 +28,15 @@ below.
 The application's default analysis years -- 2012 and 2013 -- already match this
 dataset; 2014 is available as a third round.
 
+Each row is a household ("Each row of the survey file is: a household"). The
+weights of this synthetic example were derived from person-level data and sum
+to about 42.7 million in each year, the population of Spain, so Data Readiness
+(Test 0f) reports a weighted population of about 170 million once they are
+multiplied by household size. This is a property of the example, not an
+error in the application: the estimates depend only on the relative weights.
+With real survey data, the weighted total should be close to the country's
+population.
+
 `provlab` in `auxiliary.rds` is a province *name*, not a covariate. It is
 skipped automatically during variable selection (a note appears in the step
 log), so there is no need to remove it.

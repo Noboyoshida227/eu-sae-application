@@ -485,7 +485,7 @@ assess_data_readiness <- function(survey_data,
       )), cor_target_label = cor_target_label))
     } else {
       msgs <- c(msgs,
-        "Test 0c: Direct estimates will use population_weight = weight * household size."
+        "Test 0c: Direct estimates will use population_weight = weight * household size (household size is 1 when each survey row is a person)."
       )
     }
   }

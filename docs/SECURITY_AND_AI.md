@@ -19,7 +19,7 @@ Provider model IDs can also be overridden without editing the application:
 - `SAE_OPENAI_MODEL` (default: `gpt-4.1`)
 - `SAE_ANTHROPIC_MODEL` (default: `claude-sonnet-4-6`)
 
-Do not place API keys in configuration files, saved setups, reports, logs, or
+Do not place API keys in configuration files, saved configurations, reports, logs, or
 the repository. Review provider retention, residency, contractual terms, and
 incident-response requirements before enabling external calls.
 

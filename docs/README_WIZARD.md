@@ -1,25 +1,25 @@
-# EU SAE Dashboard — Wizard edition
+# EU SAE Workbench — guided version (wizard)
 
-Wizard version: **5.2.0-rc.6-wizard.5.14**
+Wizard version: **5.2.0-rc.6-wizard.5.15**
 Underlying EU SAE package: **5.2.0-rc.6**
 
 This is the clean 5.2.0-rc.6 application package with an additional guided
 front end. The statistical pipeline and the classic dashboard remain in
-`app.R`; `app_wizard.R` presents the same inputs as six sequential steps and
-reuses the same server logic.
+`app.R`; `app_wizard.R`, the guided version, presents the same inputs as seven
+sequential steps and reuses the same server logic.
 
 ## Included entry points
 
 | File | Purpose |
 |---|---|
-| `Start_Here/Start_Wizard.bat` | Launches the six-step wizard on Windows, normally on localhost port 7788 |
-| `Start_Here/Start_Wizard.command` | Launches the six-step wizard on macOS or Linux |
-| `app_wizard.R` | Wizard front end |
+| `Start_Here/Start_Wizard.bat` | Launches the seven-step guided version on Windows, normally on localhost port 7788 |
+| `Start_Here/Start_Wizard.command` | Launches the seven-step guided version on macOS or Linux |
+| `app_wizard.R` | Guided version (wizard) front end |
 | `Start_Here/Start_Dashboard.bat` | Launches the classic dashboard on Windows, normally on localhost port 7777 |
 | `Start_Here/Start_Dashboard.command` | Launches the classic dashboard on macOS or Linux |
 | `app.R` | 5.2.0-rc.6 classic dashboard and shared server |
 
-Both dashboards may run at the same time because they use different ports.
+Both interfaces may run at the same time because they use different ports.
 
 ## Run the wizard
 
@@ -52,8 +52,9 @@ require Control-clicking the file and choosing **Open**. On Linux, run
 Gatekeeper and executable-permission help.
 
 The launcher opens `http://127.0.0.1:7788` and tries successive ports if 7788
-is occupied. Keep the launcher window open while using the dashboard. As an
-alternative, open `app_wizard.R` in RStudio and select **Run App**.
+is occupied. Keep the launcher window open while using the Workbench. On the
+front page, choose **New model run** (default settings) or **Load saved
+configuration**. As an alternative, open `app_wizard.R` in RStudio and select **Run App**.
 
 Two example datasets are included, both for learning and testing only.
 `Data/simulated/` holds fully synthetic files built by an included seeded script.
@@ -63,14 +64,23 @@ licence and open provenance item. Neither may feed a real estimate. For actual
 analyses, select your own survey, auxiliary-covariate, and geometry files in
 step 1.
 
-## Wizard steps
+## The seven steps
 
-1. **Data** — country or territory, analysis years, reproducibility seed, run
-   label, and survey, auxiliary, geometry, and optional population files. For
-   mean welfare in constant prices, an optional **Consumer price index** file
-   holds one country's CPI by year (see the Indicator step).
-2. **Mapping** — survey columns and the auxiliary/geometry join keys.
-3. **Indicator** — poverty (FGT) or mean welfare and its required settings.
+Required fields carry a red asterisk.
+
+1. **Input data** — survey, auxiliary, geometry, and optional population
+   files. For mean welfare in constant prices, an optional **Consumer price
+   index** file holds one country's CPI by year (see Configure analysis).
+2. **Map variables** — survey columns, **Each row of the survey file is** (a
+   household or a person), an optional household ID, and the
+   auxiliary/geometry join keys. With a household, population_weight = weight
+   × household size; with a person, the weight is used as it is and household
+   size is not needed. Choosing a household for a file with one row per person
+   would count each person once per household member; with a household ID,
+   readiness Test 0f stops the run in that case.
+3. **Configure analysis** — the two analysis years (chosen from the years found
+   in the survey file), country or territory, reproducibility seed, and the
+   indicator: poverty (FGT) or mean welfare and its required settings.
    For mean welfare, **Welfare in the survey data is in** says which prices
    the survey's income or expenditure is in:
    - **current prices: convert with a price index**: give a consumer price
@@ -90,7 +100,7 @@ step 1.
    and the poverty line must already be in the same prices in each year.
 
    With the first choice, **Price index values** says where the index comes from:
-   typed in by year, or read from the CPI file chosen in the Data step. The
+   typed in by year, or read from the CPI file chosen in Step 1, Input data. The
    CPI file has one row per year, with a year column (for example 2013, or
    text such as 2013A00) and one or more CPI columns; you choose the **Year
    column** and the **CPI column**, and the app takes the years it needs and
@@ -128,18 +138,26 @@ step 1.
    (for example household by household with the index of its own period) and
    choose **constant (real) prices already**. The run log, the readiness
    messages, the review page and the report name the CPI file and column.
-4. **Models** — UFH and MFH choices, Bootstrap replicates (default 500), benchmarking,
-   covariate selection, and PSU consistency.
-5. **AI Assistant** — optional external-transfer consent, API key, and output
-   language.
-6. **Review & Run** — settings summary, preflight/readiness checks, and run.
+4. **Configure model** — UFH and MFH choices, Bootstrap replicates (default
+   500), benchmarking, covariate selection, and PSU consistency.
+5. **Add AI assistant** — optional external-transfer consent, API key, and
+   output language.
+6. **Review configuration** — configuration summary, the data files of the
+   configuration, and **Check data readiness** (Preflight and Data Readiness
+   tabs).
+7. **Run model** — optional run label, **Run model** and **Stop**, a progress
+   panel with the stages of the run, then the result with buttons to open the
+   report or the output folder and to view the configuration.
 
 For UFH and MFH, `sm_out` now has one simple rule: replace a direct variance
 only when it is missing/non-finite or strictly below 0.001. A direct variance
 equal to 0.001 is retained. Under benchmarking, choose **National** to make the
 population-weighted average of the domain estimates equal the direct national
-estimate, or choose **Grouped** and map a higher-level survey variable to apply
-the constraint separately within each group. A **Benchmark Target Database**
+estimate, or choose **Grouped by a survey variable** and map a higher-level
+survey variable to apply the constraint separately within each group. Each
+domain must belong to exactly one group in the analysis years; otherwise
+readiness Test 0g and the UFH and MFH steps stop with a message that names the
+domain, its group codes, the years and the number of rows. A **Benchmark Target Database**
 replaces the survey's figures as targets; its figures must be in the same
 prices as the survey's welfare, and when the app converts welfare with a price
 index they are converted in the same way. For mean welfare fitted
@@ -152,7 +170,7 @@ adjustment. Survey-derived targets are recomputed in every replicate; uploaded
 targets are held fixed, so uncertainty in externally supplied targets is excluded.
 Matching a target alone does not validate uncertainty.
 
-In **Models**, the AIC/BIC *Model selection criterion* is used only for
+In **Configure model**, the AIC/BIC *Model selection criterion* is used only for
 stepwise covariate selection. If LASSO is off and covariates are entered for
 both years of a model, that model uses exactly those covariates: its
 criterion box shows "Not used: covariates fixed for both years", and the run
@@ -161,7 +179,7 @@ year only, the criterion applies to the other year, and a note under the box
 says so. With LASSO on, the entered covariates are a candidate pool and the
 criterion is always used.
 
-The breadcrumb is clickable. Green indicates a complete step, amber indicates
+The step buttons are clickable. Green indicates a complete step, amber indicates
 an outstanding item, and blue indicates the current step.
 
 ### MFH3/MFH2 model-selection rule
@@ -213,17 +231,25 @@ paper-to-code mapping, explicit extensions and remaining validation limits.
 ### Validation and consent
 
 Navigation is deliberately soft: **Next** remains available when a step is
-incomplete, and the wizard lists the outstanding items. The final run control
-is disabled until the fatal data prerequisites are present. The shared rc.6
+incomplete, and each step lists its outstanding items. **Run model** is
+disabled until the three data files and the two analysis years are set, and a
+run starts only after a data readiness check without ERROR. The shared rc.6
 server performs its own configuration and readiness checks before analysis.
 
 ### Data Readiness
 
-**1. Check Data Readiness** (and every **Run Analysis**, which repeats the
-check first) writes the readiness tables to `outputs/tables/`:
+**Check data readiness** (Step 6; **1. Check data readiness** in the classic
+dashboard), and every **Run model**, which repeats the check first, writes the
+readiness tables to `outputs/tables/`:
 `aux_covariate_summary.csv`, `national_poverty.csv`, `domain_poverty_rates.csv`,
 `domain_consistency.csv`, `readiness_messages.txt` and, when cells are missing,
 `missing_poverty.csv`. They are kept through the run and archived with it.
+Test 0f reports the weighted population total and, when a household ID is
+mapped, checks that the rows match **Each row of the survey file is**; with
+grouped benchmarking, Test 0g checks that each domain belongs to one group.
+Changes to the data files, mapping, years, indicator, model transformations,
+LASSO, seed, bootstrap replicates, steps, benchmarking or the price settings
+of mean welfare ask for a new check.
 
 The *Auxiliary Covariate Summary* reports, for each covariate and each analysis
 year plus "All years", the mean, standard error, number of domains and the
@@ -237,13 +263,15 @@ selection in UFH and MFH.
 
 ### Running and stopping
 
-**2. Run Analysis** starts the UFH / MFH / Comparison steps, the optional AI
+**Run model** (Step 7; **2. Run model** in the classic dashboard) starts the
+UFH / MFH / Comparison steps, the optional AI
 interpretation, the report and the archive copy in a separate R process
-(`scripts/run_pipeline_bg.R`). The page stays responsive while it works: the
-log pane follows `app_runs/<run>/run.log` live and the progress bar follows
-the step in progress. A second click on **Run Analysis** is refused until the
-current run has ended. Do not start analyses from two browser pages, or from
-the wizard and the classic dashboard, at the same time: they share `outputs/`,
+(`scripts/run_pipeline_bg.R`). The page stays responsive while it works: a
+progress panel shows each stage with a progress bar, and the run log (a
+collapsible section) follows `app_runs/<run>/run.log` live. A second click on
+**Run model** is refused until the current run has ended. Do not start model
+runs from two browser pages, or from the guided version and the classic
+dashboard, at the same time: they share `outputs/`,
 and the second run clears the first run's files. **Stop** ends
 the run: the R process of the current step is terminated and the run
 finishes with the status *Stopped by user*. Files written before the stop
@@ -263,7 +291,7 @@ percentage changes; the difference in currency units is kept in
 `statistical_significance_comparison.xlsx` (columns ending in `_eur`). The UFH
 and MFH step figures in `outputs/figures/` still show currency differences.
 When welfare is converted with a price index, or is already in constant
-prices (see **Indicator** above), these are real changes. With current prices
+prices (see **Configure analysis** above), these are real changes. With current prices
 and no conversion they include inflation, and Data Readiness says so.
 
 ### Maps
@@ -326,11 +354,30 @@ includes the complete pointwise/BH/Bonferroni table, the change-and-RMSE box
 plots, the paired UFH-MFH figures of changes and interval widths, and links to the consolidated Excel result tables in
 `outputs/data/`.
 
-### Loading a saved setup
+### Saving and loading configurations
 
-**Load Last Setup** is available from every step. After a successful load, the
-wizard moves to the review step. API keys and external-transfer consent are not
-persisted and must be entered again for each session.
+**Save configuration** records the data files, the variable mapping and the
+analysis and model settings, and copies files selected with Browse to
+`app_runs/_last_setup_files`. A successful run also saves its configuration,
+and each run folder holds its own `model_run_configuration.yml`. **Load
+configuration** (on every step) restores the last saved configuration or a
+configuration file, which must contain an `inputs` section; on the front page,
+**Load saved configuration** does the same. After a successful load, the guided
+version moves to Step 6, Review configuration, and both versions warn when a
+data file has changed since the configuration was saved (SHA-256 checksums).
+**Reset to defaults** deletes the last saved configuration and its file copies.
+API keys and external-transfer consent are not persisted and must be entered
+again for each session.
+
+### Guides and About
+
+The **Guides and notes** menu opens the three guides in `docs/instructions`
+(Guide 1, Install and start; Guide 2, Running the Workbench; Guide 3,
+Estimating poverty and welfare), in English and, under their own headings,
+in Polish (`_PL` files) and Greek (`_GR` files), then the download
+instructions, the guidelines note, the methodology mapping, the validation
+status and the changelog.
+**About** shows the version.
 
 ## Architecture and maintenance rule
 

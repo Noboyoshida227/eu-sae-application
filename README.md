@@ -1,6 +1,6 @@
-# EU SAE Application Package 5.2.0-rc.6
+# EU SAE Workbench (application package 5.2.0-rc.6)
 
-w5n is a pre-release for review by the country teams. It includes statistical repairs, revised guidance (the user guide also in Polish and Greek) and validation evidence. Start with the [QER review note](docs/QER/QER_README.md) and [methodology alignment](docs/METHODOLOGY_ALIGNMENT.md). Re-run analyses made with earlier versions: estimates and uncertainty can change. MFH2 remains the default; MFH3-first remains optional.
+w5o is a pre-release for the review meeting. The application is now called the EU SAE Workbench: a guided version with seven steps (recommended) and the classic dashboard, with saved model run configurations and three short guides. It corrects the weighting of survey files with one row per person and checks that each domain belongs to one benchmark group; estimates for household-level files are unchanged from w5n. Start with the [QER review note](docs/QER/QER_README.md) and [methodology alignment](docs/METHODOLOGY_ALIGNMENT.md). Re-run analyses made with earlier versions: estimates and uncertainty can change. MFH2 remains the default; MFH3-first remains optional.
 
 ## Start here
 
@@ -22,15 +22,15 @@ checksum-verified copy into your user profile on first run (no administrator
 rights). Without it the analysis still runs and the report is skipped; see
 `Start_Here/README.md`. The `sf` package also needs its
 platform-specific system libraries. Keep the launcher window open while using
-the application.
+the Workbench.
 
 | Interface | Launch |
 |---|---|
-| Guided wizard (recommended on Windows) | Double-click `Start_Here/Start_Wizard.bat`; normally port 7788 |
+| Guided version (recommended) on Windows | Double-click `Start_Here/Start_Wizard.bat`; normally port 7788 |
 | Classic dashboard on Windows | Double-click `Start_Here/Start_Dashboard.bat`; normally port 7777 |
-| Guided wizard on macOS | Double-click `Start_Here/Start_Wizard.command` |
+| Guided version on macOS | Double-click `Start_Here/Start_Wizard.command` |
 | Classic dashboard on macOS | Double-click `Start_Here/Start_Dashboard.command` |
-| Guided wizard on Linux | Run `bash Start_Here/Start_Wizard.command` |
+| Guided version on Linux | Run `bash Start_Here/Start_Wizard.command` |
 | Classic dashboard on Linux | Run `bash Start_Here/Start_Dashboard.command` |
 
 On Windows or macOS, open the **Start_Here** folder and choose a launcher. Keep
@@ -43,14 +43,15 @@ Ports advance if occupied. There is no supplied wizard shell launcher; manual
 launch through R remains possible from the package root using
 `source("app_wizard.R")` after installing dependencies.
 
-- [Download and verification instructions](docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_14.pdf)
-- [Wizard reference](docs/README_WIZARD.md) and [slide guide](docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_14.pptx)
+- [Download and verification instructions](docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_15.pdf)
+- Guides: [1 Install and start](docs/instructions/EU_SAE_Workbench_Guide_1_Install_and_Start.pdf), [2 Running the Workbench](docs/instructions/EU_SAE_Workbench_Guide_2_Running_the_Workbench.pdf), [3 Estimating poverty and welfare](docs/instructions/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare.pdf); Polish (`_PL`) and Greek (`_GR`) versions in the same folder
+- [Guided-version reference](docs/README_WIZARD.md)
 - [Methodological guidance](docs/guidance/guidelines_v5_2_0_rc6_wizard.docx)
 - [Examples and your own input folders](Data/README.md)
 
 
 This is a revised release candidate based on the exact v5.1.0 tag. It includes
-the Shiny dashboard, UFH/MFH analysis scripts, reporting, audit controls, tests,
+the Shiny application (guided version and classic dashboard), UFH/MFH analysis scripts, reporting, audit controls, tests,
 and guidance. The open review items are listed in `docs/REVISION_STATUS.md`
 and `docs/RELEASE_CHECKLIST.md`.
 
@@ -99,8 +100,10 @@ See [data limitations and map attribution](Data/Spain/README.md) and `THIRD_PART
 
 ## Readiness check, runs and maps
 
-- **1. Check Data Readiness** loads the inputs and checks columns, years, domain
-  keys, missing direct estimates and national totals. Its *Auxiliary Covariate
+- **Check data readiness** (Step 6 of the guided version; **1. Check data
+  readiness** in the classic dashboard) loads the inputs and checks columns,
+  years, population weights and the survey unit (Test 0f), benchmark groups
+  (Test 0g), domain keys, missing direct estimates and national totals. Its *Auxiliary Covariate
   Summary* shows, for each covariate, the mean, its standard error and the
   correlation with the target indicator, with the two-sided p-value of that
   correlation and significance codes (`***` p < 0.001, `**` p < 0.01, `*`
@@ -109,11 +112,12 @@ See [data limitations and map attribution](Data/Spain/README.md) and `THIRD_PART
   selection happens in UFH/MFH. The readiness tables are written to
   `outputs/tables/` (`aux_covariate_summary.csv` and others), refreshed when a
   run starts, and archived with the run.
-- **2. Run Analysis** runs UFH, MFH, Comparison and the report in a separate R
-  process, so the page stays responsive and the log follows the run live. A
-  second click on **Run Analysis** is refused while a run is active. Do not
-  start analyses from two browser pages, or from the wizard and the dashboard,
-  at the same time: they share `outputs/`. **Stop** ends a run, which then
+- **Run model** (Step 7; **2. Run model** in the classic dashboard) runs UFH,
+  MFH, Comparison and the report in a separate R process, so the page stays
+  responsive and shows the progress of each stage. A second click on **Run
+  model** is refused while a run is active. Do not start model runs from two
+  browser pages, or from the guided version and the classic dashboard, at the
+  same time: they share `outputs/`. **Stop** ends a run, which then
   finishes as *Stopped by user*.
 - **Maps** use one colour scheme. Level maps (poverty rates, RMSE, mean
   welfare) run from light (lower) to dark (higher); change maps use
@@ -150,9 +154,11 @@ See [data limitations and map attribution](Data/Spain/README.md) and `THIRD_PART
   `outputs/tables/benchmark_status.csv`.
 
 Generated files are placed in `outputs/` and archived under `app_runs/`. Input
-files are not copied into a run archive. `Save Current Setup` is the only
-user-initiated feature that makes local convenience copies under
-`app_runs/_last_setup_files`.
+files are not copied into a run archive. Files selected with Browse are copied
+to `app_runs/_last_setup_files` when a configuration is saved (by **Save
+configuration**, and for the configuration that each model run records in
+`model_run_configuration.yml`), so that configurations can be loaded later;
+**Reset to defaults** deletes these copies.
 
 The Comparison step also creates `outputs/data/EU_SAE_results.xlsx`, a
 consolidated workbook containing domain/year estimates, the complete pointwise,

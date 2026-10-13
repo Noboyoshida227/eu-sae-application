@@ -5,7 +5,7 @@ Build: 5.2.0-rc.6-wizard.5.14 / EU_SAE_520_w5n
 
 ## Purpose and provenance
 
-The package estimates the mean crossed-product error (MCPE) needed for uncertainty about changes over time by parametric bootstrap. Prof. Isabel Molina provided the basic code, Ifeani improved it, and the package maintainer modified it further for MFH1/MFH2/MFH3 dispatch, reproducible seeds, refit handling, diagnostics, and reporting. Responsibility for the adapted implementation and its validation remains with the package team.
+The package estimates the mean crossed-product error (MCPE) needed for uncertainty about changes over time by parametric bootstrap, adapted for MFH1/MFH2/MFH3 dispatch, reproducible seeds, refit handling, diagnostics, and reporting. Responsibility for the adapted implementation and its validation remains with the package team.
 
 ## Checks completed in this revision
 

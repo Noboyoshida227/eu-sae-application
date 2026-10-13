@@ -1,15 +1,19 @@
 # =====================================================================
-#  app_wizard.R -- Step-by-step ("wizard") front end for the EU SAE
-#                  Poverty Mapping dashboard.
+#  app_wizard.R -- Guided ("wizard") front end of the EU SAE Workbench.
 #
 #  WHAT THIS IS
 #  ------------
 #  The classic dashboard (app.R) presents every setting at once in a
 #  single long sidebar. This file presents exactly the same settings
-#  as six sequential steps:
+#  as seven sequential steps (w5o):
 #
-#      1. Data  ->  2. Mapping  ->  3. Indicator
-#                ->  4. Models  ->  5. AI Assistant  ->  6. Review & Run
+#      1. Input data  ->  2. Map variables  ->  3. Configure analysis
+#      ->  4. Configure model  ->  5. Add AI assistant (optional)
+#      ->  6. Review configuration  ->  7. Run model
+#
+#  Step 6 holds the configuration summary and "Check data readiness";
+#  step 7 starts the run and shows its progress and result (report,
+#  output folder, configuration file).
 #
 #  HOW IT REUSES app.R
 #  -------------------
@@ -18,6 +22,8 @@
 #  the launcher block, and then reuses app.R's `server()` function
 #  verbatim. Every input ID is preserved, so all of app.R's server logic
 #  works unchanged. Fixes made to app.R are inherited automatically.
+#  tools/check_ui_parity.R checks that every app.R input/output ID also
+#  exists here exactly once.
 #
 #  KEY DESIGN CONSTRAINT
 #  ---------------------
@@ -31,7 +37,8 @@
 #  ------
 #  Gating is deliberately "soft": Next and the breadcrumb are always
 #  clickable. Incomplete steps show an amber notice and an amber chip.
-#  Only "Run Analysis" on step 6 is genuinely blocked.
+#  Only "Run model" on step 7 is genuinely blocked (missing data files);
+#  app.R's own run handler also asks for a data readiness check first.
 #
 #  LAUNCH
 #  ------
@@ -123,16 +130,22 @@ shiny::addResourcePath("wizassets", file.path(.wiz_app_dir, "www"))
 # ---------------------------------------------------------------------
 
 WIZ_STEPS <- list(
-  list(id = "data",      num = 1L, short = "Data",         title = "Step 1 - Data inputs"),
-  list(id = "mapping",   num = 2L, short = "Mapping",      title = "Step 2 - Variable mapping"),
-  list(id = "indicator", num = 3L, short = "Indicator",    title = "Step 3 - Indicator definition"),
-  list(id = "models",    num = 4L, short = "Models",       title = "Step 4 - Model options"),
-  list(id = "ai",        num = 5L, short = "AI Assistant", title = "Step 5 - AI Assistant (optional)"),
-  list(id = "run",       num = 6L, short = "Review & Run", title = "Step 6 - Review & run")
+  list(id = "data",     num = 1L, short = "Input data",           title = "Step 1 - Input data"),
+  list(id = "mapping",  num = 2L, short = "Map variables",        title = "Step 2 - Map variables"),
+  list(id = "analysis", num = 3L, short = "Configure analysis",   title = "Step 3 - Configure analysis"),
+  list(id = "models",   num = 4L, short = "Configure model",      title = "Step 4 - Configure model"),
+  list(id = "ai",       num = 5L, short = "Add AI assistant",     title = "Step 5 - Add AI assistant (optional)"),
+  list(id = "review",   num = 6L, short = "Review configuration", title = "Step 6 - Review configuration"),
+  list(id = "run",      num = 7L, short = "Run model",            title = "Step 7 - Run model")
 )
 WIZ_IDS <- vapply(WIZ_STEPS, function(s) s$id, character(1))
 
 # Small helpers used only by the wizard chrome -------------------------
+
+# Label text followed by a red asterisk marking a required field.
+wiz_req <- function(text) {
+  tagList(text, tags$span(class = "wiz-req", title = "Required", "*"))
+}
 
 wiz_step_header <- function(step) {
   tags$div(
@@ -198,6 +211,8 @@ wiz_head <- tags$head(
           show.style.display = (show.id === 'main_app') ? 'block' : 'flex';
           show.style.transition = 'opacity 0.45s ease';
           setTimeout(function(){ show.style.opacity = '1'; }, 30);
+          // Tell Shiny the outputs inside are now visible, so they render.
+          $(show).trigger('shown');
         }, 450);
       });
       Shiny.addCustomMessageHandler('mappingValidity', function(msg) {
@@ -386,12 +401,12 @@ wiz_head <- tags$head(
       display: flex; align-items: center; justify-content: center;
       font-size: 1.05em; font-weight: 700;
     }
-    .wiz-step-sub { font-size: 0.87em; color: #61708a; line-height: 1.5; }
+    .wiz-step-sub { font-size: 0.95em; color: #3d4a63; line-height: 1.5; }
     .wiz-step-body { margin-top: 16px; }
     .wiz-step-body hr { margin: 18px 0; border-top: 1px solid #eceff4; }
     .wiz-step-body h4 {
-      font-size: 0.82em; font-weight: 700; letter-spacing: 1.1px;
-      text-transform: uppercase; color: #7c8aa3;
+      font-size: 0.86em; font-weight: 700; letter-spacing: 0.9px;
+      text-transform: uppercase; color: #34425c;
       margin: 22px 0 10px 0;
     }
     .wiz-step-body h4:first-child { margin-top: 0; }
@@ -448,9 +463,49 @@ wiz_head <- tags$head(
       text-transform: uppercase; font-size: 0.9em; letter-spacing: 0.8px;
       border-bottom: 1px solid #d8dfea;
     }
-    .wiz-run-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 2px; }
-    .wiz-run-row .btn { min-width: 190px; }
+    .wiz-run-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin: 6px 0 2px; }
+    .wiz-run-row .form-group { margin-bottom: 0; min-width: 260px; }
+    .wiz-run-row .btn { min-width: 170px; }
+
+    /* ---- w5o: larger type, required marks and the new layouts ---- */
+    body { font-size: 15px; color: #1f2b42; }
+    #main_app .control-label, #main_app label { color: #22314d; }
+    #main_app .help-block { color: #4a5875; }
+    .wiz-req { color: #c62828; font-weight: 700; margin-left: 2px; }
+    .wiz-grid-3 > .wiz-col { flex: 1 1 300px; min-width: 260px; }
+    .wiz-grid > .wiz-col.wiz-col-wide { flex: 2 1 520px; }
+    .wiz-topbar-right { display: flex; align-items: center; gap: 6px; }
+    .wiz-topbar .wiz-top-btn {
+      background: rgba(255,255,255,0.12); color: #fff;
+      border-color: rgba(255,255,255,0.4);
+    }
+    .wiz-topbar .wiz-top-btn:hover, .wiz-topbar .wiz-top-btn:focus {
+      background: rgba(255,255,255,0.24); color: #fff;
+    }
+    .wiz-topbar .dropdown-menu a { color: #22314d; }
+    .wiz-headrow {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 10px; margin: 2px 0 12px 0;
+    }
+    .wiz-h2 { font-size: 1.5em; font-weight: 600; color: #16233d; margin: 0; }
+    .wiz-config-actions { display: flex; align-items: center; gap: 8px; }
+    .wiz-crumb { font-size: 0.88em; }
+    .wiz-hidden { display: none; }
+    .wiz-years { display: flex; gap: 14px; flex-wrap: wrap; }
+    .wiz-years .form-group { flex: 0 1 150px; min-width: 130px; }
+    .wiz-years-hint { font-size: 0.9em; color: #3d4a63; margin: -4px 0 14px 0; }
+    .wiz-years-hint.warn { color: #8a5a00; }
+    .wiz-narrow { max-width: 680px; }
+    .wiz-small { font-size: 0.92em; color: #3d4a63; }
+    .wiz-ready { font-size: 0.92em; border-radius: 6px; padding: 8px 11px; margin: 0 0 10px 0; }
+    .wiz-ready.ok { background: #f2fbf4; border: 1px solid #b6dfc0; color: #22683a; }
+    .wiz-ready.todo { background: #fffaf0; border: 1px solid #f0d8a8; color: #7d5300; }
+    #wiz_outstanding { display: block; margin-bottom: 16px; }
+    .wiz-log { margin-top: 14px; }
+    .wiz-log > summary { cursor: pointer; font-weight: 600; color: #1e4d8f; padding: 4px 0; }
+    .wiz-step details.benchmark-format-note > summary { cursor: pointer; }
   ")),
+  tags$style(HTML(sae_run_panel_css)),
   tags$script(HTML("
     // ---- Wizard chrome handlers (additional to app.R's) ----
     Shiny.addCustomMessageHandler('wizCrumbState', function(msg) {
@@ -499,6 +554,7 @@ wiz_head <- tags$head(
 # ---------------------------------------------------------------------
 
 ui <- fluidPage(
+  title = SAE_APP_NAME,
   wiz_head,
 
   # ---- Shared landing page ----
@@ -507,31 +563,35 @@ ui <- fluidPage(
   # ---- Main app ----
   div(id = "main_app",
 
-    # Top bar -------------------------------------------------------
+    # Top bar: name, guides and About (w5o) ------------------------------
     tags$div(class = "wiz-topbar",
       tags$div(class = "wiz-title",
-        "EU Poverty Mapping",
-        tags$small("Guided setup \u00b7 six steps")
+        SAE_APP_NAME,
+        tags$small(SAE_APP_TAGLINE)
       ),
-      tags$div(
-        actionButton("wiz_jump_run", "Skip to Review & Run", class = "btn-default btn-sm")
+      tags$div(class = "wiz-topbar-right",
+        sae_resource_menu(.wiz_app_dir, button_class = "btn btn-default btn-sm wiz-top-btn"),
+        actionButton("about_btn", "About", class = "btn-default btn-sm wiz-top-btn")
       )
     ),
 
-    # Saved setup ---------------------------------------------------
-    tags$div(class = "wiz-step", style = "padding: 14px 20px 10px;",
-      h4("Saved setup"),
-      tags$div(
-        style = "font-size: 12px; color: #556; margin: -4px 0 10px 0;",
-        "Save or reload dashboard settings so later runs only require small edits. If files were selected with Browse, the app saves local setup copies under app_runs/_last_setup_files for the next session."
-      ),
-      div(
-        style = "display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;",
-        actionButton("load_setup_btn", "Load Last Setup", class = "btn-default btn-sm"),
-        actionButton("save_setup_btn", "Save Current Setup", class = "btn-default btn-sm"),
-        actionButton("reset_setup_btn", "Reset to Defaults", class = "btn-warning btn-sm")
-      ),
-      uiOutput("saved_setup_status")
+    # Heading row: configuration actions beside the steps (w5o) -----------
+    tags$div(class = "wiz-headrow",
+      tags$h2(class = "wiz-h2", "Configure your model run"),
+      tags$div(class = "wiz-config-actions",
+        actionButton("save_setup_btn", "Save configuration", class = "btn-default btn-sm"),
+        tags$div(class = "btn-group",
+          tags$button(type = "button", class = "btn btn-default btn-sm dropdown-toggle",
+                      `data-toggle` = "dropdown", `aria-haspopup` = "true", `aria-expanded` = "false",
+                      "Load configuration ", tags$span(class = "caret")),
+          tags$ul(class = "dropdown-menu dropdown-menu-right",
+            tags$li(actionLink("load_setup_btn", "Last saved configuration")),
+            tags$li(actionLink("load_config_file_btn", "From a file\u2026")),
+            tags$li(role = "separator", class = "divider"),
+            tags$li(actionLink("reset_setup_btn", "Reset to defaults and clear the saved configuration"))
+          )
+        )
+      )
     ),
 
     # Breadcrumb ----------------------------------------------------
@@ -556,66 +616,44 @@ ui <- fluidPage(
       # ============================ STEP 1 ============================
       wiz_panel("data",
         tags$div(class = "wiz-note",
-          "Start by telling the app which years to analyse and where the input data lives. ",
-          "Survey, auxiliary and geometry files are all required; the population file is optional."
+          "Select the files from any folder on your computer. Fields marked ",
+          tags$span(class = "wiz-req", "*"), " are required. ",
+          tip_label("Accepted formats",
+            "Survey and auxiliary files: R (.rds, .RData), CSV/TSV/TXT/DAT, Stata, SPSS, SAS, Parquet/Feather or Excel. Geometry: .rds, GeoPackage, GeoJSON, KML/GML, or one .zip with the ESRI shapefile parts (.shp, .shx and .dbf; the .dbf holds the domain ID). After loading a configuration, its files are shown under each Browse button; browse again only to change a file.")
         ),
-        h4("Analysis settings"),
-        tags$div(class = "wiz-grid",
+        tags$div(class = "wiz-grid wiz-grid-3",
           tags$div(class = "wiz-col",
-            textInput("years",
-              tip_label("Analysis years (two, comma-separated)", "Enter exactly two years separated by a comma. The pipeline estimates poverty for each year and tests for significant changes between them."),
-              value = "2012,2013"),
-            textInput("country_name",
-              tip_label("Country or territory", "Used only in report and brief titles; it does not affect estimation."),
-              value = ""),
-            numericInput("analysis_seed",
-              tip_label("Analysis seed", "Controls LASSO folds and the UFH, MFH and benchmarking bootstrap draws. Identical inputs, settings and package versions reproduce the same results."),
-              value = 123, min = 0, step = 1),
-            textInput("run_label",
-              tip_label("Run label", "Optional short label appended to the saved app_runs folder so outputs from different runs are easier to distinguish."),
-              value = "")
-          ),
-          tags$div(class = "wiz-col",
-            tags$div(class = "wiz-note", style = "margin-top: 26px;",
-              tags$strong("Two years are required."),
-              " The pipeline estimates the indicator separately for each year and then tests whether the change between them is statistically significant."
-            )
-          )
-        ),
-        h4("Data inputs"),
-        tags$div(
-          style = "font-size: 12px; color: #556; margin: -4px 0 10px 0;",
-          "Use Browse to select the required input files from any folder on your computer: household survey, auxiliary covariates, and shapefiles/geometries. Survey and auxiliary files can be R, CSV/TSV/DAT, Stata, SPSS, SAS, Python Parquet/Feather, or Excel files. For ESRI shapefiles, upload one .zip containing the shapefile components, especially .shp, .shx, and .dbf; the .dbf usually contains the domain ID needed for maps. Geometry files can also be .rds, GeoPackage, or GeoJSON. If a saved setup is loaded, its active files are shown below each Browse button; browse again only when changing a file."
-        )
-        ,
-        tags$div(class = "wiz-grid",
-          tags$div(class = "wiz-col",
+            h4("Survey and auxiliary data"),
             fileInput("survey_file",
-              tip_label("Browse Survey data file", "Choose the household survey file from any folder on your computer. Accepted formats: .rds, .RData/.rda, .csv, .tsv, .txt, .dat, .dta, .sav, .zsav, .por, .sas7bdat, .xpt, .parquet, .feather, .xlsx, .xls."),
+              tip_label(wiz_req("Survey data file"), "Choose the household survey file from any folder on your computer. Accepted formats: .rds, .RData/.rda, .csv, .tsv, .txt, .dat, .dta, .sav, .zsav, .por, .sas7bdat, .xpt, .parquet, .feather, .xlsx, .xls."),
               accept = c(".rds", ".RData", ".rda", ".csv", ".tsv", ".txt", ".dat",
                          ".dta", ".sav", ".zsav", ".por", ".sas7bdat", ".xpt",
                          ".parquet", ".feather", ".xlsx", ".xls")),
             uiOutput("survey_active_file"),
             fileInput("rhs_file",
-              tip_label("Browse Auxiliary data file", "Choose the auxiliary covariates file from any folder on your computer. Accepted formats: .rds, .RData/.rda, .csv, .tsv, .txt, .dat, .dta, .sav, .zsav, .por, .sas7bdat, .xpt, .parquet, .feather, .xlsx, .xls."),
+              tip_label(wiz_req("Auxiliary data file"), "Choose the auxiliary covariates file from any folder on your computer. Accepted formats: .rds, .RData/.rda, .csv, .tsv, .txt, .dat, .dta, .sav, .zsav, .por, .sas7bdat, .xpt, .parquet, .feather, .xlsx, .xls."),
               accept = c(".rds", ".RData", ".rda", ".csv", ".tsv", ".txt", ".dat",
                          ".dta", ".sav", ".zsav", ".por", ".sas7bdat", ".xpt",
                          ".parquet", ".feather", ".xlsx", ".xls")),
             uiOutput("rhs_active_file")
           ),
           tags$div(class = "wiz-col",
+            h4("Geometry and population"),
             fileInput("shp_file",
-              tip_label("Browse Shapefile/geometries file", "Choose the geometry file from any folder on your computer. For ESRI shapefiles, upload a single .zip containing all shapefile components, especially .shp, .shx, and .dbf. A .shp file alone is usually not enough because the .dbf stores the domain ID used to join estimates to map polygons. Other accepted formats: .rds, .RData/.rda, .gpkg, .geojson, .json, .kml, .gml."),
+              tip_label(wiz_req("Shapefile/geometries file"), "Choose the geometry file from any folder on your computer. For ESRI shapefiles, upload a single .zip containing all shapefile components, especially .shp, .shx, and .dbf. A .shp file alone is usually not enough because the .dbf stores the domain ID used to join estimates to map polygons. Other accepted formats: .rds, .RData/.rda, .gpkg, .geojson, .json, .kml, .gml."),
               accept = c(".rds", ".RData", ".rda", ".zip", ".gpkg", ".geojson", ".json", ".kml", ".gml")),
             uiOutput("shp_active_file")
             ,
             fileInput("population_file",
               tip_label("Domain population sizes (optional)",
-                        "Optional RDS/CSV/XLSX file with domain population sizes. Supports long domain-year-population format or wide domain-by-year format; leave blank to estimate domain populations from the survey as sum(weight * household size).")),
-            uiOutput("population_active_file"),
+                        "Optional RDS/CSV/XLSX file with domain population sizes. Supports long domain-year-population format or wide domain-by-year format; leave blank to estimate domain populations from the survey as the sum of the population weights (weight * household size when each row is a household, weight when each row is a person).")),
+            uiOutput("population_active_file")
+          ),
+          tags$div(class = "wiz-col",
+            h4("Prices (mean welfare only)"),
             fileInput("cpi_file",
               tip_label("Consumer price index (optional)",
-                        "Optional file with one country's consumer price index (CPI or HICP) by year, used only for mean welfare in constant prices (Indicator step). One row per year: a year column and one or more CPI columns, for example index levels (2015 = 100), annual indices (previous year = 100) or annual changes in %. Decimal commas are accepted. In the Indicator step you choose the columns and say how the CPI is organised. Accepted formats: .csv, .tsv, .txt, .xlsx, .xls, .rds, .dta, .sav and the other table formats."),
+                        "Optional file with one country's consumer price index (CPI or HICP) by year, used only for mean welfare in constant prices (see the indicator settings). One row per year: a year column and one or more CPI columns, for example index levels (2015 = 100), annual indices (previous year = 100) or annual changes in %. Decimal commas are accepted. In the indicator settings (Configure analysis in the guided version) you choose the columns and say how the CPI is organised. Accepted formats: .csv, .tsv, .txt, .xlsx, .xls, .rds, .dta, .sav and the other table formats."),
               accept = c(".rds", ".RData", ".rda", ".csv", ".tsv", ".txt", ".dat",
                          ".dta", ".sav", ".zsav", ".por", ".sas7bdat", ".xpt",
                          ".parquet", ".feather", ".xlsx", ".xls")),
@@ -626,69 +664,85 @@ ui <- fluidPage(
 
       # ============================ STEP 2 ============================
       wiz_panel("mapping",
-        tags$div(
-          style = "font-size: 12px; color: #556; margin: -4px 0 10px 0;",
-          "Search the dropdown list of columns loaded from the selected dataset, or type a column name directly. A red field means the typed name is not currently found in the relevant dataset."
-        ),
-        uiOutput("mapping_validation_summary")
-        ,
-        tags$div(class = "wiz-grid",
+        uiOutput("mapping_validation_summary"),
+        tags$div(class = "wiz-grid wiz-grid-3",
           tags$div(class = "wiz-col",
-            h4("Survey columns"),
+            h4("Survey design"),
             mapping_selectize("var_year",
-              tip_label("year", "Column name in the survey data that identifies the year. Search the survey columns or type the column name."),
+              tip_label(wiz_req("year"), "Column name in the survey data that identifies the year. Search the survey columns or type the column name."),
               "year"),
             mapping_selectize("var_domain",
-              tip_label("domain", "Column name in the survey data that identifies the small area domain (e.g. NUTS-3 province). Search the survey columns or type the column name."),
+              tip_label(wiz_req("domain"), "Column name in the survey data that identifies the small area domain (e.g. NUTS-3 province). Search the survey columns or type the column name."),
               "prov"),
             mapping_selectize("var_psu",
-              tip_label("psu", "Column name for the Primary Sampling Unit. Used to compute design-based sampling variances. Search the survey columns or type the column name."),
+              tip_label(wiz_req("psu"), "Column name for the Primary Sampling Unit. Used to compute design-based sampling variances. Search the survey columns or type the column name."),
               "ea_id"),
             mapping_selectize("var_weight",
-              tip_label("weight", "Column name for the survey sampling weight. Search the survey columns or type the column name."),
+              tip_label(wiz_req("weight"), "Column name for the survey sampling weight. Search the survey columns or type the column name."),
               "weight"),
             mapping_selectize("var_strata",
               tip_label("strata", "Optional strata ID column for survey-design variance estimation. Search the survey columns or type the column name. Leave blank if the survey design has no strata or strata are unavailable."),
               "")
           ),
           tags$div(class = "wiz-col",
-            h4("Survey columns (cont.)"),
-            mapping_selectize("var_hh_size",
-              tip_label("household size", "Column name for household size. Direct poverty-rate estimates use population_weight = weight * household size; when no population file is uploaded, benchmarking also estimates domain populations as sum(weight * household size) by domain and year. Search the survey columns or type the column name."),
-              "hhsize"),
+            h4("Households and welfare"),
+            survey_unit_input(),
+            conditionalPanel(
+              condition = "input.survey_unit != 'person'",
+              mapping_selectize("var_hh_size",
+                tip_label(wiz_req("household size"), "Column name for household size. With one row per household, direct estimates use population_weight = weight * household size; when no population file is uploaded, benchmarking also estimates domain populations as sum(weight * household size) by domain and year. Not used when each row is a person."),
+                "hhsize")
+            ),
+            mapping_selectize("var_hh_id",
+              tip_label("household ID (optional)", "Optional column identifying the household. It is used only to check that the rows match the survey unit chosen above: a file with several rows per household, as many as the household size, has one row per person."),
+              ""),
             mapping_selectize("var_welfare",
-              tip_label("welfare", "Column name for the welfare variable (e.g. income or consumption) used to determine poverty status. Search the survey columns or type the column name."),
+              tip_label(wiz_req("welfare"), "Column name for the welfare variable (e.g. income or consumption) used to determine poverty status. Search the survey columns or type the column name."),
               "income")
-            ,
+          ),
+          tags$div(class = "wiz-col",
             h4("Join keys"),
             mapping_selectize("rhs_domain",
-              tip_label("Auxiliary covariates domain field", "Column name in the auxiliary covariates file that identifies the domain. Search the auxiliary columns or type the column name. Used to join covariates to survey data."),
+              tip_label(wiz_req("Auxiliary covariates domain field"), "Column name in the auxiliary covariates file that identifies the domain. Search the auxiliary columns or type the column name. Used to join covariates to survey data."),
               "prov"),
             mapping_selectize("shp_domain",
-              tip_label("Shapefile domain field", "Column name in the shapefiles/geometries file that identifies the domain. Search the geometry columns or type the column name. Used to join estimates to map polygons."),
+              tip_label(wiz_req("Shapefile domain field"), "Column name in the shapefiles/geometries file that identifies the domain. Search the geometry columns or type the column name. Used to join estimates to map polygons."),
               "prov")
           )
         )
       ),
 
       # ============================ STEP 3 ============================
-      wiz_panel("indicator",
-        tags$div(class = "wiz-note",
-          "Define what is being modelled. The options below change depending on whether you choose a poverty measure or mean welfare."
-        ),
+      wiz_panel("analysis",
         tags$div(class = "wiz-grid",
           tags$div(class = "wiz-col",
-            # ---- Indicator type ----
-            # Top-level choice. Switching to "mean_welfare" hides the
-            # poverty-line / FGT inputs (they're irrelevant) and exposes
-            # an optional log-transform.
+            h4("Analysis"),
+            tags$div(class = "wiz-years",
+              selectizeInput("year_1", wiz_req("First year"), choices = NULL,
+                             options = list(create = TRUE, placeholder = "Year")),
+              selectizeInput("year_2", wiz_req("Second year"), choices = NULL,
+                             options = list(create = TRUE, placeholder = "Year"))
+            ),
+            uiOutput("wiz_years_hint"),
+            # The pipeline reads the two years from this hidden field.
+            tags$div(class = "wiz-hidden",
+              textInput("years", "Analysis years", value = "2012,2013")),
+            textInput("country_name",
+              tip_label("Country or territory", "Used only in report and brief titles; it does not affect estimation."),
+              value = ""),
+            numericInput("analysis_seed",
+              tip_label("Analysis seed", "Controls LASSO folds and the UFH, MFH and benchmarking bootstrap draws. Identical inputs, settings and package versions reproduce the same results."),
+              value = 123, min = 0, step = 1)
+          ),
+          tags$div(class = "wiz-col",
+            h4("Indicator"),
             selectInput("indicator_type",
               tip_label("Indicator",
                         "What is being modelled. 'Poverty (FGT)' uses welfare + a poverty line to compute headcount, gap, or severity. 'Mean welfare' uses the population-weighted mean of the welfare variable directly."),
               choices  = c("Poverty (FGT)" = "poverty",
                            "Mean welfare"  = "mean_welfare"),
               selected = "poverty"),
-            
+
             # ---- Poverty line (only shown for poverty indicator) ----
             conditionalPanel(
               condition = "input.indicator_type == 'poverty'",
@@ -707,7 +761,7 @@ ui <- fluidPage(
                 condition = "input.povline_type == 'numeric' && input.indicator_type == 'poverty'",
                 uiOutput("povline_numeric_by_year_ui")
               ),
-            
+
               # ---- FGT indicator ----
               selectInput("fgt_alpha",
                 tip_label("Poverty measure",
@@ -717,7 +771,7 @@ ui <- fluidPage(
                             "FGT(2) \u2013 Poverty severity"  = "2"),
                 selected = "0")
             ),
-            
+
             # ---- Mean welfare options (only shown for mean indicator) ----
             # Note: the log/no choice now lives in the UFH "Transformation"
             # dropdown below (which becomes context-aware when the indicator
@@ -756,31 +810,19 @@ ui <- fluidPage(
                 uiOutput("price_base_index_ui")
               )
             )
-          ),
-          tags$div(class = "wiz-col",
-            tags$div(class = "wiz-note", style = "margin-top: 26px;",
-              tags$strong("Poverty (FGT)"),
-              " needs a welfare variable and a poverty line, and produces the headcount ratio, poverty gap or severity. ",
-              tags$strong("Mean welfare"),
-              " models the population-weighted mean of the welfare variable directly and hides the poverty-line inputs."
-            )
           )
         )
       ),
 
       # ============================ STEP 4 ============================
       wiz_panel("models",
-        tags$div(class = "wiz-note",
-          "Every option on this step has a sensible default. Change them only if you have a specific modelling reason \u2014 you can safely continue as-is."
-        ),
-        h4("Pipeline steps"),
         checkboxGroupInput("steps",
           tip_label("Pipeline steps", "UFH fits a univariate Fay-Herriot model per year. MFH fits multivariate models (MFH1, MFH2, MFH3) that borrow strength across time. Comparison merges both results side by side with maps and precision metrics."),
           choices = c("UFH", "MFH", "Comparison"),
-          selected = c("UFH", "MFH", "Comparison")
-        )
-        ,
-        tags$div(class = "wiz-grid",
+          selected = c("UFH", "MFH", "Comparison"),
+          inline = TRUE
+        ),
+        tags$div(class = "wiz-grid wiz-grid-3",
           tags$div(class = "wiz-col",
             h4("UFH options"),
             # Transformation dropdown: choices are context-aware.
@@ -918,130 +960,121 @@ ui <- fluidPage(
               tip_label("MFH covariates for Year 2 (comma-separated, optional)",
                         "If LASSO is on, these variables define the candidate pool for the second analysis year. If LASSO is off, they define the fixed MFH specification. Leave blank to use the eligible auxiliary variables."),
               value = "")
-          )
-        ),
-        tags$hr(),
-        h4("Benchmarking"),
-        checkboxInput("do_benchmark",
-          tip_label("Apply benchmarking", "If checked, UFH and MFH estimates are benchmarked. If unchecked, uploaded benchmark files and benchmark-level mappings are ignored for the next run."),
-          value = FALSE),
-        conditionalPanel(
-          condition = "input.do_benchmark",
-          radioButtons(
-            "benchmark_level",
-            tip_label(
-              "Benchmarking level",
-              "National benchmarking makes the population-weighted average of the domain estimates equal the direct national estimate. Grouped benchmarking applies the constraint separately within each selected higher-level area."
+          ),
+          tags$div(class = "wiz-col",
+            h4("Benchmarking"),
+            checkboxInput("do_benchmark",
+              tip_label("Apply benchmarking", "If checked, UFH and MFH estimates are benchmarked. If unchecked, uploaded benchmark files and benchmark-level mappings are ignored for the next run."),
+              value = FALSE),
+            conditionalPanel(
+              condition = "input.do_benchmark",
+              radioButtons(
+                "benchmark_level",
+                tip_label(
+                  "Benchmarking level",
+                  "National benchmarking makes the population-weighted average of the domain estimates equal the direct national estimate. Grouped benchmarking applies the constraint separately within each selected higher-level area."
+                ),
+                choices = c(
+                  "National" = "national",
+                  "Grouped by a survey variable" = "custom"
+                ),
+                selected = "national"
+              ),
+              conditionalPanel(
+                condition = "input.benchmark_level == 'national' && (input.var_benchmark_level || '').trim() !== ''",
+                tags$p(class = "help-block",
+                       "A grouped benchmark variable is still selected but is not used: National ",
+                       "benchmarking applies one national constraint. Choose \"Grouped by a survey ",
+                       "variable\" to use it, or clear the variable.")
+              ),
+              fileInput("regional_benchmark_file",
+                tip_label("Benchmark Target Database (optional)",
+                          "Optional RDS/CSV/XLSX file with benchmark targets by year. Leave blank to estimate targets from the survey with the population weights (weight * household size when each row is a household, weight when each row is a person).")),
+              tags$details(
+                class = "benchmark-format-note",
+                tags$summary(class = "note-title", "External benchmark file format"),
+                tags$p(
+                  "Upload this file only when you have external benchmark targets. ",
+                  "Leave it blank to estimate targets from the survey."
+                ),
+                tags$ul(
+                  tags$li("National benchmarking: include a year column and a target column."),
+                  tags$li("Grouped benchmarking: also include the benchmark-level column selected below."),
+                  tags$li("Name the target column benchmark or target (also accepted: B_r, benchmark_target, regional_benchmark, direct, direct_rate, poverty_rate)."),
+                  tags$li("Accepted file types: .rds, .RData/.rda, .csv, .txt, .xlsx, or .xls.")
+                )
+              ),
+              tags$div(
+                class = "benchmark-clear-row",
+                actionButton("clear_benchmark_file",
+                  "Clear selected file",
+                  class = "btn-default btn-sm")
+              ),
+              uiOutput("benchmark_active_file"),
+              conditionalPanel(
+                condition = "input.benchmark_level == 'custom'",
+                mapping_selectize("var_benchmark_level",
+                  tip_label("Grouped benchmark variable",
+                            "Survey column defining the higher-level benchmark groups, such as region, NUTS2, or voivodeship."),
+                  "")
+              )
             ),
-            choices = c(
-              "National" = "national",
-              "Grouped by a survey variable" = "custom"
-            ),
-            selected = "national"
-          ),
-          conditionalPanel(
-            condition = "input.benchmark_level == 'national' && (input.var_benchmark_level || '').trim() !== ''",
-            tags$p(class = "help-block",
-                   "A grouped benchmark variable is still selected but is not used: National ",
-                   "benchmarking applies one national constraint. Choose \"Grouped by a survey ",
-                   "variable\" to use it, or clear the variable.")
-          ),
-          fileInput("regional_benchmark_file",
-            tip_label("Benchmark Target Database (optional)",
-                      "Optional RDS/CSV/XLSX file with benchmark targets by year. Leave blank to estimate targets from the survey using population_weight = weight * household size.")),
-          tags$div(
-            class = "benchmark-format-note",
-            tags$div(class = "note-title", "External benchmark file format"),
-            tags$p(
-              "Upload this file only when you have external benchmark targets. ",
-              "Leave it blank to estimate targets from the survey."
-            ),
-            tags$ul(
-              tags$li("National benchmarking: include a year column and a target column."),
-              tags$li("Grouped benchmarking: also include the benchmark-level column selected below."),
-              tags$li("Name the target column benchmark or target (also accepted: B_r, benchmark_target, regional_benchmark, direct, direct_rate, poverty_rate)."),
-              tags$li("Accepted file types: .rds, .RData/.rda, .csv, .txt, .xlsx, or .xls.")
-            )
-          ),
-          tags$div(
-            class = "benchmark-clear-row",
-            actionButton("clear_benchmark_file",
-              "Clear selected file",
-              class = "btn-default btn-sm")
-          ),
-          uiOutput("benchmark_active_file"),
-          conditionalPanel(
-            condition = "input.benchmark_level == 'custom'",
-            mapping_selectize("var_benchmark_level",
-              tip_label("Grouped benchmark variable",
-                        "Survey column defining the higher-level benchmark groups, such as region, NUTS2, or voivodeship."),
-              "")
+            h4("Data assessment"),
+            checkboxInput("psu_consistent",
+            tip_label("PSU codes are consistent over time", "Check this if the same PSU identifiers refer to the same sampling units across years. The answer is recorded with the run settings; it does not change the estimates (the cross-year covariance of sampling errors is computed from the PSU codes in the data)."),
+            value = FALSE)
           )
         )
-        ,
-        tags$hr(),
-        h4("Data assessment"),
-        checkboxInput("psu_consistent",
-          tip_label("PSU codes are consistent over time", "Check this if the same PSU identifiers refer to the same sampling units across years. The answer is recorded with the run settings; it does not change the estimates (the cross-year covariance of sampling errors is computed from the PSU codes in the data)."),
-          value = FALSE)
       ),
 
       # ============================ STEP 5 ============================
       wiz_panel("ai",
         tags$div(class = "wiz-note",
           tags$strong("This step is optional."),
-          " Leave the assistant disabled and press Next to continue \u2014 the analysis runs identically without it. ",
+          " Leave the assistant disabled and press Next to continue \u2014 the model run is identical without it. ",
           "Only aggregate statistics are ever sent to the API; never raw microdata."
         ),
-        tags$div(class = "wiz-grid",
-          tags$div(class = "wiz-col",
-            h4("AI Assistant (optional)"),
-            uiOutput("llm_consent_ui"),
-            checkboxInput("llm_enabled",
-              tip_label("Enable AI Assistant", "Enable an AI-powered assistant that interprets diagnostics, evaluates normality assumptions, and enriches the analysis brief. Supports Anthropic (Claude) and OpenAI (ChatGPT) API keys."),
+        tags$div(class = "wiz-narrow",
+          uiOutput("llm_consent_ui"),
+          checkboxInput("llm_enabled",
+            tip_label("Enable AI Assistant", "Enable an AI-powered assistant that interprets diagnostics, evaluates normality assumptions, and enriches the analysis brief. Supports Anthropic (Claude) and OpenAI (ChatGPT) API keys."),
+            value = FALSE),
+          conditionalPanel(
+            condition = "input.llm_enabled",
+            checkboxInput("llm_external_consent",
+              "I understand that aggregate estimates, uncertainty measures, diagnostics, and analysis context will be sent to the selected external AI provider. Geographic identifiers are removed from comparison prompts; raw microdata are not sent.",
               value = FALSE),
-            conditionalPanel(
-              condition = "input.llm_enabled",
-              checkboxInput("llm_external_consent",
-                "I understand that aggregate estimates, uncertainty measures, diagnostics, and analysis context will be sent to the selected external AI provider. Geographic identifiers are removed from comparison prompts; raw microdata are not sent.",
-                value = FALSE),
-              passwordInput("api_key",
-                tip_label("API Key", "Enter your Anthropic (sk-ant-...) or OpenAI (sk-...) API key. Only aggregate statistics are sent to the API \u2014 never raw microdata."),
-                value = ""),
-              selectInput("language",
-                tip_label("Language", "Switch language of AI-assisted interpretation. All 24 official EU languages are supported, plus Arabic."),
-                choices = supported_languages(),
-                selected = "en")
-            )
-          ),
-          tags$div(class = "wiz-col")
+            passwordInput("api_key",
+              tip_label("API Key", "Enter your Anthropic (sk-ant-...) or OpenAI (sk-...) API key. Only aggregate statistics are sent to the API \u2014 never raw microdata."),
+              value = ""),
+            selectInput("language",
+              tip_label("Language", "Switch language of AI-assisted interpretation. All 24 official EU languages are supported, plus Arabic."),
+              choices = supported_languages(),
+              selected = "en")
+          )
         )
       ),
 
       # ============================ STEP 6 ============================
-      wiz_panel("run",
-        tags$div(class = "wiz-note",
-          "Review the settings below, run the readiness check, then start the analysis."
-        ),
+      wiz_panel("review",
         uiOutput("wiz_outstanding"),
-        h4("Settings summary"),
-        uiOutput("wiz_summary"),
-        tags$hr(),
-        h4("Run"),
-        tags$div(class = "wiz-run-row",
-          actionButton("check_btn", "1. Check Data Readiness", class = "btn-default",
-                       style = "margin-right: 8px;"),
-          actionButton("run_btn",   "2. Run Analysis",         class = "btn-primary",
-                       style = "margin-right: 8px;"),
-          actionButton("stop_btn",  "Stop",                    class = "btn-danger",
-                       disabled = "disabled",
-                       title = "End the running analysis")
+        tags$div(class = "wiz-grid",
+          tags$div(class = "wiz-col wiz-col-wide",
+            h4("Configuration summary"),
+            uiOutput("wiz_summary")
+          ),
+          tags$div(class = "wiz-col",
+            h4("Data files of the configuration"),
+            uiOutput("saved_setup_status"),
+            h4("Data readiness"),
+            uiOutput("wiz_ready_status"),
+            tags$p(class = "wiz-small",
+                   "Check the data before running the model. Errors must be fixed; warnings and notes are for review."),
+            actionButton("check_btn", "Check data readiness", class = "btn-primary")
+          )
         ),
-        uiOutput("wiz_run_hint"),
-        tags$hr(),
         tabsetPanel(
           id = "main_tabs",
-        
           tabPanel("Preflight",
             h4("Startup Preflight"),
             p("Review these checks before running the pipeline. This panel updates automatically as you change inputs."),
@@ -1049,12 +1082,12 @@ ui <- fluidPage(
             h4("Recommended actions"),
             verbatimTextOutput("preflight_actions")
           ),
-        
+
           # ---- Tab: Data Readiness ----
           tabPanel("Data Readiness",
             h4("Data Readiness Assessment"),
-            p("Click '1. Check Data Readiness' on this step to generate diagnostics. ",
-              "Review the results here before starting the UFH / MFH analysis."),
+            p("Press 'Check data readiness' on this step to generate the diagnostics. ",
+              "Review the results here before running the model."),
             verbatimTextOutput("readiness_messages"),
             h4("National Poverty Headcount Rates"),
             tableOutput("readiness_national"),
@@ -1065,38 +1098,34 @@ ui <- fluidPage(
             h4("Auxiliary Covariate Summary"),
             p("Means, standard errors, domain counts, and Pearson correlations with the domain-level target indicator (poverty rate or mean welfare, matching the Indicator selector), shown for each year separately and pooled over all years. The p-value tests whether the correlation differs from zero (two-sided); significance codes: *** p < 0.001, ** p < 0.01, * p < 0.05, . p < 0.1. Variables are listed from the most to the least significant pooled correlation."),
             tableOutput("readiness_aux")
-          ),
-        
-          # ---- Tab: Pipeline Status ----
-          tabPanel("Status",
-            h4("Current step"),
-            textOutput("status"),
-            h4("Run folder"),
-            verbatimTextOutput("run_location"),
-            h4("Run log"),
-            verbatimTextOutput("logs"),
-            h4("Expected outputs"),
-            tableOutput("outputs")
           )
         )
-      )
-    ),
-
-    # Resources footer ----------------------------------------------
-    tags$div(class = "wiz-step", style = "padding: 14px 20px 10px;",
-      h4("Resources"),
-      tags$div(
-        style = "font-size: 12px; color: #556; margin: -4px 0 10px 0;",
-        "Detailed instructions and methodological notes are maintained outside the app. ",
-        "Use these files as the authoritative user guidance:"
       ),
-      tags$ul(
-        style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
-        tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
-        tags$li(tags$code("docs/MCPE_VALIDATION_STATUS.md")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_14.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_14.pptx")),
-        tags$li(tags$code("outputs/final_report.html"), " after a completed run")
+
+      # ============================ STEP 7 ============================
+      wiz_panel("run",
+        tags$div(class = "wiz-run-row",
+          textInput("run_label",
+            tip_label("Run label (optional)", "Short label appended to the run folder under app_runs/, so outputs from different runs are easier to tell apart."),
+            value = ""),
+          actionButton("run_btn",  "Run model", class = "btn-primary btn-lg"),
+          actionButton("stop_btn", "Stop",      class = "btn-danger btn-lg",
+                       disabled = "disabled",
+                       title = "End the running model run")
+        ),
+        uiOutput("wiz_run_hint"),
+        uiOutput("run_progress_panel"),
+        tags$details(class = "wiz-log",
+          tags$summary("Run log and output files"),
+          h4("Current step"),
+          textOutput("status"),
+          h4("Run folder"),
+          verbatimTextOutput("run_location"),
+          h4("Run log"),
+          verbatimTextOutput("logs"),
+          h4("Expected outputs"),
+          tableOutput("outputs")
+        )
       )
     )
   ) # end main_app
@@ -1119,55 +1148,143 @@ wiz_is_blank <- function(x) {
   !length(x) || is.null(x) || !nzchar(trimws(as.character(x)[1]))
 }
 
-# Does a saved-setup entry point at a file that still exists on disk?
-wiz_saved_file_exists <- function(key) {
-  setup <- tryCatch(read_dashboard_setup(), error = function(e) NULL)
-  if (is.null(setup)) return(FALSE)
-  ref <- tryCatch(setup$data_files[[key]], error = function(e) NULL)
-  if (wiz_is_blank(ref)) return(FALSE)
-  isTRUE(tryCatch(setup_file_exists(ref), error = function(e) FALSE))
-}
-
-wiz_have_file <- function(file_input, key) {
-  !is.null(file_input) || wiz_saved_file_exists(key)
-}
-
 wizard_server <- function(input, output, session) {
 
   # ---- Everything from the classic dashboard, unchanged --------------
   .wiz_core_server(input, output, session)
 
+  # Shared with app.R's server (w5o): the data files of the configuration
+  # that is loaded (none for a new model run), whether data readiness has
+  # been confirmed for the current settings, and a counter that increases
+  # each time a configuration is loaded.
+  active_files  <- session$userData$active_setup_files
+  readiness_ok  <- session$userData$readiness_checked
+  config_loaded <- session$userData$config_loaded
+
+  wiz_config_file_ok <- function(key) {
+    ref <- tryCatch(active_files()[[key]], error = function(e) NULL)
+    if (wiz_is_blank(ref)) return(FALSE)
+    isTRUE(tryCatch(setup_file_exists(ref), error = function(e) FALSE))
+  }
+
+  wiz_have_file <- function(file_input, key) {
+    !is.null(file_input) || wiz_config_file_ok(key)
+  }
+
+  wiz_file_label <- function(file_input, key) {
+    if (!is.null(file_input)) return(basename(file_input$name[1]))
+    if (wiz_config_file_ok(key)) {
+      return(paste0(basename(active_files()[[key]]), " (from the loaded configuration)"))
+    }
+    "(not selected)"
+  }
+
+  # ===================================================================
+  # Analysis years: two selectors on step 3, kept in step with the hidden
+  # `years` field that app.R's server and the pipeline read.
+  # ===================================================================
+
+  # Years present in the survey file (needs the file and its year column).
+  wiz_survey_years <- reactive({
+    path <- tryCatch(session$userData$survey_input_path(), error = function(e) NULL)
+    ycol <- trimws(as.character(input$var_year %||% ""))
+    if (is.null(path) || !nzchar(path %||% "") || !file.exists(path) || !nzchar(ycol)) {
+      return(integer())
+    }
+    df <- tryCatch(
+      suppressMessages(suppressWarnings(sae_read_table_input(path, "survey data file"))),
+      error = function(e) NULL
+    )
+    if (is.null(df) || !ycol %in% names(df)) return(integer())
+    yrs <- suppressWarnings(as.integer(as.character(unique(df[[ycol]]))))
+    sort(unique(yrs[!is.na(yrs)]))
+  })
+
+  wiz_picked_years <- function() {
+    parse_years(paste(c(input$year_1 %||% "", input$year_2 %||% ""), collapse = ","))
+  }
+
+  # Selectors -> years (user choices).
+  observeEvent(list(input$year_1, input$year_2), {
+    picked <- wiz_picked_years()
+    if (!identical(picked, parse_years(input$years))) {
+      updateTextInput(session, "years", value = paste(picked, collapse = ","))
+    }
+  }, ignoreInit = TRUE, ignoreNULL = FALSE)
+
+  # years (defaults, a loaded configuration) and the survey's years -> selectors.
+  # When the selectors already hold the target years, only the list of choices
+  # is refreshed and each selector keeps its own value: re-sorting them here
+  # would move the user's first choice into the second box, and the next pick
+  # would then overwrite it.
+  wiz_last_year_choices <- NULL
+  observe({
+    target  <- parse_years(input$years)
+    choices <- as.character(sort(unique(c(wiz_survey_years(), target))))
+    cur1 <- isolate(input$year_1) %||% ""
+    cur2 <- isolate(input$year_2) %||% ""
+    picked <- isolate(wiz_picked_years())
+    if (identical(picked, target)) {
+      if (identical(choices, wiz_last_year_choices)) return()
+      wiz_last_year_choices <<- choices
+      updateSelectizeInput(session, "year_1", choices = choices,
+                           selected = if (nzchar(cur1)) cur1 else character(0))
+      updateSelectizeInput(session, "year_2", choices = choices,
+                           selected = if (nzchar(cur2)) cur2 else character(0))
+      return()
+    }
+    wiz_last_year_choices <<- choices
+    sel <- as.character(target)
+    updateSelectizeInput(session, "year_1", choices = choices,
+                         selected = if (length(sel) >= 1L) sel[1] else character(0))
+    updateSelectizeInput(session, "year_2", choices = choices,
+                         selected = if (length(sel) >= 2L) sel[2] else character(0))
+  })
+
+  output$wiz_years_hint <- renderUI({
+    avail  <- wiz_survey_years()
+    chosen <- parse_years(input$years)
+    two    <- if (length(chosen) == 2L) NULL else " Choose two different years."
+    if (length(avail)) {
+      missing <- setdiff(chosen, avail)
+      return(tags$div(
+        class = paste("wiz-years-hint", if (length(missing) || !is.null(two)) "warn" else ""),
+        sprintf("Years in the survey file: %s.", paste(avail, collapse = ", ")),
+        if (length(missing)) sprintf(" Not in the survey file: %s.", paste(missing, collapse = ", ")),
+        two
+      ))
+    }
+    tags$div(
+      class = paste("wiz-years-hint", if (!is.null(two)) "warn" else ""),
+      "The years in the survey file are listed here once the file is selected (step 1) and its year column mapped (step 2).",
+      two
+    )
+  })
+
   # ===================================================================
   # Per-step outstanding issues
   #
   # Each returns character(0) when the step is complete. These drive the
-  # amber notices, the breadcrumb colours and the step 6 summary. They
-  # never block navigation.
+  # amber notices, the breadcrumb colours and the review step. They never
+  # block navigation.
   # ===================================================================
 
   issues_data <- reactive({
     msgs <- character()
-    if (length(parse_years(input$years)) != 2L) {
-      msgs <- c(msgs, "Enter exactly two analysis years, separated by a comma (e.g. 2012,2013).")
-    }
-    seed <- suppressWarnings(as.numeric(input$analysis_seed))
-    if (length(seed) != 1L || !is.finite(seed) || seed < 0 || seed != floor(seed)) {
-      msgs <- c(msgs, "Analysis seed must be a non-negative whole number.")
-    }
     if (!wiz_have_file(input$survey_file, "survey_file")) {
       msgs <- c(msgs, "Survey data file not selected.")
     }
     if (!wiz_have_file(input$rhs_file, "rhs_file")) {
-      msgs <- c(msgs, "Auxiliary covariates file not selected.")
+      msgs <- c(msgs, "Auxiliary data file not selected.")
     }
     if (!wiz_have_file(input$shp_file, "shp_file")) {
-      msgs <- c(msgs, "Shapefile / geometries file not selected.")
+      msgs <- c(msgs, "Shapefile/geometries file not selected.")
     }
     msgs
   })
 
   issues_mapping <- reactive({
-    required <- list(
+    required <- c(
       var_year    = "year",
       var_domain  = "domain",
       var_psu     = "psu",
@@ -1177,18 +1294,30 @@ wizard_server <- function(input, output, session) {
       rhs_domain  = "auxiliary covariates domain field",
       shp_domain  = "shapefile domain field"
     )
+    # With one row per person household size is not used.
+    if (identical(input$survey_unit %||% "household", "person")) {
+      required <- required[names(required) != "var_hh_size"]
+    }
     msgs <- character()
     for (id in names(required)) {
       if (wiz_is_blank(input[[id]])) {
         msgs <- c(msgs, sprintf("No column mapped for %s.", required[[id]]))
       }
     }
-    # strata is genuinely optional and is deliberately not checked here.
+    # strata and household ID are optional and deliberately not checked here.
     msgs
   })
 
-  issues_indicator <- reactive({
-    msgs <- character()
+  issues_years <- reactive({
+    if (length(parse_years(input$years)) != 2L) "Choose two different analysis years." else character()
+  })
+
+  issues_analysis <- reactive({
+    msgs <- issues_years()
+    seed <- suppressWarnings(as.numeric(input$analysis_seed))
+    if (length(seed) != 1L || !is.finite(seed) || seed < 0 || seed != floor(seed)) {
+      msgs <- c(msgs, "Analysis seed must be a non-negative whole number.")
+    }
     ind <- input$indicator_type %||% "poverty"
     if (identical(ind, "poverty")) {
       if (identical(input$povline_type %||% "column", "column")) {
@@ -1196,8 +1325,7 @@ wizard_server <- function(input, output, session) {
           msgs <- c(msgs, "No column mapped for the poverty line.")
         }
       } else {
-        yrs <- parse_years(input$years)
-        for (yr in yrs) {
+        for (yr in parse_years(input$years)) {
           val <- input[[paste0("povline_numeric_", yr)]]
           if (is.null(val) || !is.finite(suppressWarnings(as.numeric(val)))) {
             msgs <- c(msgs, sprintf("No numeric poverty line entered for %s.", yr))
@@ -1225,7 +1353,7 @@ wizard_server <- function(input, output, session) {
     }
     n_boot <- suppressWarnings(as.numeric(input$mcpe_bootstrap_replicates))
     if (length(n_boot) != 1L || !is.finite(n_boot) || n_boot < 50 || n_boot != floor(n_boot)) {
-      msgs <- c(msgs, "MCPE bootstrap replicates must be a whole number of at least 50.")
+      msgs <- c(msgs, "Bootstrap replicates must be a whole number of at least 50.")
     }
     msgs
   })
@@ -1233,22 +1361,28 @@ wizard_server <- function(input, output, session) {
   issues_ai <- reactive({
     msgs <- character()
     if (isTRUE(input$llm_enabled) && !isTRUE(input$llm_external_consent)) {
-      msgs <- c(msgs, "AI Assistant is enabled but external-transfer consent has not been acknowledged.")
+      msgs <- c(msgs, "The AI assistant is enabled but external-transfer consent has not been acknowledged.")
     }
     if (isTRUE(input$llm_enabled) && wiz_is_blank(input$api_key)) {
-      msgs <- c(msgs, "AI Assistant is enabled but no API key has been entered.")
+      msgs <- c(msgs, "The AI assistant is enabled but no API key has been entered.")
     }
     msgs
   })
 
+  issues_review <- reactive({
+    if (isTRUE(readiness_ok())) return(character())
+    "Data readiness has not been confirmed for this configuration: press 'Check data readiness' and fix any ERROR items."
+  })
+
   wiz_issue_map <- reactive({
     list(
-      data      = issues_data(),
-      mapping   = issues_mapping(),
-      indicator = issues_indicator(),
-      models    = issues_models(),
-      ai        = issues_ai(),
-      run       = character()
+      data     = issues_data(),
+      mapping  = issues_mapping(),
+      analysis = issues_analysis(),
+      models   = issues_models(),
+      ai       = issues_ai(),
+      review   = issues_review(),
+      run      = character()
     )
   })
 
@@ -1270,26 +1404,27 @@ wizard_server <- function(input, output, session) {
 
   local({
     ok_texts <- list(
-      data      = "All required data inputs are set.",
-      mapping   = "All required columns are mapped.",
-      indicator = "The indicator is fully defined.",
-      models    = "Model options are set.",
-      ai        = "Nothing outstanding - the AI Assistant is optional.",
-      run       = "Ready."
+      data     = "All required data files are selected.",
+      mapping  = "All required columns are mapped.",
+      analysis = "The analysis years and the indicator are set.",
+      models   = "Model options are set.",
+      ai       = "Nothing outstanding - the AI assistant is optional."
     )
     subs <- list(
-      data      = "Choose the analysis years and point the app at your survey, auxiliary and geometry files (and, for mean welfare in constant prices, a CPI file).",
-      mapping   = "Tell the app which column in each file holds which variable. Red fields are names not found in the selected dataset.",
-      indicator = "Choose what is being modelled: a poverty measure (FGT) or mean welfare.",
-      models    = "Fay-Herriot model settings, benchmarking and covariate selection. All have defaults.",
-      ai        = "Optional. Enables AI-assisted interpretation of the diagnostics.",
-      run       = "Check the settings, run the readiness diagnostics, then start the analysis."
+      data     = "Select the survey, auxiliary and geometry files. The population and price-index files are optional.",
+      mapping  = "Tell the app which column in each file holds which variable. Fields in red name columns that are not in the selected file.",
+      analysis = "Choose the two years to compare and what is estimated: a poverty measure (FGT) or mean welfare.",
+      models   = "Fay-Herriot model settings, covariate selection and benchmarking. All have defaults.",
+      ai       = "Optional. Adds AI-written interpretation of the results to the report.",
+      review   = "Check the configuration, then check the data before running the model.",
+      run      = "Start the model run. Its progress and result appear below; open the report from here when it is complete."
     )
     for (sid in WIZ_IDS) {
       local({
         this_id <- sid
         output[[paste0("wiz_issues_", this_id)]] <- renderUI({
-          if (identical(this_id, "run")) return(NULL)
+          # The review step lists everything itself; the run step has its hint.
+          if (this_id %in% c("review", "run")) return(NULL)
           wiz_issue_box(wiz_issue_map()[[this_id]], ok_texts[[this_id]])
         })
         output[[paste0("wiz_sub_", this_id)]] <- renderUI({
@@ -1347,36 +1482,49 @@ wizard_server <- function(input, output, session) {
     })
   }
 
-  observeEvent(input$wiz_jump_run, { go_to("run") }, ignoreInit = TRUE)
-
-  # Loading a saved setup fills in every step at once, so jump straight
-  # to the review step rather than making the user click through.
-  observeEvent(input$load_setup_btn, { go_to("run") }, ignoreInit = TRUE)
+  # A loaded configuration (last saved or from a file, on the front page or
+  # from the "Load configuration" menu) fills in every step at once, so show
+  # the review step rather than making the user click through.
+  observeEvent(config_loaded(), { go_to("review") }, ignoreInit = TRUE)
   observeEvent(input$reset_setup_btn, { go_to("data") }, ignoreInit = TRUE)
+  observeEvent(input$wiz_go_review, { go_to("review") }, ignoreInit = TRUE)
+  observeEvent(input$wiz_go_run, { go_to("run") }, ignoreInit = TRUE)
 
   # ===================================================================
-  # Step 6: consolidated outstanding list, settings summary, run gate
+  # Step 6: outstanding items, configuration summary, readiness status
   # ===================================================================
 
   output$wiz_outstanding <- renderUI({
     issues <- wiz_issue_map()
     labels <- vapply(WIZ_STEPS, function(s) s$short, character(1))
     names(labels) <- WIZ_IDS
+    check_ids <- setdiff(WIZ_IDS, c("review", "run"))
 
-    open_steps <- WIZ_IDS[vapply(WIZ_IDS, function(id) length(issues[[id]]) > 0L, logical(1))]
+    open_steps <- check_ids[vapply(check_ids, function(id) length(issues[[id]]) > 0L, logical(1))]
     if (length(open_steps) == 0L) {
-      return(tags$div(class = "wiz-ok", "All steps are complete. You can run the analysis."))
+      return(tags$div(class = "wiz-ok", "Steps 1 to 5 are complete."))
     }
     tags$div(
       class = "wiz-issues",
       tags$div(class = "wiz-issues-title", "Outstanding items"),
       tags$ul(lapply(open_steps, function(id) {
         tags$li(
-          tags$strong(paste0(labels[[id]], ": ")),
+          tags$strong(sprintf("Step %d, %s: ", match(id, WIZ_IDS), labels[[id]])),
           paste(issues[[id]], collapse = " ")
         )
       }))
     )
+  })
+
+  output$wiz_ready_status <- renderUI({
+    if (isTRUE(readiness_ok())) {
+      tags$div(class = "wiz-ready ok",
+               "Data readiness checked: no blocking errors. Review any warnings below, then go to ",
+               actionLink("wiz_go_run", "step 7, Run model"), ".")
+    } else {
+      tags$div(class = "wiz-ready todo",
+               "Not yet checked for the current configuration (or the last check found errors).")
+    }
   })
 
   wiz_fmt <- function(x, blank = "(not set)") {
@@ -1384,42 +1532,36 @@ wizard_server <- function(input, output, session) {
     paste(as.character(x), collapse = ", ")
   }
 
-  wiz_file_label <- function(file_input, key) {
-    if (!is.null(file_input)) return(basename(file_input$name[1]))
-    setup <- tryCatch(read_dashboard_setup(), error = function(e) NULL)
-    ref <- tryCatch(setup$data_files[[key]], error = function(e) NULL)
-    if (!wiz_is_blank(ref) && isTRUE(tryCatch(setup_file_exists(ref), error = function(e) FALSE))) {
-      return(paste0(basename(ref), " (from saved setup)"))
-    }
-    "(not selected)"
-  }
-
   output$wiz_summary <- renderUI({
     row  <- function(k, v) tags$tr(tags$th(k), tags$td(v))
     sec  <- function(k) tags$tr(class = "wiz-sec", tags$td(colspan = 2, k))
 
     ind <- input$indicator_type %||% "poverty"
+    person <- identical(input$survey_unit %||% "household", "person")
+    n_boot <- suppressWarnings(as.numeric(input$mcpe_bootstrap_replicates))
 
     rows <- list(
-      sec("1. Data"),
-      row("Analysis years", wiz_fmt(paste(parse_years(input$years), collapse = ", "))),
-      row("Country or territory", wiz_fmt(input$country_name, "Not specified")),
-      row("Analysis seed", wiz_fmt(input$analysis_seed, "123")),
-      row("Run label", wiz_fmt(input$run_label, "(none)")),
+      sec("1. Input data"),
       row("Survey file", wiz_file_label(input$survey_file, "survey_file")),
       row("Auxiliary file", wiz_file_label(input$rhs_file, "rhs_file")),
       row("Geometry file", wiz_file_label(input$shp_file, "shp_file")),
       row("Population file", wiz_file_label(input$population_file, "population_file")),
       row("CPI file", wiz_file_label(input$cpi_file, "cpi_file")),
 
-      sec("2. Mapping"),
+      sec("2. Map variables"),
       row("year / domain", paste(wiz_fmt(input$var_year), "/", wiz_fmt(input$var_domain))),
       row("psu / weight", paste(wiz_fmt(input$var_psu), "/", wiz_fmt(input$var_weight))),
       row("strata", wiz_fmt(input$var_strata, "(none)")),
-      row("household size / welfare", paste(wiz_fmt(input$var_hh_size), "/", wiz_fmt(input$var_welfare))),
+      row("Each row of the survey file is", if (person) "a person" else "a household"),
+      row("household size", if (person) "not used (one row per person)" else wiz_fmt(input$var_hh_size)),
+      row("household ID", wiz_fmt(input$var_hh_id, "(none)")),
+      row("welfare", wiz_fmt(input$var_welfare)),
       row("auxiliary / shapefile domain", paste(wiz_fmt(input$rhs_domain), "/", wiz_fmt(input$shp_domain))),
 
-      sec("3. Indicator"),
+      sec("3. Configure analysis"),
+      row("Analysis years", wiz_fmt(paste(parse_years(input$years), collapse = ", "))),
+      row("Country or territory", wiz_fmt(input$country_name, "Not specified")),
+      row("Analysis seed", wiz_fmt(input$analysis_seed, "123")),
       row("Indicator", if (identical(ind, "poverty")) "Poverty (FGT)" else "Mean welfare")
     )
 
@@ -1446,7 +1588,7 @@ wizard_server <- function(input, output, session) {
     }
 
     rows <- c(rows, list(
-      sec("4. Models"),
+      sec("4. Configure model"),
       row("Pipeline steps", wiz_fmt(input$steps, "(none selected)")),
       row("UFH transformation / criterion",
           paste(wiz_fmt(input$ufh_transformation), "/",
@@ -1474,7 +1616,11 @@ wizard_server <- function(input, output, session) {
         }
       ),
       row("Poverty-change inference", "pointwise primary; BH and Bonferroni sensitivities reported"),
-      row("Bootstrap replicates", wiz_fmt(input$mcpe_bootstrap_replicates, "500")),
+      row("Bootstrap replicates",
+          if (length(n_boot) == 1L && is.finite(n_boot) && n_boot < 500) {
+            sprintf("%s (below the default of 500: suitable for quick checks; check Monte Carlo precision before interpreting results)",
+                    wiz_fmt(input$mcpe_bootstrap_replicates))
+          } else wiz_fmt(input$mcpe_bootstrap_replicates, "500")),
       row("Benchmarking",
           if (isTRUE(input$do_benchmark)) {
             lvl <- if (identical(input$benchmark_level %||% "national", "national")) {
@@ -1486,7 +1632,7 @@ wizard_server <- function(input, output, session) {
           } else "off"),
       row("PSU codes consistent over time", if (isTRUE(input$psu_consistent)) "yes" else "no"),
 
-      sec("5. AI Assistant"),
+      sec("5. AI assistant"),
       row("Enabled", if (isTRUE(input$llm_enabled)) "yes" else "no"),
       row("External-transfer consent", if (isTRUE(input$llm_external_consent)) "acknowledged" else "not acknowledged"),
       row("API key", if (wiz_is_blank(input$api_key)) "(not entered)" else "entered"),
@@ -1496,10 +1642,15 @@ wizard_server <- function(input, output, session) {
     tags$table(class = "wiz-summary", tags$tbody(rows))
   })
 
-  # Run gate. Only the genuinely fatal prerequisites block the button --
-  # the same ones app.R's own run handler requires. Everything else is a
+  # ===================================================================
+  # Step 7: run gate and hint
+  # ===================================================================
+
+  # Run gate. Only the genuinely fatal prerequisites block the button:
+  # the three data files and two analysis years. app.R's own run handler
+  # additionally asks for a data readiness check; everything else is a
   # hint, so an expert user is never trapped by a validation rule.
-  wiz_run_blockers <- reactive({ issues_data() })
+  wiz_run_blockers <- reactive({ c(issues_data(), issues_years()) })
 
   observe({
     session$sendCustomMessage("wizToggleBtn", list(
@@ -1509,27 +1660,33 @@ wizard_server <- function(input, output, session) {
   })
 
   output$wiz_run_hint <- renderUI({
+    # While a run is in progress the progress panel says it all.
+    if (identical(session$userData$run_panel()$state, "running")) return(NULL)
     blockers <- wiz_run_blockers()
     if (length(blockers) > 0L) {
       return(tags$div(
         class = "wiz-issues",
-        tags$div(class = "wiz-issues-title", "Run Analysis is disabled until step 1 is complete:"),
+        tags$div(class = "wiz-issues-title", "Run model is disabled until these are set:"),
         tags$ul(lapply(blockers, tags$li))
       ))
     }
-    other <- setdiff(unlist(wiz_issue_map()[setdiff(WIZ_IDS, "data")]), NULL)
+    if (!isTRUE(readiness_ok())) {
+      return(tags$div(
+        class = "wiz-issues",
+        tags$div(class = "wiz-issues-title", "Check data readiness first"),
+        "The data have not been checked for the current configuration. Go to ",
+        actionLink("wiz_go_review", "step 6, Review configuration"),
+        " and press ", tags$strong("Check data readiness"), "."
+      ))
+    }
+    other <- unlist(wiz_issue_map()[setdiff(WIZ_IDS, c("data", "review", "run"))])
     if (length(other) > 0L) {
       return(tags$div(
         class = "wiz-note",
-        "You can run now, but some later steps still have outstanding items (listed above). ",
-        "Run ", tags$strong("1. Check Data Readiness"), " first if you are unsure."
+        "You can run now, but some steps still have outstanding items (listed in step 6)."
       ))
     }
-    tags$div(
-      class = "wiz-note",
-      "Tip: run ", tags$strong("1. Check Data Readiness"),
-      " before ", tags$strong("2. Run Analysis"), " to catch data problems early."
-    )
+    tags$div(class = "wiz-ok", "Ready to run.")
   })
 }
 

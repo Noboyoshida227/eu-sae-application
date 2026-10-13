@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for trying the EU SAE Application Package. This tool produces
+Thank you for trying the EU SAE Workbench (EU SAE application package). This tool produces
 small-area estimates of poverty and welfare indicators from household survey
 data, and the people who use it are producing numbers that matter, so the most
 valuable contribution is usually a careful report of something that behaved

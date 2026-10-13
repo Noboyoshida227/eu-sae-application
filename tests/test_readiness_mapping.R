@@ -67,6 +67,19 @@ local({
     invalid$strata <- "absent_strata"
     ok(inherits(try(load(invalid), silent = TRUE), "try-error"),
        paste(src, "rejects an unavailable selected stratum column"))
+    # w5o: one row per person needs no household-size mapping; household
+    # size is set to 1, so population_weight = weight.
+    person <- vm
+    person$survey_unit <- "person"
+    person$hh_size <- ""
+    pr <- load(person)
+    ok(all(pr$survey$hh_size == 1) &&
+         any(grepl("Survey rows are persons", pr$notes, fixed = TRUE)),
+       paste(src, "person rows use household size 1 without a household-size mapping"))
+    with_id <- vm
+    with_id$hh_id <- "absent_id"
+    ok(inherits(try(load(with_id), silent = TRUE), "try-error"),
+       paste(src, "rejects a mapped household ID that is not in the survey"))
   }
 
   # Run the real mapping blocks, without sourcing pipeline I/O or model fits.
@@ -81,6 +94,8 @@ local({
       env <- new.env(parent = environment())
       env$var_map <- vm
       env$var_map$strata <- stratum
+      env$.app_cfg <- list()
+      env$cfg <- list()
       env$survey_raw <- survey
       env$use_strata <- TRUE
       env$indicator_type <- "poverty"
@@ -91,6 +106,23 @@ local({
            identical(d$region, survey$region) && identical(d$domain, survey$prov),
          paste(src, "retains all roles with strata mapped to", stratum))
     }
+    # w5o: person rows do not map household size; a household ID is kept.
+    env <- new.env(parent = environment())
+    env$var_map <- vm
+    env$var_map$survey_unit <- "person"
+    env$var_map$hh_size <- ""
+    env$var_map$hh_id <- "ea_id"
+    env$.app_cfg <- list()
+    env$cfg <- list()
+    env$survey_raw <- survey
+    env$use_strata <- TRUE
+    env$indicator_type <- "poverty"
+    env$povline_type <- "column"
+    invisible(capture.output(eval(block, env)))
+    d <- if (grepl("01_ufh", src)) env$survey_all else env$survey_dt
+    ok(identical(env$survey_unit, "person") && !"hh_size" %in% names(d) &&
+         identical(d$hh_id, survey$ea_id),
+       paste(src, "person rows skip household size and keep the household ID"))
   }
   original <- data.frame(a = 1:2, b = 3:4, keep = 5:6)
   swapped <- sae_apply_column_mapping(original, c(a = "b", b = "a"))

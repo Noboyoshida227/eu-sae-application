@@ -5,6 +5,11 @@ package name: **EU_SAE_520_w5n**. This is a local candidate for methodological
 review. It is circulated as a GitHub pre-release (tag
 v5.2.0-rc.6-wizard.5.14) for review by the Polish and Greek teams.
 
+**w5o note (13 October 2026).** w5o (5.2.0-rc.6-wizard.5.15) is built on this
+candidate for the review meeting and keeps the methods reviewed here; see
+`docs/METHODOLOGY_ALIGNMENT.md` and `docs/CHANGELOG.md` for its changes. The
+evidence below refers to w5n.
+
 ## What has been revised
 
 A follow-up mapping correction was made after the first w5n archive was sent

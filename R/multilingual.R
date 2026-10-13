@@ -24,7 +24,7 @@
     normality_re       = "Normality (Random Effects)",
     normality_resid    = "Normality (Residuals)",
     llm_consent_text   = paste(
-      "This dashboard can optionally use AI assistance (Claude and ChatGPT) to help",
+      "The EU SAE Workbench can optionally use AI assistance (Claude and ChatGPT) to help",
       "interpret diagnostics and generate analysis briefs. When enabled,",
       "only aggregate summary statistics are shared -- never raw microdata.",
       "You can disable this feature at any time."

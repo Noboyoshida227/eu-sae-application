@@ -1,7 +1,7 @@
 ---
 title: "Small Area Estimation - UFH, MFH & Comparison Report"
-author: "EU SAE Pipeline"
-date: "`r format(Sys.Date(), '%B %d, %Y')`"
+author: "EU SAE Workbench"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
 params:
   include_ai: false
 output:
@@ -883,8 +883,11 @@ The table also reports Benjamini-Hochberg (BH) and Bonferroni adjustments across
 the geographic domains within each method. With valid p-values, BH targets the
 false discovery rate under its dependence assumptions; Bonferroni controls the
 family-wise probability of any false rejection. Neither adjustment repairs
-undercoverage or invalid boundary-sensitive p-values. These
-are sensitivity results and do not control the figure colors or headline counts.
+undercoverage or invalid boundary-sensitive p-values. The significance
+figures below draw a change in red when its 95% confidence interval excludes
+zero; the table gives the pointwise, BH and Bonferroni results for every domain,
+and the summary at the top of the report counts the significant domains under
+each rule.
 `r if (mfh_rule_applied) "They are separate from the MFH3 reference-variance test adjustment, which applies only to pairwise time-variance contrasts when MFH3 is fitted." else ""`
 
 `r if (change_is_percent) paste("For mean welfare, each change is the percentage change of the estimated mean: 100 x (mean in the later year / mean in the earlier year - 1). Its 95% interval and p-value are computed on the log of that ratio, from the MSEs of the two estimates and their covariance (from the MCPE for MFH; UFH treats the two years as independent), so the interval is not symmetric around the estimate. The change in currency units is kept in the Excel tables (columns ending in _eur).", price_sentence) else ""`
@@ -1141,7 +1144,9 @@ Change maps use one diverging scale centred on zero, with the same range on
 every change map: blue indicates a decrease in `r change_noun` between the
 two years, white no change, and red an increase. Domains without an estimate
 are shown in grey. The significance plots after the maps show the estimated
-change in each domain with its pointwise 95% confidence interval.
+change in each domain with its pointwise 95% confidence interval: intervals that
+exclude zero (statistically significant changes) are drawn in red, the others in
+grey.
 
 ```{r change-figures, results='asis'}
 change_files <- list.files(file.path(fig_dir, "change_figures"),

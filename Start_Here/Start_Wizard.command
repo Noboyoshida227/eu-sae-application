@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-#  EU SAE Wizard - One-click launcher (macOS / Linux)
+#  EU SAE Workbench (guided version) - One-click launcher (macOS / Linux)
 #
 #  macOS:  double-click this file. Terminal opens and the app starts.
 #          Your default web browser opens automatically.
@@ -80,7 +80,7 @@ if [ -n "$MISSING" ]; then
 fi
 
 echo "============================================"
-echo "   EU SAE Application - Guided Setup (Wizard)"
+echo "   EU SAE Workbench - Guided version"
 echo "============================================"
 echo ""
 echo "Starting up..."

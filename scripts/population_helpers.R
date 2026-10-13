@@ -240,6 +240,7 @@ sae_resolve_population_matrix <- function(population_path,
     hh_size_col = hh_size_col
   )
   cat("No population file supplied; estimated domain populations for ",
-      context, " as sum(weight * household size) by domain/year.\n", sep = "")
+      context, " as sum(weight * household size) by domain/year ",
+      "(household size is 1 when each survey row is a person).\n", sep = "")
   mat
 }

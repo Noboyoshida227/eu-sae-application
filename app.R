@@ -60,6 +60,7 @@ if (!identical(normalizePath(getwd(), winslash = "/", mustWork = TRUE), .app_dir
   "R/input_readers.R",
   "R/input_paths.R",
   "R/pipeline_helpers.R",
+  "R/workbench_ui.R",
   "R/release_controls.R",
   "app_support.R",
   "R/validation_checks.R",
@@ -123,6 +124,8 @@ if (!dir.exists(data_dir_path())) {
 source("R/input_readers.R")
 source("R/input_paths.R")
 source("R/pipeline_helpers.R")
+source("R/workbench_ui.R")
+sae_register_static_paths(.app_dir)
 source("R/release_controls.R")
 source("app_support.R")
 source("R/landing_page.R")
@@ -207,6 +210,8 @@ dashboard_setup_defaults <- function() {
       var_weight = "weight",
       var_strata = "",
       var_hh_size = "hhsize",
+      survey_unit = "household",
+      var_hh_id = "",
       var_welfare = "income",
       indicator_type = "poverty",
       povline_type = "column",
@@ -267,9 +272,68 @@ read_dashboard_setup <- function(path = dashboard_setup_path()) {
   tryCatch(yaml::read_yaml(path), error = function(e) NULL)
 }
 
+# A configuration read from a file is untrusted (w5o): keep only the known
+# keys, with values of the expected shape, so a damaged or hand-edited file
+# cannot stop the session. Returns NULL when the file is not a configuration.
+sae_sanitize_setup <- function(setup) {
+  defaults <- dashboard_setup_defaults()
+  if (!is.list(setup) || !is.list(setup$inputs) || is.null(names(setup$inputs))) {
+    return(NULL)
+  }
+  is_scalar <- function(v) !is.null(v) && is.atomic(v) && length(v) == 1L
+  out <- list(
+    saved_at = if (is_scalar(setup$saved_at)) as.character(setup$saved_at) else NULL,
+    data_files = list(),
+    inputs = list()
+  )
+  files <- if (is.list(setup$data_files)) setup$data_files else list()
+  for (k in names(defaults$data_files)) {
+    v <- files[[k]]
+    if (is_scalar(v) && !is.na(v)) out$data_files[[k]] <- as.character(v)
+  }
+  for (k in intersect(names(setup$inputs), names(defaults$inputs))) {
+    v <- setup$inputs[[k]]
+    d <- defaults$inputs[[k]]
+    ok <- if (is.list(d)) {
+      is.list(v) && all(vapply(v, function(z) is.null(z) || (is.atomic(z) && length(z) <= 1L), logical(1)))
+    } else if (length(d) == 1L) {
+      is_scalar(v)
+    } else {
+      !is.null(v) && is.atomic(v)
+    }
+    if (isTRUE(ok)) out$inputs[k] <- list(v)
+  }
+  if (!is.null(setup$data_file_sha256) && is.list(setup$data_file_sha256)) {
+    out$data_file_sha256 <- Filter(function(v) is_scalar(v) && !is.na(v), setup$data_file_sha256)
+  }
+  out
+}
+
+# SHA-256 of each data file of a configuration, so a later load can tell
+# whether a file with the same name now has different content (w5o).
+sae_setup_file_hashes <- function(data_files) {
+  out <- list()
+  for (k in names(data_files)) {
+    ref <- data_files[[k]] %||% ""
+    if (!nzchar(ref)) next
+    path <- setup_file_path(ref)
+    if (!is.null(path) && file.exists(path)) out[[k]] <- sae_sha256_file(path)
+  }
+  out
+}
+
+sae_changed_setup_files <- function(setup) {
+  saved <- setup$data_file_sha256
+  if (!length(saved)) return(character())
+  now <- sae_setup_file_hashes(setup$data_files[intersect(names(saved), names(setup$data_files))])
+  keys <- intersect(names(saved), names(now))
+  changed <- keys[vapply(keys, function(k) !identical(tolower(saved[[k]]), tolower(now[[k]])), logical(1))]
+  vapply(changed, function(k) basename(setup$data_files[[k]]), character(1), USE.NAMES = FALSE)
+}
+
 write_dashboard_setup <- function(setup, path = dashboard_setup_path()) {
   if (!requireNamespace("yaml", quietly = TRUE)) {
-    stop("Package 'yaml' is required to save dashboard setup.", call. = FALSE)
+    stop("Package 'yaml' is required to save the configuration.", call. = FALSE)
   }
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   yaml::write_yaml(setup, path)
@@ -289,6 +353,10 @@ validate_mapped_input_columns <- function(survey_raw, rhs_raw, var_map, rhs_doma
                                           povline_type = "column",
                                           indicator_type = "poverty") {
   required_roles <- c("year", "domain", "psu", "weight", "hh_size", "welfare")
+  # With one row per person (w5o) household size is not used.
+  if (identical(sae_survey_unit(var_map$survey_unit), "person")) {
+    required_roles <- setdiff(required_roles, "hh_size")
+  }
   if (identical(indicator_type, "poverty") && identical(povline_type, "column")) {
     required_roles <- c(required_roles, "povline")
   }
@@ -308,6 +376,9 @@ validate_mapped_input_columns <- function(survey_raw, rhs_raw, var_map, rhs_doma
   strata <- var_map$strata
   if (is.character(strata) && length(strata) == 1L && !is.na(strata) && nzchar(trimws(strata))) {
     survey_required <- c(survey_required, strata = strata)
+  }
+  if (sae_has_mapping(var_map$hh_id)) {
+    survey_required <- c(survey_required, hh_id = var_map$hh_id)
   }
   missing_survey <- survey_required[!survey_required %in% names(survey_raw)]
 
@@ -364,9 +435,11 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
     strata_var <- trimws(as.character(var_map$strata %||% ""))
     length(strata_var) == 1 && !is.na(strata_var) && nzchar(strata_var)
   })
+  survey_unit <- sae_survey_unit(var_map$survey_unit)
   rename_vec <- c(
     year = var_map$year, domain = var_map$domain, psu = var_map$psu,
-    welfare = var_map$welfare, weight = var_map$weight, hh_size = var_map$hh_size
+    welfare = var_map$welfare, weight = var_map$weight,
+    sae_unit_rename_cols(var_map, names(survey_raw), survey_unit)
   )
   if (use_strata) rename_vec <- c(rename_vec, strata = var_map$strata)
   benchmark_level_var <- trimws(as.character(
@@ -384,6 +457,9 @@ load_and_harmonize <- function(survey_path, rhs_path, var_map, rhs_domain,
     )
   )
   if (!use_strata && "strata" %in% names(survey_data)) survey_data$strata <- NULL
+  harmonize_notes <- c(harmonize_notes, utils::capture.output(
+    survey_data <- sae_apply_survey_unit(survey_data, survey_unit, "Data Readiness")
+  ))
 
   # When the poverty line is numeric, create the column. The value may be
   # a legacy scalar or a named year-to-line map.
@@ -742,6 +818,16 @@ price_index_inputs <- function() {
   )
 }
 
+# Survey unit (w5o): one row per household (weights are multiplied by
+# household size) or one row per person (weights used as they are).
+survey_unit_input <- function() {
+  radioButtons("survey_unit",
+    tip_label("Each row of the survey file is",
+              "A household: each row is one household and its weight is multiplied by the household size, so that every member is counted. A person: each row is one person with a person weight (for example an EU-SILC personal file); household size is not used. Choosing the wrong unit counts people several times or not at all."),
+    choices = c("a household" = "household", "a person" = "person"),
+    selected = "household", inline = TRUE)
+}
+
 mapping_selectize <- function(input_id, label, selected = "",
                               placeholder = "Search or type column name") {
   selected <- selected %||% ""
@@ -788,6 +874,8 @@ ui <- fluidPage(
           show.style.display = (show.id === 'main_app') ? 'block' : 'flex';
           show.style.transition = 'opacity 0.45s ease';
           setTimeout(function(){ show.style.opacity = '1'; }, 30);
+          // Tell Shiny the outputs inside are now visible, so they render.
+          $(show).trigger('shown');
         }, 450);
       });
       Shiny.addCustomMessageHandler('mappingValidity', function(msg) {
@@ -902,12 +990,21 @@ ui <- fluidPage(
     .benchmark-clear-row {
       margin: 2px 0 8px 0;
     }
-  "))),
+  ")),
+    tags$style(HTML(sae_run_panel_css))),
 
   sae_landing_page(wizard = FALSE),
 
   div(id = "main_app",
-    titlePanel("EU Poverty Mapping App"),
+    titlePanel(
+      tags$div(
+        style = "display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap;",
+        tags$span(SAE_APP_NAME, tags$small(style = "font-size: 0.5em; color: #4a5875; margin-left: 10px;", SAE_APP_TAGLINE)),
+        tags$span(style = "font-size: 0.45em;",
+          sae_resource_menu(.app_dir),
+          actionLink("about_btn", "About", style = "margin-left: 12px;"))
+      ),
+      windowTitle = SAE_APP_NAME),
     sidebarLayout(
     sidebarPanel(
       # ---- Analysis settings ----
@@ -931,41 +1028,29 @@ ui <- fluidPage(
       tags$hr(),
 
       # ---- Reusable setup ----
-      h4("Saved setup"),
+      h4("Model run configuration"),
       tags$div(
         style = "font-size: 12px; color: #556; margin: -4px 0 10px 0;",
-        "Save or reload dashboard settings so later runs only require small edits. If files were selected with Browse, the app saves local setup copies under app_runs/_last_setup_files for the next session."
+        "Save the configuration (data files, variables, analysis and model settings) to reuse it later. Files selected with Browse are copied under app_runs/_last_setup_files. Each model run also stores its configuration in its run folder."
       ),
       div(
         style = "display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;",
-        actionButton("load_setup_btn", "Load Last Setup", class = "btn-default btn-sm"),
-        actionButton("save_setup_btn", "Save Current Setup", class = "btn-default btn-sm"),
-        actionButton("reset_setup_btn", "Reset to Defaults", class = "btn-warning btn-sm")
+        actionButton("load_setup_btn", "Load last configuration", class = "btn-default btn-sm"),
+        actionButton("load_config_file_btn", "Load from a file", class = "btn-default btn-sm"),
+        actionButton("save_setup_btn", "Save configuration", class = "btn-default btn-sm"),
+        actionButton("reset_setup_btn", "Reset to defaults", class = "btn-warning btn-sm")
       ),
       uiOutput("saved_setup_status"),
       tags$hr(),
 
-      # ---- Resources ----
-      h4("Resources"),
-      tags$div(
-        style = "font-size: 12px; color: #556; margin: -4px 0 10px 0;",
-        "Detailed instructions and methodological notes are maintained outside the app. ",
-        "Use these files as the authoritative user guidance:"
-      ),
-      tags$ul(
-        style = "font-size: 12px; color: #556; padding-left: 18px; margin-top: 0;",
-        tags$li(tags$code("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx")),
-        tags$li(tags$code("docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_14.pdf")),
-        tags$li(tags$code("docs/instructions/EU_SAE_User_Guide_5_2_0_rc_6_wizard_5_14.pptx")),
-        tags$li(tags$code("outputs/final_report.html"), " after a completed run")
-      ),
+      # ---- Resources: see "Guides and notes" next to the title ----
       tags$hr(),
 
       # ---- Data inputs ----
       h4("Data inputs"),
       tags$div(
         style = "font-size: 12px; color: #556; margin: -4px 0 10px 0;",
-        "Use Browse to select the required input files from any folder on your computer: household survey, auxiliary covariates, and shapefiles/geometries. Survey and auxiliary files can be R, CSV/TSV/DAT, Stata, SPSS, SAS, Python Parquet/Feather, or Excel files. For ESRI shapefiles, upload one .zip containing the shapefile components, especially .shp, .shx, and .dbf; the .dbf usually contains the domain ID needed for maps. Geometry files can also be .rds, GeoPackage, or GeoJSON. If a saved setup is loaded, its active files are shown below each Browse button; browse again only when changing a file."
+        "Use Browse to select the required input files from any folder on your computer: household survey, auxiliary covariates, and shapefiles/geometries. Survey and auxiliary files can be R, CSV/TSV/DAT, Stata, SPSS, SAS, Python Parquet/Feather, or Excel files. For ESRI shapefiles, upload one .zip containing the shapefile components, especially .shp, .shx, and .dbf; the .dbf usually contains the domain ID needed for maps. Geometry files can also be .rds, GeoPackage, or GeoJSON. If a saved configuration is loaded, its active files are shown below each Browse button; browse again only when changing a file."
       ),
       fileInput("survey_file",
         tip_label("Browse Survey data file", "Choose the household survey file from any folder on your computer. Accepted formats: .rds, .RData/.rda, .csv, .tsv, .txt, .dat, .dta, .sav, .zsav, .por, .sas7bdat, .xpt, .parquet, .feather, .xlsx, .xls."),
@@ -1009,7 +1094,7 @@ ui <- fluidPage(
         ),
         fileInput("regional_benchmark_file",
           tip_label("Benchmark Target Database (optional)",
-                    "Optional RDS/CSV/XLSX file with benchmark targets by year. Leave blank to estimate targets from the survey using population_weight = weight * household size.")),
+                    "Optional RDS/CSV/XLSX file with benchmark targets by year. Leave blank to estimate targets from the survey with the population weights (weight * household size when each row is a household, weight when each row is a person).")),
         tags$div(
           class = "benchmark-format-note",
           tags$div(class = "note-title", "External benchmark file format"),
@@ -1041,11 +1126,11 @@ ui <- fluidPage(
       ),
       fileInput("population_file",
         tip_label("Domain population sizes (optional)",
-                  "Optional RDS/CSV/XLSX file with domain population sizes. Supports long domain-year-population format or wide domain-by-year format; leave blank to estimate domain populations from the survey as sum(weight * household size).")),
+                  "Optional RDS/CSV/XLSX file with domain population sizes. Supports long domain-year-population format or wide domain-by-year format; leave blank to estimate domain populations from the survey as the sum of the population weights (weight * household size when each row is a household, weight when each row is a person).")),
       uiOutput("population_active_file"),
       fileInput("cpi_file",
         tip_label("Consumer price index (optional)",
-                  "Optional file with one country's consumer price index (CPI or HICP) by year, used only for mean welfare in constant prices (Indicator step). One row per year: a year column and one or more CPI columns, for example index levels (2015 = 100), annual indices (previous year = 100) or annual changes in %. Decimal commas are accepted. In the Indicator step you choose the columns and say how the CPI is organised. Accepted formats: .csv, .tsv, .txt, .xlsx, .xls, .rds, .dta, .sav and the other table formats."),
+                  "Optional file with one country's consumer price index (CPI or HICP) by year, used only for mean welfare in constant prices (see the indicator settings). One row per year: a year column and one or more CPI columns, for example index levels (2015 = 100), annual indices (previous year = 100) or annual changes in %. Decimal commas are accepted. In the indicator settings (Configure analysis in the guided version) you choose the columns and say how the CPI is organised. Accepted formats: .csv, .tsv, .txt, .xlsx, .xls, .rds, .dta, .sav and the other table formats."),
         accept = c(".rds", ".RData", ".rda", ".csv", ".tsv", ".txt", ".dat",
                    ".dta", ".sav", ".zsav", ".por", ".sas7bdat", ".xpt",
                    ".parquet", ".feather", ".xlsx", ".xls")),
@@ -1074,9 +1159,16 @@ ui <- fluidPage(
       mapping_selectize("var_strata",
         tip_label("strata", "Optional strata ID column for survey-design variance estimation. Search the survey columns or type the column name. Leave blank if the survey design has no strata or strata are unavailable."),
         ""),
-      mapping_selectize("var_hh_size",
-        tip_label("household size", "Column name for household size. Direct poverty-rate estimates use population_weight = weight * household size; when no population file is uploaded, benchmarking also estimates domain populations as sum(weight * household size) by domain and year. Search the survey columns or type the column name."),
-        "hhsize"),
+      survey_unit_input(),
+      conditionalPanel(
+        condition = "input.survey_unit != 'person'",
+        mapping_selectize("var_hh_size",
+          tip_label("household size", "Column name for household size. With one row per household, direct estimates use population_weight = weight * household size; when no population file is uploaded, benchmarking also estimates domain populations as sum(weight * household size) by domain and year. Not used when each row is a person. Search the survey columns or type the column name."),
+          "hhsize")
+      ),
+      mapping_selectize("var_hh_id",
+        tip_label("household ID (optional)", "Optional column identifying the household. It is used only to check that the rows match the survey unit chosen above: a file with several rows per household, as many as the household size, has one row per person."),
+        ""),
       mapping_selectize("var_welfare",
         tip_label("welfare", "Column name for the welfare variable (e.g. income or consumption) used to determine poverty status. Search the survey columns or type the column name."),
         "income"),
@@ -1338,13 +1430,13 @@ ui <- fluidPage(
       tags$hr(),
 
       # Two-stage launch: first review readiness, then run the analysis.
-      actionButton("check_btn", "1. Check Data Readiness", class = "btn-default",
+      actionButton("check_btn", "1. Check data readiness", class = "btn-default",
                    style = "margin-right: 8px;"),
-      actionButton("run_btn",   "2. Run Analysis",         class = "btn-primary",
+      actionButton("run_btn",   "2. Run model",            class = "btn-primary",
                    style = "margin-right: 8px;"),
       actionButton("stop_btn",  "Stop",                    class = "btn-danger",
                    disabled = "disabled",
-                   title = "End the running analysis")
+                   title = "End the running model run")
     ),
 
     mainPanel(
@@ -1362,8 +1454,8 @@ ui <- fluidPage(
         # ---- Tab: Data Readiness ----
         tabPanel("Data Readiness",
           h4("Data Readiness Assessment"),
-          p("Click '1. Check Data Readiness' in the sidebar to generate diagnostics. ",
-            "Review the results here before starting the UFH / MFH analysis."),
+          p("Click 'Check data readiness' to generate diagnostics. ",
+            "Review the results here before running the model."),
           verbatimTextOutput("readiness_messages"),
           h4("National Poverty Headcount Rates"),
           tableOutput("readiness_national"),
@@ -1378,6 +1470,7 @@ ui <- fluidPage(
 
         # ---- Tab: Pipeline Status ----
         tabPanel("Status",
+          uiOutput("run_progress_panel"),
           h4("Current step"),
           textOutput("status"),
           h4("Run folder"),
@@ -1453,7 +1546,7 @@ server <- function(input, output, session) {
   restoring_setup   <- reactiveVal(FALSE)
   active_setup_files <- reactiveVal(dashboard_setup_defaults()$data_files)
   benchmark_upload_cleared <- reactiveVal(FALSE)
-  setup_status_text  <- reactiveVal("Using default dashboard settings.")
+  setup_status_text  <- reactiveVal("Using the default configuration.")
 
   append_log <- function(msg) {
     stamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
@@ -1472,6 +1565,37 @@ server <- function(input, output, session) {
     started_at = NULL, stop_requested_at = NULL, last_alive_check = NULL
   )
 
+  # Model-run progress and result panel (w5o; R/workbench_ui.R).
+  run_panel <- reactiveVal(list(state = "idle"))
+  run_panel_update <- function(...) {
+    st <- isolate(run_panel())
+    upd <- list(...)
+    st[names(upd)] <- upd
+    run_panel(st)
+  }
+  output$run_progress_panel <- renderUI(sae_run_panel_ui(run_panel()))
+  open_from_panel <- function(path, what) {
+    tryCatch(sae_open_path(path), error = function(e) {
+      showNotification(sprintf("Could not open the %s: %s", what, conditionMessage(e)),
+                       type = "error", duration = 8)
+    })
+  }
+  observeEvent(input$open_report_btn, open_from_panel(run_panel()$report_path, "report"), ignoreInit = TRUE)
+  observeEvent(input$open_outputs_btn, open_from_panel(run_panel()$outputs_dir %||% run_panel()$run_dir, "output folder"), ignoreInit = TRUE)
+  observeEvent(input$open_run_folder_btn, open_from_panel(run_panel()$run_dir, "run folder"), ignoreInit = TRUE)
+  observeEvent(input$view_config_btn, {
+    path <- run_panel()$config_path
+    txt <- tryCatch(readLines(path, warn = FALSE, encoding = "UTF-8"), error = function(e) "(could not read the file)")
+    showModal(modalDialog(
+      title = "Configuration of this model run", size = "l", easyClose = TRUE,
+      footer = tagList(actionButton("open_config_folder_btn", "Open its folder"), modalButton("Close")),
+      tags$p("Saved as ", tags$code(path), ". To repeat or adapt this run, use ",
+             tags$strong("Load configuration \u2192 From a file"), " and choose this file."),
+      tags$pre(style = "max-height: 420px; overflow: auto; font-size: 12px;", paste(txt, collapse = "\n"))
+    ))
+  }, ignoreInit = TRUE)
+  observeEvent(input$open_config_folder_btn, open_from_panel(dirname(run_panel()$config_path %||% ""), "folder"), ignoreInit = TRUE)
+
   append_log_raw <- function(lines) {
     lines <- as.character(lines)
     lines <- lines[nzchar(lines)]
@@ -1484,7 +1608,10 @@ server <- function(input, output, session) {
     session$sendCustomMessage("saeToggleBtn", list(id = "stop_btn", disabled = !isTRUE(running)))
   }
 
-  bg_advance <- function(stage, detail = NULL) {
+  bg_advance <- function(stage, detail = NULL, panel = TRUE) {
+    if (isTRUE(panel) && identical(isolate(run_panel())$state, "running")) {
+      run_panel_update(current = if (identical(stage, "Report")) "Render Report" else stage)
+    }
     pr <- isolate(bg_run$progress)
     if (is.null(pr)) return(invisible(NULL))
     bg_run$step_counter <- isolate(bg_run$step_counter) + 1L
@@ -1673,7 +1800,9 @@ server <- function(input, output, session) {
     report_reason  <- if (report_missing) st$report_reason else NULL
     archive_dir <- if (ok) st$archive_dir else NULL
 
-    bg_advance("Finalizing", if (ok) "Checking outputs" else if (identical(state, "stopped")) "Stopped" else "Pipeline failed")
+    # A failed or stopped run keeps the panel on the stage where it ended.
+    bg_advance("Finalizing", if (ok) "Checking outputs" else if (identical(state, "stopped")) "Stopped" else "Pipeline failed",
+               panel = ok)
     status(if (ok) "Finalizing..." else if (identical(state, "stopped")) "Stopped by user" else "Run failed")
     update_output_table(ctx$do_benchmark, archive_dir)
 
@@ -1702,7 +1831,7 @@ server <- function(input, output, session) {
       tryCatch({
         save_current_dashboard_setup("successful run")
       }, error = function(e) {
-        append_log(paste("WARNING: Could not save reusable dashboard setup:", e$message))
+        append_log(paste("WARNING: Could not save the configuration:", e$message))
       })
     } else if (identical(state, "stopped")) {
       run_location(paste(
@@ -1728,6 +1857,20 @@ server <- function(input, output, session) {
         append_log(paste("ERROR:", st$err_msg))
       }
     }
+
+    final_state <- if (ok) "finished" else if (identical(state, "stopped")) "stopped" else "failed"
+    report_candidates <- c(if (!is.null(archive_dir)) file.path(archive_dir, "final_report.html"),
+                           file.path("outputs", "final_report.html"))
+    report_path <- report_candidates[file.exists(report_candidates)][1]
+    run_panel_update(
+      state = final_state, finished_at = Sys.time(),
+      report_path = if (ok && !report_missing && !is.na(report_path)) {
+        normalizePath(report_path, winslash = "/", mustWork = FALSE)
+      } else NULL,
+      outputs_dir = if (!is.null(archive_dir)) normalizePath(archive_dir, winslash = "/", mustWork = FALSE) else run_dir_abs,
+      report_missing = isTRUE(report_missing), report_reason = report_reason %||% "",
+      error = if (identical(final_state, "failed")) (st$err_msg %||% "") else ""
+    )
 
     bg_run$active <- FALSE
     set_run_buttons(running = FALSE)
@@ -1855,7 +1998,9 @@ server <- function(input, output, session) {
       psu     = input$var_psu,
       weight  = input$var_weight,
       strata  = input$var_strata %||% "",
-      hh_size = input$var_hh_size,
+      hh_size = if (identical(input$survey_unit, "person")) "" else input$var_hh_size,
+      hh_id   = input$var_hh_id %||% "",
+      survey_unit = sae_survey_unit(input$survey_unit),
       benchmark_level = benchmark_level_var,
       region  = benchmark_level_var,
       welfare = input$var_welfare,
@@ -2432,6 +2577,9 @@ server <- function(input, output, session) {
     f <- setup$data_files
     update_mapping_select <- function(id, value) {
       value <- value %||% ""
+      # Remember the restored value until the browser reports it (see
+      # mapping_restore below), so the column-list refresh does not overwrite it.
+      assign(id, trimws(as.character(value)), envir = mapping_restore)
       cols <- if (exists("columns_for_mapping_id", inherits = FALSE)) {
         columns_for_mapping_id(id)
       } else {
@@ -2472,6 +2620,9 @@ server <- function(input, output, session) {
     update_mapping_select("var_weight", x$var_weight %||% "weight")
     update_mapping_select("var_strata", x$var_strata %||% "")
     update_mapping_select("var_hh_size", x$var_hh_size %||% "hhsize")
+    update_mapping_select("var_hh_id", x$var_hh_id %||% "")
+    updateRadioButtons(session, "survey_unit",
+                       selected = sae_survey_unit(x$survey_unit %||% "household"))
     update_mapping_select("var_welfare", x$var_welfare %||% "income")
     updateSelectInput(session, "indicator_type",
                       selected = x$indicator_type %||% "poverty")
@@ -2607,13 +2758,14 @@ server <- function(input, output, session) {
 
   save_current_dashboard_setup <- function(reason = "manual") {
     setup <- collect_dashboard_setup()
+    setup$data_file_sha256 <- sae_setup_file_hashes(setup$data_files)
     path <- write_dashboard_setup(setup)
     active_setup_files(setup$data_files)
     setup_status_text(sprintf(
-      "Saved current dashboard setup at %s.",
+      "Configuration saved at %s.",
       setup$saved_at %||% format(Sys.time(), "%Y-%m-%d %H:%M:%S")
     ))
-    append_log(sprintf("Saved reusable dashboard setup: %s", path))
+    append_log(sprintf("Saved the configuration: %s", path))
     invisible(path)
   }
 
@@ -2734,7 +2886,7 @@ server <- function(input, output, session) {
       msg <- sprintf("Active %s: %s (selected for this session)", label, basename(file_input$name))
       color <- "#2e7d32"
     } else if (!is.null(path) && nzchar(path) && file.exists(path)) {
-      msg <- sprintf("Active %s: %s (loaded from saved setup)", label, basename(path))
+      msg <- sprintf("Active %s: %s (from the loaded configuration)", label, basename(path))
       color <- "#2e7d32"
     } else if (nzchar(saved_name)) {
       msg <- sprintf("Saved %s file not found: %s. Browse again to select it.", label, basename(saved_name))
@@ -2821,7 +2973,7 @@ server <- function(input, output, session) {
 
   survey_mapping_ids <- c(
     "var_year", "var_domain", "var_psu", "var_weight",
-    "var_strata", "var_hh_size", "var_welfare",
+    "var_strata", "var_hh_size", "var_hh_id", "var_welfare",
     "var_povline", "var_benchmark_level"
   )
 
@@ -2837,9 +2989,30 @@ server <- function(input, output, session) {
     }
   }
 
+  # Mapping values restored from a configuration (w5o). Loading a
+  # configuration changes the data files, so the column lists below are
+  # refreshed in the same cycle, before the browser has applied the restored
+  # values; reading input[[id]] there would put the old value back. Until the
+  # browser reports a value for a mapping field, the restored one is used.
+  mapping_restore <- new.env(parent = emptyenv())
+  for (.map_id in c(survey_mapping_ids, "rhs_domain", "shp_domain")) local({
+    map_id <- .map_id
+    observeEvent(input[[map_id]], {
+      if (exists(map_id, envir = mapping_restore, inherits = FALSE)) {
+        rm(list = map_id, envir = mapping_restore)
+      }
+    }, ignoreInit = TRUE)
+  })
+
   update_mapping_choices <- function(id, cols = NULL, selected = NULL) {
     if (is.null(cols)) cols <- columns_for_mapping_id(id)
-    current <- if (is.null(selected)) isolate(input[[id]] %||% "") else selected
+    current <- if (!is.null(selected)) {
+      selected
+    } else if (exists(id, envir = mapping_restore, inherits = FALSE)) {
+      get(id, envir = mapping_restore, inherits = FALSE)
+    } else {
+      isolate(input[[id]] %||% "")
+    }
     current <- trimws(as.character(current %||% ""))
     updateSelectizeInput(
       session,
@@ -2911,7 +3084,9 @@ server <- function(input, output, session) {
     add_entry("var_psu", "psu", s_cols)
     add_entry("var_weight", "weight", s_cols)
     add_entry("var_strata", "strata", s_cols, required = FALSE)
-    add_entry("var_hh_size", "household size", s_cols)
+    add_entry("var_hh_size", "household size", s_cols,
+              enabled = !identical(input$survey_unit, "person"))
+    add_entry("var_hh_id", "household ID", s_cols, required = FALSE)
     add_entry("var_welfare", "welfare", s_cols)
     add_entry(
       "var_povline", "povline", s_cols,
@@ -2935,7 +3110,7 @@ server <- function(input, output, session) {
     invalid_ids <- vapply(invalid, function(x) x$id, character(1))
     all_ids <- c(
       "var_year", "var_domain", "var_psu", "var_weight",
-      "var_strata", "var_hh_size", "var_welfare", "var_povline",
+      "var_strata", "var_hh_size", "var_hh_id", "var_welfare", "var_povline",
       "var_benchmark_level", "rhs_domain", "shp_domain"
     )
     for (id in all_ids) {
@@ -3030,30 +3205,31 @@ server <- function(input, output, session) {
     tryCatch({
       path <- save_current_dashboard_setup("manual")
       showNotification(
-        paste("Dashboard setup saved:", normalizePath(path, winslash = "/", mustWork = FALSE)),
+        paste("Configuration saved:", normalizePath(path, winslash = "/", mustWork = FALSE)),
         type = "message", duration = 6
       )
     }, error = function(e) {
-      showNotification(paste("Could not save dashboard setup:", e$message),
+      showNotification(paste("Could not save the configuration:", e$message),
                        type = "error", duration = 8)
     })
   })
 
   observeEvent(input$load_setup_btn, {
-    setup <- read_dashboard_setup()
+    setup <- sae_sanitize_setup(read_dashboard_setup())
     if (is.null(setup)) {
       showNotification(
-        "No saved dashboard setup was found. Run the app once or click 'Save Current Setup' first.",
+        "No saved configuration was found. Click 'Save configuration' first; a successful model run also saves it.",
         type = "warning", duration = 8
       )
       return()
     }
-    apply_dashboard_setup(setup, "last setup")
+    if (!safe_apply_setup(setup, "last setup")) return()
     append_log(sprintf(
-      "Loaded reusable dashboard setup: %s",
+      "Loaded the configuration: %s",
       normalizePath(dashboard_setup_path(), winslash = "/", mustWork = FALSE)
     ))
-    showNotification("Loaded the last saved dashboard setup.", type = "message", duration = 5)
+    showNotification("Loaded the last saved configuration.", type = "message", duration = 5)
+    session$userData$config_loaded(isolate(session$userData$config_loaded()) + 1L)
   })
 
   observeEvent(input$reset_setup_btn, {
@@ -3066,17 +3242,117 @@ server <- function(input, output, session) {
     }
     append_log("Reset dashboard controls to default setup.")
     showNotification(
-      "Dashboard controls reset to defaults and the saved local setup was cleared.",
+      "Settings reset to defaults; the saved configuration and its file copies were cleared.",
       type = "message", duration = 8
     )
   })
 
-  session$onFlushed(function() {
-    setup <- read_dashboard_setup()
-    if (!is.null(setup)) {
-      apply_dashboard_setup(setup, "last setup")
+  # ---- Front page choice and loading configurations (w5o) ----------------
+  # The front page offers "New model run" (default settings) and "Load saved
+  # configuration"; the last configuration is no longer applied silently at
+  # start-up. The wizard reuses this server and reads these session values.
+  session$userData$active_setup_files <- active_setup_files
+  session$userData$readiness_checked <- readiness_checked
+  session$userData$run_panel <- run_panel
+  session$userData$config_loaded <- reactiveVal(0L)
+  session$userData$survey_input_path <- reactive({
+    resolve_upload(input$survey_file, fallback = saved_setup_path_for("survey_file"))
+  })
+  load_modal_enter <- reactiveVal(FALSE)
+
+  # Applies a (sanitised) configuration; a failure is reported, not fatal.
+  # Warns when a data file differs from the one the configuration was saved
+  # with (same name, different content).
+  safe_apply_setup <- function(setup, label) {
+    ok <- tryCatch({
+      apply_dashboard_setup(setup, label)
+      TRUE
+    }, error = function(e) {
+      showNotification(paste("The configuration could not be loaded:", conditionMessage(e)),
+                       type = "error", duration = 10)
+      FALSE
+    })
+    if (ok) {
+      changed <- sae_changed_setup_files(setup)
+      if (length(changed)) {
+        showNotification(paste0(
+          "These data files have changed since the configuration was saved: ",
+          paste(changed, collapse = ", "),
+          ". Results can differ from the saved run; browse the original files if you need to repeat it."),
+          type = "warning", duration = 15)
+      }
     }
-  }, once = TRUE)
+    ok
+  }
+
+  config_load_done <- function(enter) {
+    session$userData$config_loaded(isolate(session$userData$config_loaded()) + 1L)
+    removeModal()
+    if (isTRUE(enter)) fade_transition("cover_page", "main_app")
+  }
+
+  show_load_modal <- function(enter) {
+    load_modal_enter(isTRUE(enter))
+    last <- sae_sanitize_setup(read_dashboard_setup())
+    showModal(modalDialog(
+      title = "Load a saved configuration", easyClose = TRUE,
+      footer = modalButton("Cancel"),
+      if (!is.null(last)) {
+        tagList(
+          actionButton("modal_load_last",
+                       sprintf("Last saved configuration (saved %s)", last$saved_at %||% "earlier"),
+                       class = "btn-primary"),
+          tags$p(class = "help-block",
+                 "Saved with 'Save configuration' or by the last successful model run on this computer.")
+        )
+      } else {
+        tags$p("No configuration has been saved on this computer yet.")
+      },
+      tags$hr(),
+      fileInput("config_file", "Or choose a configuration file (.yml)",
+                accept = c(".yml", ".yaml")),
+      tags$p(class = "help-block",
+             "Each model run stores its configuration as model_run_configuration.yml in its folder under app_runs/.")
+    ))
+  }
+
+  observeEvent(input$enter_load_btn, show_load_modal(TRUE), ignoreInit = TRUE)
+  observeEvent(input$load_config_file_btn, show_load_modal(FALSE), ignoreInit = TRUE)
+
+  observeEvent(input$modal_load_last, {
+    setup <- sae_sanitize_setup(read_dashboard_setup())
+    if (is.null(setup)) {
+      showNotification("No saved configuration was found.", type = "warning", duration = 6)
+      return()
+    }
+    if (!safe_apply_setup(setup, "last configuration")) return()
+    append_log(sprintf("Loaded the configuration: %s",
+                       normalizePath(dashboard_setup_path(), winslash = "/", mustWork = FALSE)))
+    showNotification("Loaded the last saved configuration.", type = "message", duration = 5)
+    config_load_done(load_modal_enter())
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$config_file, {
+    f <- input$config_file
+    setup <- tryCatch(sae_sanitize_setup(yaml::read_yaml(f$datapath)), error = function(e) NULL)
+    if (is.null(setup)) {
+      showNotification(paste(
+        "This file is not a configuration saved by the app. Choose model_run_configuration.yml",
+        "from a run folder, or a file saved with 'Save configuration'."),
+        type = "error", duration = 10)
+      return()
+    }
+    if (!safe_apply_setup(setup, paste("configuration", f$name))) return()
+    append_log(sprintf("Loaded the configuration file %s.", f$name))
+    showNotification(sprintf("Loaded the configuration %s. Check the data files: browse again for any marked 'not found'.", f$name),
+                     type = "message", duration = 8)
+    config_load_done(load_modal_enter())
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$about_btn, showModal(sae_about_dialog(.app_dir)),
+               ignoreInit = TRUE)
+  observeEvent(input$about_btn_cover, showModal(sae_about_dialog(.app_dir)),
+               ignoreInit = TRUE)
 
   output$preflight_ui <- renderUI({
     build_check <- function(label, ok, detail) {
@@ -3205,7 +3481,7 @@ server <- function(input, output, session) {
   # ---- Data Readiness tab outputs ----
   output$readiness_messages <- renderText({
     rr <- readiness_result()
-    if (is.null(rr)) return("Click '1. Check Data Readiness' in the sidebar to generate diagnostics.")
+    if (is.null(rr)) return("Click 'Check data readiness' to generate diagnostics.")
     paste(rr$messages, collapse = "\n")
   })
 
@@ -3381,6 +3657,7 @@ server <- function(input, output, session) {
       input$regional_benchmark_file, input$population_file,
       input$var_year, input$var_domain, input$var_psu,
       input$var_weight, input$var_strata, input$var_hh_size,
+      input$survey_unit, input$var_hh_id,
       input$var_benchmark_level, input$var_welfare, input$var_povline,
       input$rhs_domain, input$shp_domain,
       # Poverty-line config
@@ -3397,14 +3674,20 @@ server <- function(input, output, session) {
       input$analysis_seed, input$mcpe_bootstrap_replicates,
       # Which steps will run (changes the readiness scope/messages)
       input$steps,
-      # Benchmarking choices affect required variables and outputs.
-      input$do_benchmark,
-      input$run_label
+      # Benchmarking choices affect required variables and outputs
+      # (grouped benchmarking adds the benchmark-group check, Test 0g).
+      input$do_benchmark, input$benchmark_level,
+      # Prices for mean welfare (w5o): the conversion changes the welfare
+      # the readiness check summarises.
+      input$welfare_prices, input$cpi_file,
+      tryCatch(get_price_index_config(parse_years(input$years)), error = function(e) NULL),
+      # Analysis years (the run label is not here: it does not change the data)
+      input$years
     )
     isolate({
       if (isTRUE(readiness_checked())) {
         readiness_checked(FALSE)
-        append_log("Data inputs or analysis options changed - please re-run 'Check Data Readiness'.")
+        append_log("Data inputs or analysis options changed - please check data readiness again.")
       }
     })
   })
@@ -3578,6 +3861,15 @@ server <- function(input, output, session) {
       }
     }
 
+    # Survey unit and benchmark groups (w5o): a person-level file analysed as
+    # households, or a domain coded in two benchmark groups, blocks the run.
+    year_msgs <- c(year_msgs, sae_readiness_unit_messages(
+      harmonized$survey, input$survey_unit, requested_years))
+    if (isTRUE(input$do_benchmark) && identical(get_benchmark_level(), "custom")) {
+      year_msgs <- c(year_msgs, sae_readiness_benchmark_group_messages(
+        harmonized$survey, paste(benchmark_level_var, "group"), requested_years))
+    }
+
     geo_read <- tryCatch(
       list(data = sae_read_geometry_input(shp_path, "Geometry data"),
            messages = character()),
@@ -3625,7 +3917,7 @@ server <- function(input, output, session) {
     status(if (readiness_errors) {
       "Data readiness check found blocking errors"
     } else {
-      "Data readiness check complete - review the results, then click Run Analysis."
+      "Data readiness check complete - review the results, then run the model."
     })
     updateTabsetPanel(session, "main_tabs", selected = "Data Readiness")
     if (readiness_errors) {
@@ -3635,7 +3927,7 @@ server <- function(input, output, session) {
       )
     } else {
       showNotification(
-        "Data readiness check complete. Review the Preflight and Data Readiness tabs, then click '2. Run Analysis'.",
+        "Data readiness check complete. Review the Preflight and Data Readiness results, then run the model.",
         type = "message", duration = 8
       )
     }
@@ -3657,13 +3949,14 @@ server <- function(input, output, session) {
       showModal(modalDialog(
         title = "Please check data readiness first",
         tags$p(
-          "Before running the analysis, please click ",
-          tags$strong("1. Check Data Readiness"),
-          " in the sidebar and review the Preflight and Data Readiness tabs."
+          "Before running the model, click ",
+          tags$strong("Check data readiness"),
+          " (in the Review configuration step of the guided version, or in the sidebar) ",
+          "and review the Preflight and Data Readiness results."
         ),
         tags$p(
-          "This ensures your survey data, auxiliary covariates, and geometry ",
-          "file are consistent before the UFH / MFH / Comparison pipeline starts."
+          "This makes sure the survey data, auxiliary covariates and geometry ",
+          "file are consistent before the model run starts. If the check found errors, fix them and check again."
         ),
         easyClose = TRUE,
         footer = modalButton("OK")
@@ -3926,6 +4219,14 @@ server <- function(input, output, session) {
             benchmark_level_var
           ))
         }
+      }
+
+      # Survey unit and benchmark groups (w5o), as in "Check data readiness".
+      year_msgs <- c(year_msgs, sae_readiness_unit_messages(
+        harmonized$survey, input$survey_unit, requested_years))
+      if (isTRUE(input$do_benchmark) && identical(get_benchmark_level(), "custom")) {
+        year_msgs <- c(year_msgs, sae_readiness_benchmark_group_messages(
+          harmonized$survey, paste(benchmark_level_var, "group"), requested_years))
       }
 
       geo_read <- tryCatch(
@@ -4320,6 +4621,18 @@ server <- function(input, output, session) {
     cfg_path <- file.path(run_dir, "app_config.yml")
     write_app_config(cfg, cfg_path)
     append_log(paste("Saved config:", normalizePath(cfg_path, winslash = "/", mustWork = FALSE)))
+    # The configuration as the app's inputs (w5o): can be loaded again with
+    # Load configuration -> From a file to repeat or adapt this run.
+    run_config_path <- file.path(run_dir, "model_run_configuration.yml")
+    run_config_path <- tryCatch({
+      run_setup <- collect_dashboard_setup()
+      run_setup$data_file_sha256 <- sae_setup_file_hashes(run_setup$data_files)
+      write_dashboard_setup(run_setup, run_config_path)
+    },
+      error = function(e) {
+        append_log(paste("WARNING: Could not save the model run configuration:", conditionMessage(e)))
+        NULL
+      })
 
     status("Running pipeline...")
 
@@ -4389,6 +4702,8 @@ server <- function(input, output, session) {
         sep = "\n"
       ))
       progress$set(value = n_steps, detail = "Failed")
+      run_panel(list(state = "failed", run_dir = run_dir_abs,
+                     error = "The model run could not start. The run log below has the details."))
       return()
     }
 
@@ -4414,6 +4729,11 @@ server <- function(input, output, session) {
       country                = if (nzchar(trimws(input$country_name %||% ""))) trimws(input$country_name) else "Not specified"
     )
     launched <- TRUE
+    run_panel(list(
+      state = "running", stages = pipeline_stages,
+      current = if (length(pipeline_stages) > 1L) pipeline_stages[2] else pipeline_stages[1],
+      started_at = Sys.time(), run_dir = run_dir_abs, config_path = run_config_path
+    ))
     set_run_buttons(running = TRUE)
     append_log("Analysis started in a background process; you can follow the log here and press Stop to end it.")
   })
