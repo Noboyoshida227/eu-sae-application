@@ -10,6 +10,9 @@
 if (!exists("%||%")) {
   `%||%` <- function(a, b) if (is.null(a)) b else a
 }
+if (!exists("sae_variance_choice", mode = "function")) {
+  source(file.path("R", "variance_policy.R"), local = TRUE)
+}
 
 # ===========================================================================
 # generate_data_note  --  Template-based data properties & initial assessment
@@ -118,17 +121,19 @@ generate_data_note <- function(validation,
     ln <- c(ln, sprintf("- **Transformation:** %s", ufh_trans))
     # Bias correction (back-transformation) is meaningful for both
     # arcsin (integration-based 'bc') and UFH log (Slud-Maiti 'bc_sm').
-    # Variance-smoothing is only user-configurable when transformation
-    # is 'no' -- arcsin and log both stabilize variances on their own
-    # scale.
+    # Identity and log models use the selected variance policy; arcsin
+    # uses its separate effective-sample-size working variance.
     if (ufh_trans %in% c("arcsin", "log")) {
       bt <- ufh_options$backtransformation
       if (is.null(bt) || (length(bt) == 1 && is.na(bt))) bt <- "none"
       ln <- c(ln, sprintf("- **Bias correction:** %s", bt))
+    }
+    if (identical(ufh_trans, "arcsin")) {
+      ln <- c(ln, "- **Variance input:** effective-sample-size working variance 1/(4*n_eff); the smoothing setting is not applied.")
     } else {
-      vc <- ufh_options$var_choice
-      if (is.null(vc) || (length(vc) == 1 && is.na(vc))) vc <- "sm_out"
-      ln <- c(ln, sprintf("- **Variance option:** %s", vc))
+      vc <- sae_variance_choice(ufh_options$var_choice)
+      ln <- c(ln, sprintf("- **Variance option:** %s%s", vc,
+                         if (identical(ufh_trans, "log")) " (log-scale variances)" else ""))
     }
     has_y1 <- !is.null(ufh_options$candidate_vars_y1) && length(ufh_options$candidate_vars_y1) > 0
     has_y2 <- !is.null(ufh_options$candidate_vars_y2) && length(ufh_options$candidate_vars_y2) > 0
@@ -156,8 +161,10 @@ generate_data_note <- function(validation,
       if (is.null(mfh_bt) || (length(mfh_bt) == 1 && is.na(mfh_bt))) mfh_bt <- "none"
       ln <- c(ln, sprintf("- **Bias correction:** %s", mfh_bt))
     }
-    ln <- c(ln, sprintf("- **Variance option:** %s", mfh_options$var_choice %||% "N/A"))
-    ln <- c(ln, sprintf("- **Covariance option:** %s", mfh_options$cov_choice %||% "N/A"))
+    mfh_var <- sae_variance_choice(mfh_options$var_choice)
+    ln <- c(ln, sprintf("- **Variance option:** %s", mfh_var))
+    ln <- c(ln, sprintf("- **Covariance option:** %s",
+                       sae_covariance_choice(mfh_options$cov_choice, mfh_var)))
     ln <- c(ln, sprintf("- **Selected MFH model:** %s", mfh_options$diag_model %||% "N/A"))
     ln <- c(ln, sprintf("- **Fit MFH3:** %s",
                          if (isTRUE(mfh_options$fit_mfh3)) "Yes" else "No"))

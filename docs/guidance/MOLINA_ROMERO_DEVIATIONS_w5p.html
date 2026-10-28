@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MOLINA_ROMERO_DEVIATIONS_w5p</title><style>
+:root{--ink:#182d40;--muted:#526476;--teal:#006b70;--line:#d8e2e8;--wash:#f1f6f8}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:17px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{background:var(--ink);color:white;padding:42px max(24px,calc((100vw - 1080px)/2)) 34px}
+header p{max-width:820px;margin:9px 0}header .eyebrow{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#b7dadd}
+h1{font-size:38px;line-height:1.2;margin:10px 0}h2{font-size:27px;line-height:1.3;margin:42px 0 16px}h3{font-size:21px;margin:20px 0 8px}
+main{max-width:1128px;margin:auto;padding:0 24px 48px}nav{display:flex;flex-wrap:wrap;gap:10px 22px;padding:19px 0;border-bottom:1px solid var(--line)}
+a{color:var(--teal);text-underline-offset:3px}a:hover{text-decoration-thickness:2px}a:focus-visible{outline:3px solid #ecb900;outline-offset:3px}
+.intro{font-size:20px}.note{background:var(--wash);border-left:4px solid var(--teal);padding:16px 20px;margin:20px 0}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:8px 34px}.step{border-top:2px solid var(--line)}
+table{border-collapse:collapse;width:100%;margin:14px 0 24px}th,td{text-align:left;vertical-align:top;padding:13px 12px;border-bottom:1px solid var(--line)}th{background:var(--wash);font-size:15px}
+td:first-child{width:33%}code{font:14px/1.5 Consolas,monospace;overflow-wrap:anywhere;background:var(--wash);padding:2px 4px}p{margin:8px 0 14px}
+.meta{font-size:14px;color:var(--muted)}.format{display:inline-block;margin:4px 14px 0 0;font-size:15px}.language{font-weight:600;font-size:19px}.catalogue-item{padding:18px 0;border-bottom:1px solid var(--line)}
+.catalogue-item h3{margin:0;font-size:20px}.catalogue-item p{margin:6px 0}.badge{font-size:12px;padding:2px 7px;border:1px solid var(--line);border-radius:3px;margin-left:7px}
+details{margin:22px 0;padding:15px 20px;background:var(--wash)}summary{cursor:pointer;font-size:19px;font-weight:600}footer{border-top:1px solid var(--line);padding-top:22px;margin-top:34px;font-size:14px;color:var(--muted)}
+@media(max-width:700px){h1{font-size:30px}.steps{grid-template-columns:1fr}th,td{padding:10px 6px}td:first-child{width:38%}body{font-size:16px}}
+@media print{header{padding:10px 0;background:white;color:black}nav{display:none}main{padding:0}a{color:black}h2,h3{break-after:avoid}.catalogue-item,tr{break-inside:avoid}.steps{display:block}}
+</style></head><body><main><nav><a href="../INDEX.html">Documentation catalogue</a></nav><h1 id="how-w5p-follows-and-extends-molina-and-romero-2025">How w5p follows and extends Molina and Romero (2025)</h1>
+<p><strong>Implementation:</strong> EU SAE Workbench <code>EU_SAE_520_w5p</code>, version <code>5.2.0-rc.6-wizard.5.16</code>, prepared locally on October 28, 2026. <strong>Reference:</strong> Molina, I., and Romero, E., <em>Comparable Small Area Estimates over Time</em>, manuscript dated January 29, 2025. The omission of STFH is outside this assessment, as requested.</p>
+<p>This note describes the implementation after the w5o code and documentation repairs and the owner's subsequent w5p revisions. The two-year design supports an NSO publication policy that limits routine revisions to one previously published year per release and one scheduled revision of each year's estimate. Where GVF variance selection applies, new runs now default to full smoothing (<code>sm_all</code>), with <code>rho_sm_all</code> as the corresponding MFH covariance default. Existing explicit variance choices remain available; arcsine UFH retains its separate effective-sample-size treatment.</p>
+<p>The note separates the manuscript's requirements and recommendations from choices in its examples, permitted alternatives and developments it leaves open. The Workbench retains the UFH/MFH framework and the change-MSE identity. Several additional choices have a conditional statistical rationale, but neither that rationale nor passing software tests establishes coverage for the complete workflow. Unresolved questions include GVF adequacy and estimated-input uncertainty, common national sampling correlation, UFH/Direct period independence, model selection and inference near covariance boundaries. The 0.001 cutoff remains relevant only when the optional <code>sm_out</code> policy is selected.</p>
+<p>The repairs correct unintended behavior; they are not methodological choices to defend. The release remains an uncommitted local review candidate. See the <a href="../validation/W5P_VALIDATION_RECEIPT.html">fresh validation receipt</a> and <a href="METHODOLOGY_ALIGNMENT.html">methodology alignment</a>. Historical QER studies retain their original date, design and version.</p>
+<h2 id="what-follows-the-manuscript">What follows the manuscript</h2>
+<p>The MFH covariance structures follow manuscript p20: MFH1 has time-specific independent random effects; MFH2 uses a stationary AR(1) covariance and distinguishes innovation from marginal variance; MFH3 has time-varying innovation variances and the specified initial-state variance of one. The latter makes MFH3 sensitive to measurement scale, which is a property of the specification rather than, by itself, a coding error.</p>
+<p>The change calculation follows p36:</p>
+<p><code>MSE(change) = MSE(year 1) + MSE(year 2) − 2 × MCPE(year 1, year 2)</code>.</p>
+<p>The maintained bootstrap calculates all three terms from the same accepted prediction-error draws. MCPE is an uncentered cross-product of prediction errors, not a centered sample covariance. Source: shared MFH bootstrap (<code>R/mfh_bootstrap_helpers.R</code> in the extracted package).</p>
+<p>The manuscript permits LASSO on p10, alongside other selection methods, and prefers BIC. LASSO is not itself a departure. Design-weighted Hájek-type Direct means also fall within its broader design-aware discussion, even though its worked example uses a different estimator. Correct survey design, harmonization and weights remain necessary.</p>
+<h2 id="choices-and-whether-they-are-justified">Choices and whether they are justified</h2>
+<p>“Justified” below means the stated scope choice has a clear rationale. “Conditionally justified” means validity depends on the listed assumptions and application evidence. “Unresolved” means the available evidence does not establish general suitability. These judgments are distinct from whether a choice is a departure, extension or approximation.</p>
+<table>
+<thead>
+<tr>
+<th>Choice and manuscript relationship</th>
+<th>Classification and assessment</th>
+<th>Rationale, conditions and remaining evidence needs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MFH2 default, optional MFH3-first.</strong> The p21 sequence begins with MFH3 and a variance-homogeneity test.</td>
+<td>Pragmatic departure; <strong>conditionally justified</strong>.</td>
+<td>Recorded MFH3 convergence difficulties motivate a usable simpler starting model. They do not prove homogeneous innovations or optimal MFH2 inference. Preserve the actual selection/fallback reason and compare substantively plausible alternatives. Selection (<code>R/mfh_model_selection.R</code> in the extracted package).</td>
+</tr>
+<tr>
+<td><strong>Exactly two analysis years.</strong> The paper develops a general multi-period framework.</td>
+<td>Deliberate restriction for an official-statistics revision policy; <strong>justified for the stated publication objective</strong>.</td>
+<td>Successive two-survey-year windows, followed by freezing a year after its second appearance, allow one scheduled revision of each year's estimate and at most one previously published year to be revised in each release. This limits the repeated revisions of overlapping years that a rolling T&gt;2 fit can produce. It sacrifices some multi-period borrowing; it is not a statistical optimality claim. The workflow and required NSO controls are explained below. With two years, MFH3 has one variance contrast, so raw/BH/Bonferroni variance-test decisions coincide (manuscript p23).</td>
+</tr>
+<tr>
+<td><strong>Full variance smoothing by default, <code>sm_all</code>.</strong> Pages 10–12 discuss unstable-variance smoothing and illustrate full smoothing.</td>
+<td>Aligned with the manuscript's illustrated approach; <strong>conditionally justified</strong>.</td>
+<td>Replace all working sampling variances with their GVF predictions for identity/log UFH and MFH; log models smooth the sampling variances of log arithmetic area means (delta variance V/mean²). Pair the MFH default with <code>rho_sm_all</code>. This is an owner-selected default, not a universal manuscript requirement or evidence that every GVF is adequate. Raw Direct uncertainty remains separate. Arcsine UFH retains its transformation-specific effective-sample-size variance. Estimated GVF uncertainty is still omitted from the conditional bootstrap.</td>
+</tr>
+<tr>
+<td><strong>Optional selective variance replacement, <code>sm_out</code>.</strong> The manuscript does not prescribe 0.001.</td>
+<td>Retained application departure; <strong>general suitability unresolved</strong>.</td>
+<td>When explicitly selected, retain finite variances at least 0.001 and replace missing/nonfinite or strictly smaller values with GVF predictions. Large variances are not replaced. The threshold is scale-dependent and applies to log-scale variance in log-mean models. Compare direct/selective/full smoothing for the actual indicator and survey. The counts below describe this optional policy, not the new default. Policy (<code>R/variance_policy.R</code> in the extracted package).</td>
+</tr>
+<tr>
+<td><strong>GVF lognormal retransformation.</strong> The p12 illustration exponentiates fitted log variance; the application adds half the residual variance.</td>
+<td>Example-level modeling departure; <strong>conditionally justified</strong>.</td>
+<td><code>exp(predicted log variance + residual variance/2)</code> targets a conditional mean under suitable lognormal, homoscedastic residual assumptions. It is not universally unbiased. Check log-GVF residual adequacy. GVF helper (<code>scripts/ufh_functions.R</code> in the extracted package).</td>
+</tr>
+<tr>
+<td><strong>Common national sampling correlation.</strong> Page 20 treats estimated domain sampling covariance matrices as known inputs.</td>
+<td>Stabilizing approximation; <strong>conditionally justified</strong>.</td>
+<td>A pooled correlation can stabilize noisy domain estimates but assumes it adequately represents domain dependence. The Workbench adapts the nationally pooled strategy of Boonstra and van den Brakel (2019) to PSU-level dependence. It is not an identical matched-unit implementation. Check stable PSU identifiers, the joint design and domain heterogeneity. PSU reuse alone establishes neither covariance magnitude nor sign. <a href="Technical%20notes/Note%20on%20Estimating%20the%20Sampling-Error%20Covariance%20Matrix%20%28revised%29.docx">Sampling-covariance note</a>.</td>
+</tr>
+<tr>
+<td><strong>Anchored poverty.</strong> The manuscript does not explicitly specify an anchored-poverty application.</td>
+<td>Country-requested extension of the indicator scope; <strong>conditionally justified</strong>.</td>
+<td>Added in response to requests from the Polish and Greek teams. Use the FGT workflow with analyst-supplied thresholds representing a consistent purchasing-power anchor. Document the reference-year line, price adjustment, welfare definition and survey/income periods. The application does not automatically derive or update an anchored line; an unchanged nominal threshold is not generally a constant-real anchor. See the implementation conditions below.</td>
+</tr>
+<tr>
+<td><strong>Mean welfare.</strong> The manuscript does not explicitly specify the Workbench's mean-welfare workflow.</td>
+<td>Country-requested extension of the indicator scope; <strong>conditionally justified</strong>.</td>
+<td>Added in response to requests from the Polish and Greek teams. Target survey-weighted arithmetic area means, with compatible welfare definitions, weights and price bases across years. Disclose nominal versus real changes. Log fitting, back-transformation and percentage-change uncertainty require the additional assumptions in the following rows; the country request itself does not establish statistical validity.</td>
+</tr>
+<tr>
+<td><strong>Arcsine poverty and log-mean UFH.</strong> The manuscript's worked examples do not prescribe these transformed workflows.</td>
+<td>Extensions based on the separately supplied EMDI methodology; <strong>conditionally justified</strong>.</td>
+<td>Log welfare targets the arithmetic area mean. UFH uses ML/Slud–Maiti correction where selected; this differs from original-scale REML. Retain the documented EMDI arcsine note-versus-package integration discrepancy and unavailable corrected-log predictions for unsampled areas. Transformation and boundary assumptions require review. UFH helpers (<code>scripts/ufh_functions.R</code> in the extracted package).</td>
+</tr>
+<tr>
+<td><strong>Conditional-lognormal MFH and percentage changes.</strong> The linear MFH exposition does not supply these reporting-scale predictors/intervals.</td>
+<td>Extensions and delta approximation; <strong>conditionally justified</strong>.</td>
+<td>MFH uses <code>exp(eta + v/2)</code> under the fitted conditional Gaussian model, with <code>v = diag(G − G(G + R)^−1G)</code>. It is distinct from UFH Slud–Maiti. Percentage-change intervals add a first-order log-ratio approximation. There is no general finite-sample unbiasedness or coverage guarantee. Shared prediction/bootstrap (<code>R/mfh_bootstrap_helpers.R</code> in the extracted package).</td>
+</tr>
+<tr>
+<td><strong>Joint parametric MSE/MCPE bootstrap.</strong> Page 36 explicitly identifies bootstrap development as needed.</td>
+<td>Implementation extension responding to a stated gap; <strong>conditionally justified</strong>.</td>
+<td>Refit, inverse transformation and any final benchmarking are repeated within accepted draws. Shared-draw moment identities are coherent. Normal/delta intervals and plug-in bootstrap uncertainty remain approximate. Numerical agreement is necessary but insufficient for inferential validity.</td>
+</tr>
+<tr>
+<td><strong>Bootstrap conditional on selected model and inputs.</strong> The manuscript does not specify this complete algorithm.</td>
+<td>Conditional approximation; <strong>full-workflow adequacy unresolved</strong>.</td>
+<td>Hold selected formulas, selected MFH type, auxiliary values, populations and estimated sampling covariances fixed. Do not repeat variable selection, MFH3/MFH2 selection, GVF fitting or covariance estimation in each draw. Their uncertainty is omitted. Review attempts, refit failures and accepted boundary fits; obtaining the requested count does not prove failed draws inconsequential. <a href="Technical%20notes/Note%20on%20MSE%20Estimation%20-%20Levels%20and%20Changes.docx">MSE note</a>.</td>
+</tr>
+<tr>
+<td><strong>Optional ratio benchmarking.</strong> Benchmarking is not discussed in the supplied manuscript.</td>
+<td>Extension added at the EMDI team's recommendation; <strong>conditionally justified</strong>.</td>
+<td>The operational rationale is coherence between population-weighted area estimates and the chosen national or group target. Repeat the reported-scale adjustment in each uncertainty draw. Recompute survey-derived targets; hold uploaded targets fixed and disclose excluded target uncertainty. Check populations, aggregate constraints and poverty-rate bounds. A positive factor preserves already nonnegative inputs but does not repair negative predictions or impose an upper bound of one. Zero/zero conventions differ between UFH and MFH and are disclosed below. The recommendation to include benchmarking does not establish endorsement of every implementation detail. UFH (<code>scripts/ufh_functions.R</code> in the extracted package), MFH (<code>scripts/bench_regional_mfh.R</code> in the extracted package).</td>
+</tr>
+<tr>
+<td><strong>UFH and Direct change calculations assume period independence.</strong> Dependent comparisons require cross-products/covariances.</td>
+<td>Simplifying assumption; <strong>conditionally justified only when independence is supported, otherwise unresolved for substantive inference</strong>.</td>
+<td>Separate annual fitting does not create independent errors. Overlapping samples and persistent clusters can invalidate the assumption. Use an explicitly qualified sensitivity calculation unless design/error evidence supports zero cross-period covariance.</td>
+</tr>
+<tr>
+<td><strong>Endpoint checks, constrained refits and covariance repair.</strong> The paper does not specify the complete safeguard policy.</td>
+<td>Numerical extensions; <strong>conditionally justified</strong>.</td>
+<td>Preserve the intended likelihood, use consistent covariance inputs, record repairs and check sensitivity. A numerically admissible correlation near the stationary limit can still have poor inferential performance. Convergence checks (<code>R/mfh_convergence_check.R</code> in the extracted package), robust MFH2 (<code>scripts/eblupMFH2_robust.R</code> in the extracted package).</td>
+</tr>
+<tr>
+<td><strong>Primary pointwise displays and counts across domains.</strong> Pages 36–37 support individual-area comparison, explain familywise correction and caution against many-area testing.</td>
+<td>Reporting-policy departure; <strong>conditionally justified for individual-area or exploratory interpretation</strong>.</td>
+<td>Pointwise colors/counts do not provide familywise control. BH and Bonferroni are already exported; they answer different error-control questions and do not repair invalid p-values. Primary counts are now explicitly exploratory, with provisional/unavailable status retained. Plot helper (<code>R/mfh_change_plots.R</code> in the extracted package), report (<code>report.Rmd</code> in the extracted package).</td>
+</tr>
+<tr>
+<td><strong>Automated variable selection and analyst review.</strong> Pages 10 and 21 allow selection and require diagnostic/revision steps.</td>
+<td>Permitted tools with implementation choices; <strong>conditionally justified</strong>.</td>
+<td>LASSO screening, the two-stage/fallback sequence and default AIC in MFH instead of the paper's preferred BIC are disclosed choices. A completed run does not prove substantive assumptions/outliers were reviewed. Keep a run-specific diagnostic, sensitivity and acceptance/withholding record.</td>
+</tr>
+<tr>
+<td><strong>Residual diagnostic scaling and tests.</strong> The paper recommends model checking without prescribing every displayed diagnostic.</td>
+<td>Implementation choice; <strong>conditionally justified as descriptive evidence</strong>.</td>
+<td>MFH residual plots use <code>(Direct − EBLUP)/sqrt(diag(RPR))</code>, where P accounts for fitted fixed effects. Residuals remain correlated. Shapiro–Wilk and residual-versus-fitted regressions are descriptive checks, not exact independent-sample tests or a substitute for the analyst's model review. MFH pipeline (<code>scripts/02_mfh.R</code> in the extracted package).</td>
+</tr>
+</tbody>
+</table>
+<p>The conservative MFH complete-two-year Direct-panel restriction is a capability limit consistent with the paper's caution about unsupported area predictions. w5p blocks missing required cells before cleanup rather than silently dropping areas or inventing predictions. It does not impose the same blanket restriction on supported UFH-only analyses. Theoretical missing-area results in the companion covariance-prediction paper should not be read as current production capability.</p>
+<h2 id="why-benchmarking-anchored-poverty-and-mean-welfare-were-added">Why benchmarking, anchored poverty and mean welfare were added</h2>
+<p>The project maintainer confirmed on October 28, 2026 that benchmarking was included following the EMDI team's recommendation, while anchored poverty and mean welfare were included in response to requests from the Polish and Greek teams. This records the provenance of the project decisions; it is not an attribution of those recommendations to Molina and Romero (2025), nor a claim that the teams validated all formulas or software choices. These are extensions to the manuscript's explicit scope, rather than failures to follow a stated prohibition.</p>
+<p><strong>Benchmarking</strong> serves the publication objective of making population-weighted small-area estimates agree with a selected national or group mean/rate on the reporting scale. That is a practical reason to offer the option, especially where area estimates must reconcile with official aggregates. It remains conditional on a compatible target population, indicator, period and measurement scale, correct aggregation weights and defensible targets. Reconciliation does not by itself improve accuracy or coverage. The implemented ratio adjustment and treatment of target uncertainty must be assessed separately from the EMDI team's recommendation to include benchmarking.</p>
+<p><strong>Anchored poverty</strong> addresses a country-team need to compare poverty against a reference standard held constant in purchasing-power terms. The Workbench supports this through its existing FGT calculations with a supplied poverty-line column or positive, finite year-specific numeric thresholds. The analyst must construct and document the reference-year anchor and its appropriate price updating, or supply welfare and poverty lines already expressed on a consistent price basis. The mean-welfare CPI option does not deflate poverty runs or construct poverty lines. In particular, holding a nominal threshold unchanged during inflation is not equivalent to holding purchasing power constant, and automatically calculating a reference-year median-based anchor is not part of this implementation. Maintain comparable income-reference periods, welfare definitions, equivalence scales and survey weights. Uncertainty from estimating the anchor or price index is not automatically propagated by the conditional model bootstrap. Threshold handling (<code>R/pipeline_helpers.R</code> in the extracted package).</p>
+<p><strong>Mean welfare</strong> addresses the country teams' request to report levels and changes in average welfare alongside poverty. The target is a survey-weighted arithmetic area mean, not the mean of logged household welfare or a geometric mean. The selected household/person-row interpretation and equivalence scale must match that target. When configured, welfare is converted to constant prices before aggregation; otherwise reported changes can include inflation. A log fit requires positive finite area means and appropriate back-transformation, while the reporting-scale MSE and change intervals retain their stated conditional and approximation limits. The usefulness of the indicator justifies extending the reporting scope; model adequacy and uncertainty for each application still require evidence. Price and change handling (<code>R/pipeline_helpers.R</code> in the extracted package), UFH implementation (<code>scripts/01_ufh.R</code> in the extracted package), MFH implementation (<code>scripts/02_mfh.R</code> in the extracted package).</p>
+<h2 id="why-the-official-statistics-workflow-uses-two-years">Why the official-statistics workflow uses two years</h2>
+<p>The principal reason for T=2 is control of revisions to published annual poverty estimates. With a three-year window such as (2022, 2024, 2025), a subsequent fit of (2024, 2025, 2026) can change both 2024 and 2025. The 2025 estimate can change again when the window advances to (2025, 2026, 2027). Such repeated changes complicate the NSO's publication and communication of official figures.</p>
+<p>The intended two-year sequence is (2022, 2024), then (2024, 2025), then (2025, 2026). The windows use successive available survey years; they need not be consecutive calendar years. A later-year estimate is first released provisionally, revised once when that year becomes the earlier year of the next pair, and then frozen for routine releases.</p>
+<table>
+<thead>
+<tr>
+<th>Analysis pair</th>
+<th>Routine revision to an existing published year</th>
+<th>Newly available estimate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(2024, 2025), after a prior (2022, 2024) release</td>
+<td>Revise 2024 once and freeze it</td>
+<td>Publish 2025 provisionally</td>
+</tr>
+<tr>
+<td>(2025, 2026)</td>
+<td>Revise 2025 once and freeze it; retain frozen 2024</td>
+<td>Publish 2026 provisionally</td>
+</tr>
+</tbody>
+</table>
+<p>Under this policy, each release routinely revises at most one previously published year, and each year undergoes at most one scheduled revision. The two-year estimator makes that policy practicable; it does not enforce it automatically. The NSO must select the intended successive windows, retain dated releases, identify provisional/final status and freeze earlier vintages. The application still permits rerunning any selected pair and does not contain a publication register or automatic freeze. Exceptional revisions for corrected data, classifications or methods require the NSO's separate revision policy.</p>
+<p>The tradeoff is less borrowing across periods than a longer joint fit and a published annual series assembled from successive fit vintages. Retain each pair's jointly estimated levels, change, MSE and MCPE together. A change computed from annual figures taken from different frozen vintages is not automatically the model's pairwise change and must not inherit that pair's uncertainty. The operational rationale is strong for the stated official-statistics objective, while comparative precision and coverage remain empirical questions.</p>
+<h2 id="what-the-w5p-repairs-change">What the w5p repairs change</h2>
+<p>Following the owner's additional instruction, new and missing variance settings resolve to <code>sm_all</code>, with matching MFH <code>rho_sm_all</code>. Explicit saved <code>sm_out</code>/<code>direct</code> choices remain in force; existing results and saved runs are not rewritten. The UFH variance selector is also available for log models so the visible, saved and applied policy agree; arcsine UFH retains its distinct treatment. This default change can alter model estimates, selected covariates, uncertainty and significance for new or incompletely specified runs. It is an intentional methodological setting change, unlike the input/reporting defect repairs below. Compare policies using fixed data and settings when assessing its consequences; do not claim unchanged estimates merely because the default change is small in code.</p>
+<p>Older dashboard setup files require one additional check for log UFH: a stored hidden variance choice could differ from the <code>sm_out</code> policy that the older interface actually applied. The revised interface makes the choice visible, honors it and flags the legacy case. Reproducing an earlier log run requires its actual pipeline configuration or an explicit <code>sm_out</code> selection. Preserving a stored dashboard choice does not guarantee numerical reproduction of a choice that the older interface ignored.</p>
+<p>Named matrix years are now matched before relabeling, and population/target readers reject duplicate required keys, including identical duplicates. Leading zeros in text identifiers are retained. Completely unnamed matrix year columns require exactly the selected years in their selected order and produce a warning. Preflight and estimation share the resolution of saved settings, so blank per-method settings cannot bypass the effective global/legacy inputs. Relevant files and MFH panel completeness are checked before cleanup; stale unused optional paths do not block a run.</p>
+<p>UFH now preserves original-scale raw Direct variance by domain for every transformation and indicator. The model still receives its selected working variance. <code>outputs/tables/ufh_variance_audit.csv</code> distinguishes the two, and missing raw uncertainty remains unavailable. This repair changes Direct uncertainty labels/values in affected outputs, not the statistical rationale for smoothing.</p>
+<p>The logged UFH benchmark factor now comes from the actual applied operation on the reporting scale. For a numerically zero target and model mean, UFH sets group predictions to zero and records an undefined ratio; MFH retains predictions with factor 1. A nonzero target with zero model mean is rejected. These existing degenerate-case conventions are not a general fallback for invalid inputs.</p>
+<p>Standalone MFH figures retain pointwise, boundary-sensitive/provisional and unavailable-inference qualifications. The final report labels pointwise counts exploratory. The dormant obsolete bootstrap implementation was removed; production continues to use the maintained shared engine. These changes do not resolve the statistical validation gaps below.</p>
+<h2 id="how-often-the-optional-sm_out-cutoff-applies-in-the-shipped-examples">How often the optional sm_out cutoff applies in the shipped examples</h2>
+<p>The actual Direct-estimation/GVF source paths were evaluated without fitting models or running bootstrap draws, with <code>sm_out</code> explicitly selected. These earlier counts remain evidence about the retained optional policy; they do not describe the new <code>sm_all</code> default, which replaces all working variances. UFH and MFH gave identical counts under the recorded household-row designs, supplied poverty-line columns and identity proportion scale.</p>
+<table>
+<thead>
+<tr>
+<th>Example/year</th>
+<th style="text-align: right;">Domains</th>
+<th style="text-align: right;">FGT0</th>
+<th style="text-align: right;">FGT1</th>
+<th style="text-align: right;">FGT2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Spain 2012</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;">8 (15.4%)</td>
+<td style="text-align: right;">28 (53.8%)</td>
+<td style="text-align: right;">41 (78.8%)</td>
+</tr>
+<tr>
+<td>Spain 2013</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;">8 (15.4%)</td>
+<td style="text-align: right;">26 (50.0%)</td>
+<td style="text-align: right;">40 (76.9%)</td>
+</tr>
+<tr>
+<td>Simulated 2022</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">7 (17.5%)</td>
+<td style="text-align: right;">37 (92.5%)</td>
+<td style="text-align: right;">39 (97.5%)</td>
+</tr>
+<tr>
+<td>Simulated 2023</td>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">11 (27.5%)</td>
+<td style="text-align: right;">36 (90.0%)</td>
+<td style="text-align: right;">40 (100.0%)</td>
+</tr>
+</tbody>
+</table>
+<p>Each cell counts variances eligible for replacement and successfully replaced. All were finite and strictly below 0.001; there were no nonfinite requests or failed replacements. On a proportion scale, the cutoff corresponds to an SE of approximately 3.16 percentage points. The frequencies are illustrative examples, not country-wide estimates or coverage results. Changing currency units also changes an absolute cutoff's meaning for identity-scale welfare. Configuration, input/source hashes and per-path counts are retained in the repository's dated w5p review audit; that internal audit is excluded from the portable release.</p>
+<h2 id="evidence-and-remaining-limits">Evidence and remaining limits</h2>
+<p>Regression checks exercise the corrected readers, readiness, Direct-variance reporting, actual benchmark factors and standalone figures. The initial w5p bounded integrations used an explicit <code>sm_out</code>/<code>rho_sm_out</code> configuration for household-row poverty and person-row log welfare. A same-configuration w5o poverty comparison preserved model point estimates and joint uncertainty within numerical tolerance while correcting 73 of 80 domain-year UFH Direct-variance entries. Those findings concern the explicit old policy; they are not an equivalence claim for the new default. The <a href="../validation/W5P_VALIDATION_RECEIPT.html">validation receipt</a> separately records follow-up default-policy checks and bounded integrations, their environment and source provenance. Fifty accepted bootstrap draws per integration test execution, not coverage.</p>
+<p>The historical 2,100-outer-simulation MFH2 study used specified fixed-covariate, known-sampling-covariance scenarios. Its nominal-95% absolute-change coverage was approximately 94.3–94.9% in ordinary scenarios, 87.4% in a low-signal scenario and 65.2% among correlation-limit fits. These are scenario-specific historical findings, not fresh w5p coverage measurements or universal rates. Increasing bootstrap draws reduces Monte Carlo noise; it cannot repair the demonstrated inferential limitation. See <a href="../validation/MCPE_VALIDATION_STATUS.html">MCPE validation status</a> and the <a href="../validation/QER/VALIDATION_RECEIPT.html">historical QER receipt</a>.</p>
+<p>Coverage remains unestablished for the full combination of complex survey design, estimated GVFs/sampling covariances, variable/model selection, final benchmarking and familywide testing. Larger fitted-model coverage studies for MFH1/MFH3 remain outstanding. The software repairs and independent review do not close those questions or guarantee absence of all remaining bugs.</p>
+<p>The guidelines, affected technical notes, app help, report captions and active English/Polish/Greek guides have been reconciled with these distinctions. Tracked copies and an item-by-item correction ledger are retained locally for review. Each real analysis should additionally retain survey-design choices, variance/covariance specifications, actual formulas and selected model, repair/boundary diagnostics, bootstrap failure/precision information, benchmark sources and the analyst's substantive diagnostic decision.</p>
+<p>When AI report writing is selected, the final report also offers an advisory UFH-versus-MFH recommendation based on the run's available aggregate evidence. This is support for analyst review, not a model-selection rule specified by Molina and Romero or an automatic change to the fitted estimator. It distinguishes annual-level and change estimation, comparable precision summaries, fit/convergence status, inference limitations and missing evidence. It may report no clear preference or insufficient evidence; smaller estimated MSEs, narrower intervals or more significant results alone do not validate a model. The analyst must review the recommendation and retain the substantive model and publication decision.</p>
+<h2 id="suggested-description-for-an-external-methodological-review">Suggested description for an external methodological review</h2>
+<blockquote>
+<p>The EU SAE Workbench w5p implements the UFH/MFH framework and change-MSE identity of Molina and Romero (2025). Its two-year workflow supports an NSO policy of one scheduled revision of each year's estimate, provided successive survey-year windows are used and each year is frozen after its second appearance. The MFH2 default and optional MFH3-first selection remain. Full GVF variance smoothing is now the default, consistent with the manuscript's illustration; selective smoothing remains an optional application-specific policy. Benchmarking was added following the EMDI team's recommendation; anchored poverty and mean welfare were added at the Polish and Greek teams' request. These extend the manuscript's explicit scope, with the project provenance confirmed by the maintainer. Pooled sampling correlations, transformed prediction, numerical safeguards, joint parametric MSE/MCPE bootstrap and reported-scale benchmarking require stated model and survey assumptions. Pointwise counts are exploratory, with BH and Bonferroni outputs available separately. The software repairs and bounded checks do not resolve covariance-boundary undercoverage or establish coverage for the complete survey-to-report workflow.</p>
+</blockquote>
+<p>The principal source is the privately supplied January 29, 2025 manuscript, especially pp10–12, 20–21, 23 and 36–37; it is not redistributed. The supplied EMDI note and the package/version discrepancy are described in the alignment register. The October 28 independent review evaluation and the dated w5o/w5p audit records provide the review provenance and are retained in the repository, outside the portable release.</p>
+</main></body></html>

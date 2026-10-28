@@ -49,8 +49,8 @@ conflicted::conflict_prefer("recode", "dplyr")
 options(survey.lonely.psu = "adjust")
 
 source(here::here("scripts", "ufh_functions.R"))
-source(here::here("scripts", "mcpe_functions.R"))
 source(here::here("scripts", "population_helpers.R"))
+source(here::here("R", "input_preflight.R"))
 source(here::here("R", "input_readers.R"))
 source(here::here("R", "input_paths.R"))
 source(here::here("R", "pipeline_helpers.R"))
@@ -58,36 +58,9 @@ source(here::here("R", "variance_policy.R"))
 source(here::here("R", "mfh_model_selection.R"))
 source(here::here("R", "mfh_convergence_check.R"))
 source(here::here("R", "mfh_bootstrap_helpers.R"))
+source(here::here("R", "mfh_change_plots.R"))
 source(here::here("R", "map_style.R"))
 
-# ---- Invalidate stale MFH output artifacts ----
-dir.create(here::here("outputs", "data"), showWarnings = FALSE, recursive = TRUE)
-.mfh_outputs_to_clean <- c(
-  here::here("outputs", "data", "mfh_artifacts.rds"),
-  here::here("outputs", "tables", "mfh_shapiro_results.csv"),
-  here::here("outputs", "data", "mcpemfh2_obj.rds"),
-  here::here("outputs", "data", "mcpe_mfh1_obj.rds"),
-  here::here("outputs", "data", "mcpe_mfh2_obj.rds"),
-  here::here("outputs", "data", "mcpe_mfh3_obj.rds"),
-  here::here("outputs", "tables", "comparison_final.csv"),
-  here::here("outputs", "tables", "comparison_final_bench.csv"),
-  here::here("outputs", "data", "pov_mfh.xlsx"),
-  here::here("outputs", "tables", "mfh_selection_diagnostics.csv"),
-  here::here("outputs", "tables", "mfh_model_diagnostics.csv"),
-  here::here("outputs", "tables", "mfh_variance_structure_selection.csv"),
-  here::here("outputs", "tables", "mfh_mcpe_validation.csv"),
-  here::here("outputs", "tables", "mfh_convergence_check.csv"),
-  here::here("outputs", "tables", "mfh_sampling_covariance.csv"),
-  here::here("outputs", "tables", "mfh_standardized_residuals.csv")
-)
-for (.f in .mfh_outputs_to_clean) {
-  if (file.exists(.f)) {
-    tryCatch(file.remove(.f),
-             warning = function(w) NULL,
-             error   = function(e) NULL)
-  }
-}
-cat("Cleaned stale MFH output artifacts before render.\n")
 
 .write_xlsx_safe <- function(df, path) {
   if (!requireNamespace("writexl", quietly = TRUE)) {
@@ -156,6 +129,8 @@ if (nzchar(cfg_path) && file.exists(cfg_path)) {
   cfg <- yaml::read_yaml(cfg_path)
   if (!is.null(cfg$mfh)) mfh_cfg <- cfg$mfh
 }
+mfh_cfg <- sae_resolve_method_input_config(cfg, "mfh")
+cfg$mfh <- mfh_cfg
 
 if (!exists("%||%", mode = "function")) {
   `%||%` <- function(x, y) {
@@ -628,6 +603,42 @@ if (do_benchmark) {
   }
 }
 
+# Validate the complete Direct panel and relevant uploads before cleanup.
+sae_validate_relevant_analysis_inputs(survey_dt, rhs_dt, years_keep,
+  steps = "MFH", do_benchmark = do_benchmark, population_path = population_path,
+  target_path = benchmark_target_path, benchmark_level = benchmark_level,
+  level_col = var_map$benchmark_level, indicator_type = indicator_type, fgt_alpha = fgt_alpha)
+
+# ---- Invalidate stale MFH output artifacts ----
+dir.create(here::here("outputs", "data"), showWarnings = FALSE, recursive = TRUE)
+.mfh_outputs_to_clean <- c(
+  here::here("outputs", "data", "mfh_artifacts.rds"),
+  here::here("outputs", "tables", "mfh_shapiro_results.csv"),
+  here::here("outputs", "data", "mcpemfh2_obj.rds"),
+  here::here("outputs", "data", "mcpe_mfh1_obj.rds"),
+  here::here("outputs", "data", "mcpe_mfh2_obj.rds"),
+  here::here("outputs", "data", "mcpe_mfh3_obj.rds"),
+  here::here("outputs", "tables", "comparison_final.csv"),
+  here::here("outputs", "tables", "comparison_final_bench.csv"),
+  here::here("outputs", "data", "pov_mfh.xlsx"),
+  here::here("outputs", "tables", "mfh_selection_diagnostics.csv"),
+  here::here("outputs", "tables", "mfh_model_diagnostics.csv"),
+  here::here("outputs", "tables", "mfh_variance_structure_selection.csv"),
+  here::here("outputs", "tables", "mfh_mcpe_validation.csv"),
+  here::here("outputs", "tables", "mfh_convergence_check.csv"),
+  here::here("outputs", "tables", "mfh_sampling_covariance.csv"),
+  here::here("outputs", "tables", "mfh_standardized_residuals.csv")
+)
+for (.f in .mfh_outputs_to_clean) {
+  if (file.exists(.f)) {
+    tryCatch(file.remove(.f),
+             warning = function(w) NULL,
+             error   = function(e) NULL)
+  }
+}
+cat("Cleaned stale MFH output artifacts before render.\n")
+
+
 # Source benchmarking functions for MFH
 source(here::here("scripts", "bench_regional_mfh.R"))
 
@@ -885,7 +896,8 @@ all_var_hat_domain_dt <- all_var_hat_domain_dt %>%
     # "direct" safety-backfilled variants: keep raw direct variances but
     # replace NA / exactly-zero values with smoothed ones so downstream MFH
     # fits don't error out. Matches UFH's "direct" safety backfill. (Direct
-    # is intentionally NOT upper-tail-trimmed -- that's what sm_out is for.)
+    # is intentionally NOT upper-tail-trimmed; sm_out replaces only
+    # nonfinite or below-0.001 variances, not upper-tail values.)
     v1_direct = if_else(is.na(v1) | v1 == 0, v1_sm_all, v1),
     v2_direct = if_else(is.na(v2) | v2 == 0, v2_sm_all, v2)
   )
@@ -1428,7 +1440,7 @@ domain_dt <- domain_dt %>%
 
 var_menu <- list(
   direct   = c("v1_direct", "v2_direct"),# domain direct variances, NA/zero backfilled
-  sm_out   = c("v1_sm_out", "v2_sm_out"),# outlier-smoothed variances
+  sm_out   = c("v1_sm_out", "v2_sm_out"),# threshold-smoothed variances
   sm_all   = c("v1_sm_all", "v2_sm_all") # all variances replaced with smoothed
 )
 
@@ -1441,8 +1453,8 @@ cov_menu <- list(
 )
 
 # 3) Choose which variance and covariance definitions to use
-var_choice <- cfg_or_default(mfh_cfg$var_choice, "sm_out")
-cov_choice <- cfg_or_default(mfh_cfg$cov_choice, "rho_sm_out")
+var_choice <- sae_variance_choice(mfh_cfg$var_choice)
+cov_choice <- sae_covariance_choice(mfh_cfg$cov_choice, var_choice)
 
 # 4) Build the chosen column-name vector (to pass downstream)
 vardir_cols <- c(var_menu[[var_choice]], cov_menu[[cov_choice]])
@@ -2150,151 +2162,11 @@ if (.refvar_zero) {
 }
 
 .matrix_from_optional_population <- function(path, domain_vec, years_keep) {
-  obj <- .read_optional_benchmark_table(path)
-  if (is.null(obj)) return(NULL)
-
-  nD <- length(domain_vec)
-  nT <- length(years_keep)
-  domain_chr <- as.character(domain_vec)
-  year_chr <- as.character(years_keep)
-
-  if (is.matrix(obj)) {
-    mat <- obj
-    if (is.null(rownames(mat))) stop("Population matrix must have domain row names.")
-    missing_domains <- setdiff(domain_chr, rownames(mat))
-    if (length(missing_domains) > 0) {
-      stop("Population matrix is missing domain(s): ",
-           paste(missing_domains, collapse = ", "))
-    }
-    mat <- mat[domain_chr, , drop = FALSE]
-    if (ncol(mat) != nT) stop("Population matrix must have one column per analysis year.")
-    storage.mode(mat) <- "double"
-    colnames(mat) <- year_chr
-    return(mat)
-  }
-
-  df <- as.data.frame(obj, check.names = FALSE)
-  nms <- names(df)
-  domain_col <- .pick_col(nms, c("domain", "prov", "area", "area_id"))
-  year_col <- .pick_col(nms, c("year", "time", "period"))
-  value_col <- .pick_col(nms, c("Nd", "N_d", "population", "pop", "N"))
-
-  if (!is.null(domain_col) && !is.null(year_col) && !is.null(value_col)) {
-    mat <- matrix(NA_real_, nrow = nD, ncol = nT,
-                  dimnames = list(domain_chr, year_chr))
-    for (tt in seq_along(years_keep)) {
-      idx <- as.character(df[[year_col]]) == year_chr[tt]
-      vals <- as.numeric(df[[value_col]][idx])
-      ids <- as.character(df[[domain_col]][idx])
-      mat[intersect(domain_chr, ids), tt] <- vals[match(intersect(domain_chr, ids), ids)]
-    }
-    return(mat)
-  }
-
-  if (!is.null(domain_col)) {
-    mat <- matrix(NA_real_, nrow = nD, ncol = nT,
-                  dimnames = list(domain_chr, year_chr))
-    for (tt in seq_along(years_keep)) {
-      candidates <- c(
-        year_chr[tt],
-        paste0("Nd_", year_chr[tt]),
-        paste0("N_", year_chr[tt]),
-        paste0("population_", year_chr[tt]),
-        paste0("pop_", year_chr[tt])
-      )
-      col <- .pick_col(nms, candidates)
-      if (is.null(col)) stop("Population file is missing a column for year ", year_chr[tt], ".")
-      ids <- as.character(df[[domain_col]])
-      mat[domain_chr, tt] <- as.numeric(df[[col]][match(domain_chr, ids)])
-    }
-    return(mat)
-  }
-
-  stop("Population input must be a matrix with domain row names, a long table ",
-       "(domain/year/population), or a wide table with one row per domain.")
+  sae_population_matrix_from_file(path, domain_vec, years_keep)
 }
 
-.matrix_from_optional_regional_benchmark <- function(path, region_vec, years_keep,
-                                                     level_col = "") {
-  obj <- .read_optional_benchmark_table(path)
-  if (is.null(obj)) return(NULL)
-
-  region_ids <- sort(unique(as.character(region_vec[!is.na(region_vec)])))
-  year_chr <- as.character(years_keep)
-  nT <- length(years_keep)
-
-  if (is.matrix(obj)) {
-    mat <- obj
-    if (is.null(rownames(mat))) stop("Benchmark target matrix must have group row names.")
-    missing_regions <- setdiff(region_ids, rownames(mat))
-    if (length(missing_regions) > 0) {
-      stop("Benchmark target matrix is missing group(s): ",
-           paste(missing_regions, collapse = ", "))
-    }
-    mat <- mat[region_ids, , drop = FALSE]
-    if (ncol(mat) != nT) stop("Benchmark target matrix must have one column per analysis year.")
-    storage.mode(mat) <- "double"
-    colnames(mat) <- year_chr
-    if (any(!is.finite(mat))) {
-      stop("Benchmark target matrix contains missing/non-finite targets.")
-    }
-    return(mat)
-  }
-
-  df <- as.data.frame(obj, check.names = FALSE)
-  nms <- names(df)
-  region_col <- .pick_col(nms, c(level_col, "benchmark_level", "level",
-                                 "group", "group_id", "region", "reg", "region_id"))
-  year_col <- .pick_col(nms, c("year", "time", "period"))
-  value_col <- .pick_col(nms, c("benchmark", "target", "B_r",
-                                "benchmark_target", "regional_benchmark",
-                                "direct", "direct_rate", "poverty_rate"))
-  if (is.null(region_col)) {
-    if (length(region_ids) == 1L) {
-      region_col <- ".benchmark_level"
-      df[[region_col]] <- region_ids[1]
-    } else {
-      stop("Benchmark Target Database must contain a benchmark-level column ",
-           "(for example '",
-           if (nzchar(level_col)) level_col else "benchmark_level",
-           "') or matrix row names.")
-    }
-  }
-
-  mat <- matrix(NA_real_, nrow = length(region_ids), ncol = nT,
-                dimnames = list(region_ids, year_chr))
-
-  if (!is.null(year_col) && !is.null(value_col)) {
-    for (tt in seq_along(years_keep)) {
-      idx <- as.character(df[[year_col]]) == year_chr[tt]
-      ids <- as.character(df[[region_col]][idx])
-      vals <- as.numeric(df[[value_col]][idx])
-      mat[intersect(region_ids, ids), tt] <- vals[match(intersect(region_ids, ids), ids)]
-    }
-    if (any(!is.finite(mat))) {
-      stop("Benchmark Target Database is missing targets for at least one benchmark level/year.")
-    }
-    return(mat)
-  }
-
-  for (tt in seq_along(years_keep)) {
-    candidates <- c(
-      year_chr[tt],
-      paste0("B_r_", year_chr[tt]),
-      paste0("benchmark_", year_chr[tt]),
-      paste0("target_", year_chr[tt]),
-      paste0("direct_", year_chr[tt]),
-      paste0("poor_", year_chr[tt])
-    )
-    col <- .pick_col(nms, candidates)
-    if (is.null(col)) stop("Benchmark Target Database is missing a column for year ", year_chr[tt], ".")
-    ids <- as.character(df[[region_col]])
-    mat[region_ids, tt] <- as.numeric(df[[col]][match(region_ids, ids)])
-  }
-  if (any(!is.finite(mat))) {
-    stop("Benchmark Target Database is missing targets for at least one benchmark level/year.")
-  }
-  mat
+.matrix_from_optional_regional_benchmark <- function(path, region_vec, years_keep, level_col = "") {
+  sae_benchmark_targets_from_file(path, region_vec, years_keep, level_col)
 }
 
 bench_result <- NULL
@@ -3085,7 +2957,8 @@ ggsave(here::here("outputs", "figures", "mfh_smoothing_diagnostic.png"),
 compare_mfh <- function(period_list = c(1, 2),
                         mcpe_obj = if (exists("mcpe_obj")) mcpe_obj else mcpemfh2_obj,
                         alpha = 0.05,
-                        year_labels = NULL) {
+                        year_labels = NULL,
+                        inference_status = "regular", inference_warning = "") {
   stopifnot(length(period_list) == 2)
   
   # Force 2D objects even when there is only 1 column
@@ -3168,26 +3041,10 @@ compare_mfh <- function(period_list = c(1, 2),
     y_label     <- "Difference between time periods"
   }
 
-  p1 <- ggplot2::ggplot(df, ggplot2::aes(x = domain, y = diff, color = significant)) +
-    ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-    ggplot2::geom_point(size = 2.5, alpha = 0.7) +
-    ggplot2::geom_errorbar(ggplot2::aes(ymin = lb, ymax = ub), width = 0.3, alpha = 0.5) +
-    ggplot2::scale_color_manual(
-      values = c("Significant" = "red", "Not Significant" = "gray60"),
-      name = "Pointwise\nSignificance"
-    ) +
-    ggplot2::labs(
-      title    = plot_title,
-      subtitle = "With 95% Confidence Intervals",
-      x        = "Domain",
-      y        = y_label,
-      caption  = "Red points indicate pointwise significance (unadjusted p < 0.05); bars are pointwise 95% confidence intervals"
-    ) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(
-      plot.title      = ggplot2::element_text(face = "bold", size = 14),
-      legend.position = "right"
-    )
+  df$inference_status <- inference_status
+  df$inference_warning <- inference_warning
+  p1 <- sae_mfh_change_plot(df, plot_title, y_label,
+                            inference_status, inference_warning, alpha = alpha)
   
   list(df = df, plot = p1)
 }
@@ -3200,7 +3057,9 @@ compare_mfh2 <- compare_mfh
 if (is.null(mcpe_obj)) {
   comp12_obj <- NULL
 } else {
-comp12_obj <- compare_mfh(mcpe_obj = mcpe_obj, year_labels = years_keep)
+comp12_obj <- compare_mfh(mcpe_obj = mcpe_obj, year_labels = years_keep,
+                          inference_status = .inference_status,
+                          inference_warning = .inference_warning)
 
 
 
@@ -3232,7 +3091,9 @@ if (do_benchmark && !is.null(bench_result) && !is.null(bench_result$mcpe_bench))
   comp12_bench_obj <- compare_mfh(
     period_list = c(1, 2),
     mcpe_obj    = bench_mcpe_obj,
-    year_labels = years_keep
+    year_labels = years_keep,
+    inference_status = .inference_status,
+    inference_warning = .inference_warning
   )
 
 
@@ -3254,27 +3115,13 @@ if (is.null(comp12_bench_obj)) {
 
 
 if (exists("comp12_obj") && !is.null(comp12_obj)) {
-  p_change_unbench <- ggplot(comp12_obj$df, aes(x = domain, y = diff, color = significant)) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-    geom_point(size = 2.5, alpha = 0.7) +
-    geom_errorbar(aes(ymin = lb, ymax = ub), width = 0.3, alpha = 0.5) +
-    scale_color_manual(
-      values = c("Not Significant" = "gray60", "Significant" = "red"),
-      name = "Pointwise\nSignificance"
-    ) +
-    labs(
-      title = paste(pov_lab$short, "Changes Between", years_keep[1], "and", years_keep[2],
-                    "(Without Benchmarking)"),
-      subtitle = paste0(diag_model, " MCPE-based with 95% Confidence Intervals"),
-      x = "Domain",
-      y = paste0("Change in ", pov_lab$short, " (", years_keep[2], " - ", years_keep[1], ")"),
-      caption = "Red points indicate pointwise significance (unadjusted p < 0.05); bars are pointwise 95% confidence intervals"
-    ) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(face = "bold", size = 14),
-      legend.position = "right"
-    )
+  p_change_unbench <- sae_mfh_change_plot(
+    comp12_obj$df,
+    paste(pov_lab$short, "Changes Between", years_keep[1], "and", years_keep[2],
+          "(Without Benchmarking)"),
+    paste0("Change in ", pov_lab$short, " (", years_keep[2], " - ", years_keep[1], ")"),
+    .inference_status, .inference_warning, model_label = diag_model
+  )
   print(p_change_unbench)
   ggsave(here::here("outputs", "figures", "mfh_change_unbench_points.png"),
          p_change_unbench, width = 12, height = 6, dpi = 150)
@@ -3282,20 +3129,12 @@ if (exists("comp12_obj") && !is.null(comp12_obj)) {
 
 
 if (exists("comp12_obj") && !is.null(comp12_obj)) {
-  p_change_unbench_hist <- ggplot(comp12_obj$df, aes(x = diff, fill = significant)) +
-    geom_histogram(bins = 20, alpha = 0.7, color = "black") +
-    geom_vline(xintercept = 0, linetype = "dashed", color = "red", linewidth = 1) +
-    scale_fill_manual(
-      values = c("Not Significant" = "lightblue", "Significant" = "coral"),
-      name = "Pointwise\nSignificance"
-    ) +
-    labs(
-      title = paste0("Distribution of ", pov_lab$short, " Changes (Without Benchmarking)"),
-      x = paste0("Change in ", pov_lab$short, " (", years_keep[2], " - ", years_keep[1], ")"),
-      y = "Frequency"
-    ) +
-    theme_minimal() +
-    theme(plot.title = element_text(face = "bold", size = 14))
+  p_change_unbench_hist <- sae_mfh_change_plot(
+    comp12_obj$df,
+    paste0("Distribution of ", pov_lab$short, " Changes (Without Benchmarking)"),
+    paste0("Change in ", pov_lab$short, " (", years_keep[2], " - ", years_keep[1], ")"),
+    .inference_status, .inference_warning, model_label = diag_model, histogram = TRUE
+  )
   print(p_change_unbench_hist)
   ggsave(here::here("outputs", "figures", "mfh_change_unbench_hist.png"),
          p_change_unbench_hist, width = 10, height = 6, dpi = 150)
@@ -3303,27 +3142,13 @@ if (exists("comp12_obj") && !is.null(comp12_obj)) {
 
 
 if (exists("comp12_bench_obj") && !is.null(comp12_bench_obj)) {
-  p_change_bench <- ggplot(comp12_bench_obj$df, aes(x = domain, y = diff, color = significant)) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-    geom_point(size = 2.5, alpha = 0.7) +
-    geom_errorbar(aes(ymin = lb, ymax = ub), width = 0.3, alpha = 0.5) +
-    scale_color_manual(
-      values = c("Not Significant" = "gray60", "Significant" = "red"),
-      name = "Pointwise\nSignificance"
-    ) +
-    labs(
-      title = paste(pov_lab$short, "Changes Between", years_keep[1], "and", years_keep[2],
-                    "(With Benchmarking)"),
-      subtitle = paste0("Benchmarked ", diag_model, " MCPE-based with 95% Confidence Intervals"),
-      x = "Domain",
-      y = paste0("Change in ", pov_lab$short, " (", years_keep[2], " - ", years_keep[1], ")"),
-      caption = "Red points indicate pointwise significance (unadjusted p < 0.05); bars are pointwise 95% confidence intervals"
-    ) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(face = "bold", size = 14),
-      legend.position = "right"
-    )
+  p_change_bench <- sae_mfh_change_plot(
+    comp12_bench_obj$df,
+    paste(pov_lab$short, "Changes Between", years_keep[1], "and", years_keep[2],
+          "(With Benchmarking)"),
+    paste0("Change in ", pov_lab$short, " (", years_keep[2], " - ", years_keep[1], ")"),
+    .inference_status, .inference_warning, model_label = diag_model
+  )
   print(p_change_bench)
   ggsave(here::here("outputs", "figures", "mfh_change_bench_points.png"),
          p_change_bench, width = 12, height = 6, dpi = 150)
@@ -3331,20 +3156,12 @@ if (exists("comp12_bench_obj") && !is.null(comp12_bench_obj)) {
 
 
 if (exists("comp12_bench_obj") && !is.null(comp12_bench_obj)) {
-  p_change_bench_hist <- ggplot(comp12_bench_obj$df, aes(x = diff, fill = significant)) +
-    geom_histogram(bins = 20, alpha = 0.7, color = "black") +
-    geom_vline(xintercept = 0, linetype = "dashed", color = "red", linewidth = 1) +
-    scale_fill_manual(
-      values = c("Not Significant" = "lightblue", "Significant" = "coral"),
-      name = "Pointwise\nSignificance"
-    ) +
-    labs(
-      title = paste0("Distribution of ", pov_lab$short, " Changes (With Benchmarking)"),
-      x = paste0("Change in ", pov_lab$short, " (", years_keep[2], " - ", years_keep[1], ")"),
-      y = "Frequency"
-    ) +
-    theme_minimal() +
-    theme(plot.title = element_text(face = "bold", size = 14))
+  p_change_bench_hist <- sae_mfh_change_plot(
+    comp12_bench_obj$df,
+    paste0("Distribution of ", pov_lab$short, " Changes (With Benchmarking)"),
+    paste0("Change in ", pov_lab$short, " (", years_keep[2], " - ", years_keep[1], ")"),
+    .inference_status, .inference_warning, model_label = diag_model, histogram = TRUE
+  )
   print(p_change_bench_hist)
   ggsave(here::here("outputs", "figures", "mfh_change_bench_hist.png"),
          p_change_bench_hist, width = 10, height = 6, dpi = 150)
@@ -3371,7 +3188,9 @@ if (exists("comp12_obj") && !is.null(comp12_obj) &&
       )
     )
 
-  cat(sprintf("=== Impact of Benchmarking on %s Significance Conclusions ===\n\n",
+  cat("Exploratory counts of pointwise results; no familywide interpretation.\n")
+  if (nzchar(.inference_warning)) cat(.inference_warning, "\n")
+  cat(sprintf("=== Impact of Benchmarking on %s Pointwise Results ===\n\n",
               diag_model))
   status_tbl <- table(comparison_df$status)
   for (s in names(status_tbl)) {

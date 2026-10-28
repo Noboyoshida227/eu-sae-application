@@ -1,0 +1,3 @@
+"scenario","domains","configured_variance_policy","effective_variance_policy","effective_covariance_policy","requested_model","selected_model","inference_status","ufh_rows","mfh_rows","comparison_rows","bootstrap_successes","bootstrap_failures","bootstrap_covariance_boundaries"
+"poverty",40,"default","sm_all","rho_sm_all","MFH2","MFH2","regular",80,80,80,50,0,3
+"log",40,"default","sm_all","rho_sm_all","MFH2","MFH2","regular",80,80,80,50,0,8

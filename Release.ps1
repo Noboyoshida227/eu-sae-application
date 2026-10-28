@@ -19,11 +19,11 @@
          built once. To build again, change the version
          (python tools\bump_version.py <new>) or remove that folder if it was
          never sent to anyone.
-      3. docs\CHANGELOG.md has a "## <version>" heading, so what changed is
+      3. docs\maintenance\CHANGELOG.md has a "## <version>" heading, so what changed is
          written down where recipients will find it.
       4. The Spain example data and every other inventory file is present.
 
-    The full process is described in docs\RELEASING.md.
+    The full process is described in docs\maintenance\RELEASING.md.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\Release.ps1
@@ -41,7 +41,7 @@ function Write-Bad  { param($m) Write-Host "   $m" -ForegroundColor Red }
 function Write-Warn { param($m) Write-Host "   $m" -ForegroundColor Yellow }
 
 Set-Location -LiteralPath $PSScriptRoot
-foreach ($required in @('scripts\build_clean_release.R', 'WIZARD_VERSION', 'RELEASE_NAME', 'docs\CHANGELOG.md')) {
+foreach ($required in @('scripts\build_clean_release.R', 'WIZARD_VERSION', 'RELEASE_NAME', 'docs\maintenance\CHANGELOG.md')) {
     if (-not (Test-Path -LiteralPath $required)) { Write-Bad "Cannot find $required - run this from the package root."; exit 1 }
 }
 $version = (Get-Content -LiteralPath 'WIZARD_VERSION' -Raw).Trim()
@@ -101,9 +101,9 @@ if (Test-Path -LiteralPath $target) {
 Write-Good "Release folder: $target"
 
 # ---- 3. CHANGELOG entry ---------------------------------------------------
-$changelog = Get-Content -LiteralPath 'docs\CHANGELOG.md' -Raw
+$changelog = Get-Content -LiteralPath 'docs\maintenance\CHANGELOG.md' -Raw
 if ($changelog -notmatch ('(?m)^##\s+' + [regex]::Escape($version))) {
-    Write-Bad "docs\CHANGELOG.md has no '## $version' heading."
+    Write-Bad "docs\maintenance\CHANGELOG.md has no '## $version' heading."
     Write-Bad "Write down what changed in this version before building it."
     exit 1
 }

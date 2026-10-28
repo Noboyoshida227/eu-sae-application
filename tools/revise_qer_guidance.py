@@ -13,6 +13,12 @@ import re
 from lxml import etree
 
 ROOT = Path(__file__).resolve().parents[1]
+current_version = (ROOT / 'WIZARD_VERSION').read_text(encoding='utf-8').strip()
+revision = re.search(r'-wizard\.(\d+)\.(\d+)', current_version)
+if revision and tuple(map(int, revision.groups())) >= (5, 16):
+    raise SystemExit('This historical QER generator restores w5n source documents. '
+                     'It is disabled for w5p and later to preserve subsequent edits. '
+                     'Use tools/revise_w5p_guidance.py for the current prose corrections.')
 BACKUP = ROOT / '_private_build/qer_guidance_20261010/originals'
 NS = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
       'm': 'http://schemas.openxmlformats.org/officeDocument/2006/math'}
@@ -160,7 +166,7 @@ BOUNDARY = ('Boundary-sensitive inference. If the original MFH fit has zero rand
     'undercoverage. Review the current validation status and assess model sensitivity before '
     'using these results for substantive significance claims.')
 QUALIFY = ('The implementation checks and simulation evidence are documented in '
-    'docs/METHODOLOGY_ALIGNMENT.md and docs/MCPE_VALIDATION_STATUS.md. Numerical agreement and '
+    'docs/guidance/METHODOLOGY_ALIGNMENT.md and docs/validation/MCPE_VALIDATION_STATUS.md. Numerical agreement and '
     'Monte Carlo precision do not certify interval coverage for all survey designs. Review '
     'model assumptions, boundary sensitivity and any undercoverage before dissemination. '
     'Use the latest validation status for current experiment counts and results.')

@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>REVISION_STATUS</title><style>
+:root{--ink:#182d40;--muted:#526476;--teal:#006b70;--line:#d8e2e8;--wash:#f1f6f8}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:17px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{background:var(--ink);color:white;padding:42px max(24px,calc((100vw - 1080px)/2)) 34px}
+header p{max-width:820px;margin:9px 0}header .eyebrow{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#b7dadd}
+h1{font-size:38px;line-height:1.2;margin:10px 0}h2{font-size:27px;line-height:1.3;margin:42px 0 16px}h3{font-size:21px;margin:20px 0 8px}
+main{max-width:1128px;margin:auto;padding:0 24px 48px}nav{display:flex;flex-wrap:wrap;gap:10px 22px;padding:19px 0;border-bottom:1px solid var(--line)}
+a{color:var(--teal);text-underline-offset:3px}a:hover{text-decoration-thickness:2px}a:focus-visible{outline:3px solid #ecb900;outline-offset:3px}
+.intro{font-size:20px}.note{background:var(--wash);border-left:4px solid var(--teal);padding:16px 20px;margin:20px 0}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:8px 34px}.step{border-top:2px solid var(--line)}
+table{border-collapse:collapse;width:100%;margin:14px 0 24px}th,td{text-align:left;vertical-align:top;padding:13px 12px;border-bottom:1px solid var(--line)}th{background:var(--wash);font-size:15px}
+td:first-child{width:33%}code{font:14px/1.5 Consolas,monospace;overflow-wrap:anywhere;background:var(--wash);padding:2px 4px}p{margin:8px 0 14px}
+.meta{font-size:14px;color:var(--muted)}.format{display:inline-block;margin:4px 14px 0 0;font-size:15px}.language{font-weight:600;font-size:19px}.catalogue-item{padding:18px 0;border-bottom:1px solid var(--line)}
+.catalogue-item h3{margin:0;font-size:20px}.catalogue-item p{margin:6px 0}.badge{font-size:12px;padding:2px 7px;border:1px solid var(--line);border-radius:3px;margin-left:7px}
+details{margin:22px 0;padding:15px 20px;background:var(--wash)}summary{cursor:pointer;font-size:19px;font-weight:600}footer{border-top:1px solid var(--line);padding-top:22px;margin-top:34px;font-size:14px;color:var(--muted)}
+@media(max-width:700px){h1{font-size:30px}.steps{grid-template-columns:1fr}th,td{padding:10px 6px}td:first-child{width:38%}body{font-size:16px}}
+@media print{header{padding:10px 0;background:white;color:black}nav{display:none}main{padding:0}a{color:black}h2,h3{break-after:avoid}.catalogue-item,tr{break-inside:avoid}.steps{display:block}}
+</style></head><body><main><nav><a href="../INDEX.html">Documentation catalogue</a></nav><h1 id="revision-status-against-the-merged-issue-register">Revision status against the merged issue register</h1>
+<p>Baseline: EU SAE application package v5.1.0. Current local review candidate: 5.2.0-rc.6-wizard.5.16 (w5p), revising w5o (5.15) and the QER candidate w5n (5.14).</p>
+<p>w5p repairs matrix-year/key validation, pre-cleanup readiness, raw Direct uncertainty, logged benchmark factors and standalone MFH figure qualifications. It retires the dormant bootstrap implementation and synchronizes methodology guidance. See <a href="../guidance/MOLINA_ROMERO_DEVIATIONS_w5p.html">the deviations note</a> and <a href="W5P_VALIDATION_RECEIPT.html">fresh validation receipt</a>. The historical issue register and coverage limitations below remain in force.</p>
+<p>The older issue register is retained below. The current technical disposition and evidence are in <a href="QER/QER_README.html">QER review note</a> and <a href="../guidance/METHODOLOGY_ALIGNMENT.html">methodology alignment</a>; open institutional approvals are not software defects that a local revision can close.</p>
+<p>The owner's w5p follow-up sets <code>sm_all</code>/<code>rho_sm_all</code> as applicable defaults while preserving explicit saved policies and arcsine UFH's distinct variance treatment. The optional <code>sm_out</code> policy and its validation limitation remain. T=2 is a deliberate publication-policy choice: successive windows and freezing each year after its second appearance limit routine revisions; the app does not manage the NSO's publication register.</p>
+<p><code>Implemented</code> means the candidate contains a code or documentation change for the finding; it is not a production-method approval. <code>Partial</code> identifies work done but an unresolved decision or validation. <code>Open</code> means no substantive closure is claimed.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Status</th>
+<th>Disposition in 5.2.0-rc.6</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B1</td>
+<td>Implemented</td>
+<td>LASSO folds use and record a deterministic analysis seed.</td>
+</tr>
+<tr>
+<td>B2</td>
+<td>Implemented</td>
+<td>Removed the unreachable covariance branch; UFH change inference labels period independence and exports raw and BH-adjusted p-values.</td>
+</tr>
+<tr>
+<td>B3</td>
+<td>Partial</td>
+<td>The explicit application policy uses the absolute 0.001 cutoff for sm_out (log-scale variance for log means). It is disclosed as an implementation choice, not prescribed by Molina–Romero or EMDI; representative policy validation remains open.</td>
+</tr>
+<tr>
+<td>B4</td>
+<td>Implemented</td>
+<td>AI prompts are evidence-conditional and no longer assert fixed conclusions or eight combinations.</td>
+</tr>
+<tr>
+<td>B5</td>
+<td>Partial</td>
+<td>Added explicit external-transfer consent, prompt minimization, a prompt-injection guard and configurable gateway URLs. Lawful basis, provider/retention terms and institutional approval remain open.</td>
+</tr>
+<tr>
+<td>B6</td>
+<td>Partial—blocks production/official release</td>
+<td>Non-inventory literature files are excluded. The candidate includes only listed Spain RDS and simulated examples; the replacement Spain map has documented IGN/CNIG CC BY 4.0 provenance; the survey derivation remains missing. The canonical repository was restarted with a fresh history on 17 Sep 2026 and the previous one deleted on 27 Sep 2026 (<code>docs/maintenance/HISTORY_REMEDIATION.md</code>); older repositories still need review, and non-code rights remain unapproved.</td>
+</tr>
+<tr>
+<td>B7</td>
+<td>Implemented</td>
+<td>Added targeted tests and CI; this is code QA, not statistical validation.</td>
+</tr>
+<tr>
+<td>B8</td>
+<td>Implemented</td>
+<td>Removed hard-coded Greece labels and added a country/territory input.</td>
+</tr>
+<tr>
+<td>H1</td>
+<td>Implemented</td>
+<td>Input-load failure is blocking.</td>
+</tr>
+<tr>
+<td>H2</td>
+<td>Implemented with limits</td>
+<td>Shared Bootstrap replicates defaults to 500 for UFH, MFH and benchmarking; explicit saved counts are preserved, counts/precision exported. The larger MFH2 study compares 500/1,000 draws; it does not certify all settings.</td>
+</tr>
+<tr>
+<td>H3</td>
+<td>Implemented</td>
+<td>MFH annual and change MSE/MCPE use the same joint bootstrap. Impossible covariance or unavailable moments produce unavailable inference, never an independence substitute. Boundary-sensitive intervals remain provisional.</td>
+</tr>
+<tr>
+<td>H4</td>
+<td>Partial</td>
+<td>UFH/MFH results include BH adjustment and explicit variance handling; the multiplicity family and covariance policy need approval.</td>
+</tr>
+<tr>
+<td>H5</td>
+<td>Implemented with limits</td>
+<td>UFH models log arithmetic Direct means with native emdi ML/bc_sm; MFH uses conditional-lognormal prediction. Original-scale bootstrap, package agreement and oracle tests added; finite-sample coverage limits disclosed.</td>
+</tr>
+<tr>
+<td>H6</td>
+<td>Implemented with limits</td>
+<td>Independent REML endpoint/curvature checks and bounded MFH2 refit retain legitimate zero-variance boundaries. Original/replicate covariance boundaries are diagnosed; boundary-sensitive inference is explicitly provisional.</td>
+</tr>
+<tr>
+<td>H7</td>
+<td>Partial</td>
+<td>Native emdi corrected-log predictions remain unavailable for unsampled areas; benchmarking requires complete predictions. No invented correction is substituted. Wider nonsampled-domain validation remains open.</td>
+</tr>
+<tr>
+<td>H8</td>
+<td>Partial</td>
+<td>Joint original-scale bootstrap identities and installed-model behavior pass. Larger MFH2 studies identify undercoverage at covariance boundaries and normal/delta approximation limits. Uniform inference validity is not claimed.</td>
+</tr>
+<tr>
+<td>H9</td>
+<td>Implemented</td>
+<td>Run metadata and input hashes are captured before one final report render. MFH inversion, robust-refit, condition-number-method, and g3/MSE availability diagnostics are added after the MFH step and explicitly printed in the report.</td>
+</tr>
+<tr>
+<td>H10</td>
+<td>Implemented</td>
+<td>UFH complete-case filtering uses required estimation fields and logs excluded domain IDs.</td>
+</tr>
+<tr>
+<td>H11</td>
+<td>Partial</td>
+<td>Diagnostics are more visible, but no institutionally approved warning/action policy or thresholds exist.</td>
+</tr>
+<tr>
+<td>H12</td>
+<td>Implemented</td>
+<td>Delimited inputs are read as UTF-8 when valid and as Latin-1 otherwise, without re-encoding, so no rows are lost; <code>SAE_INPUT_ENCODING</code> overrides.</td>
+</tr>
+<tr>
+<td>H13</td>
+<td>Partial</td>
+<td>Quality indicators are exported, but publication thresholds and actions remain unapproved.</td>
+</tr>
+<tr>
+<td>H14</td>
+<td>Implemented</td>
+<td>Duplicate rendering was removed; the final report follows completed run metadata.</td>
+</tr>
+<tr>
+<td>H15</td>
+<td>Implemented</td>
+<td>Missing normality p-values are reported as unavailable rather than failed.</td>
+</tr>
+<tr>
+<td>H16</td>
+<td>Partial</td>
+<td>A direct dependency snapshot/check exists; reproducible cross-platform restoration remains open.</td>
+</tr>
+<tr>
+<td>H17</td>
+<td>Implemented</td>
+<td>Added clean-release tooling, manifests/checksums and complete output placeholders.</td>
+</tr>
+<tr>
+<td>H18</td>
+<td>Implemented with limits</td>
+<td>Guarded inversions, constrained marginal-variance REML refits, zero-G and correlation-limit fixtures, non-inferior likelihood checks and standardized residual diagnostics pass. Selected uncertainty uses joint bootstrap; a valid optimization endpoint alone does not guarantee nominal interval coverage.</td>
+</tr>
+<tr>
+<td>H19</td>
+<td>Open</td>
+<td>Remote branches/tags and publication workflow require repository-owner action.</td>
+</tr>
+<tr>
+<td>H20</td>
+<td>Implemented</td>
+<td>Added VERSION/changelog and replaced country-specific labels.</td>
+</tr>
+<tr>
+<td>H21</td>
+<td>Implemented</td>
+<td>English guidelines, four technical notes, 57-slide guide, download PDF and help/report prose revised for w5n. In w5o the guidelines note, download PDF and READMEs follow the EU SAE Workbench interface, and three short guides, in English, Polish and Greek, replace the 57-slide guide and its Polish and Greek versions. Historical figures are labeled illustrative.</td>
+</tr>
+<tr>
+<td>H22</td>
+<td>Partial</td>
+<td>The canonical repository (eu-sae-application) was started with a fresh history that contains none of the prohibited binaries; the previous repository was deleted on 27 Sep 2026. Older repositories that predate the fresh start still need review (<code>docs/maintenance/HISTORY_REMEDIATION.md</code>).</td>
+</tr>
+<tr>
+<td>M1</td>
+<td>Partial</td>
+<td>Numerical/package/oracle checks and 2,100 MFH2 outer simulations completed. Complex-survey, selection, benchmarking and large MFH1/MFH3 coverage studies remain open.</td>
+</tr>
+<tr>
+<td>M2</td>
+<td>Implemented</td>
+<td>User-authorized MFH2 default retained; users can explicitly choose MFH3-first, with documented selection/fallback rules.</td>
+</tr>
+<tr>
+<td>M3</td>
+<td>Implemented</td>
+<td>Clean exports omit run histories and input-file copies.</td>
+</tr>
+<tr>
+<td>M4</td>
+<td>Implemented</td>
+<td>Convenience copies of browsed input files are made only when a configuration is saved (<strong>Save configuration</strong>, and the configuration each model run records) and are excluded from clean exports.</td>
+</tr>
+<tr>
+<td>M5</td>
+<td>Partial</td>
+<td>Added R-object/type, duplicate-column and ZIP-isolation checks; a full adversarial input review remains open.</td>
+</tr>
+<tr>
+<td>M6</td>
+<td>Open</td>
+<td>No substantive closure is claimed; requires owner decision and validation.</td>
+</tr>
+<tr>
+<td>M7</td>
+<td>Open</td>
+<td>No substantive closure is claimed; requires owner decision and validation.</td>
+</tr>
+<tr>
+<td>M8</td>
+<td>Open</td>
+<td>No substantive closure is claimed; requires owner decision and validation.</td>
+</tr>
+<tr>
+<td>M9</td>
+<td>Implemented</td>
+<td>Approved API gateways can be configured without code changes; provider approval remains under B5.</td>
+</tr>
+<tr>
+<td>M10</td>
+<td>Open</td>
+<td>No substantive closure is claimed; requires owner decision and validation.</td>
+</tr>
+<tr>
+<td>M11</td>
+<td>Open</td>
+<td>No substantive closure is claimed; requires owner decision and validation.</td>
+</tr>
+<tr>
+<td>M12</td>
+<td>Open</td>
+<td>Full UI translation/localization coverage has not been completed.</td>
+</tr>
+<tr>
+<td>M13</td>
+<td>Implemented</td>
+<td>README and the explicit release inventory describe required inputs and include the listed Spain and simulated examples for learning and testing only.</td>
+</tr>
+<tr>
+<td>M14</td>
+<td>Open</td>
+<td>No substantive closure is claimed; requires method-owner validation.</td>
+</tr>
+<tr>
+<td>M15</td>
+<td>Open</td>
+<td>No substantive closure is claimed; requires method-owner validation.</td>
+</tr>
+<tr>
+<td>M16</td>
+<td>Open</td>
+<td>No substantive closure is claimed; requires method-owner validation.</td>
+</tr>
+<tr>
+<td>M17</td>
+<td>Partial—blocks production/official release</td>
+<td>Added scoped LICENSE, NOTICE, third-party inventory and governance file. Institutional copyright/release authority, asset ownership and disclaimer approval remain unresolved.</td>
+</tr>
+<tr>
+<td>M18</td>
+<td>Implemented</td>
+<td>Robust MFH2 refit now applies one shared complete-case mask.</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>Implemented</td>
+<td>Bootstrap time-loop construction now handles <code>nT = 1</code>; convergence checks use <code>isTRUE</code>.</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>Open</td>
+<td>Canonical remote tag/case cleanup remains repository-owner work.</td>
+</tr>
+<tr>
+<td>L3</td>
+<td>Open</td>
+<td>No substantive closure is claimed.</td>
+</tr>
+<tr>
+<td>L4</td>
+<td>Implemented</td>
+<td>Root junk is excluded from the clean build and covered by ignore/release rules.</td>
+</tr>
+<tr>
+<td>L5</td>
+<td>Open</td>
+<td>No substantive closure is claimed.</td>
+</tr>
+<tr>
+<td>L6</td>
+<td>Partial</td>
+<td>Metadata for the revised guidance and technical notes was refreshed. Ownership fields in unchanged documents and institutional metadata policy still require rights-holder decisions.</td>
+</tr>
+<tr>
+<td>L7</td>
+<td>Open</td>
+<td>Full accessibility remediation remains incomplete.</td>
+</tr>
+<tr>
+<td>L8</td>
+<td>Open</td>
+<td>Remaining statistical/documentation convention requires owner decision.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="public-sharing">Public sharing</h2>
+<p>The maintainer publishes the package as a release candidate on the GitHub Releases page, <a href="https://github.com/Noboyoshida227/eu-sae-application/releases">https://github.com/Noboyoshida227/eu-sae-application/releases</a>, for review and testing. M17 (document, asset and institutional release authority) remains open. Passing tests and checksums does not by itself validate estimators, privacy basis or data rights. Whether to publish estimates as official statistics is for each national statistical office to decide.</p>
+</main></body></html>

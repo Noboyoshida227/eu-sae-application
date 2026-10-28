@@ -6,6 +6,36 @@
 
 SAE_SM_OUT_VARIANCE_THRESHOLD <- 0.001
 
+# New or omitted settings use full smoothing. Explicit saved alternatives
+# remain unchanged; a missing covariance follows the effective variance.
+.sae_variance_setting_missing <- function(x) {
+  is.null(x) || length(x) == 0L ||
+    (is.atomic(x) && length(x) == 1L &&
+       (is.na(x) || !nzchar(trimws(as.character(x)))))
+}
+
+sae_variance_choice <- function(x = NULL) {
+  if (.sae_variance_setting_missing(x)) "sm_all" else x
+}
+
+sae_covariance_choice <- function(x = NULL, var_choice = NULL) {
+  if (.sae_variance_setting_missing(x)) {
+    return(switch(as.character(sae_variance_choice(var_choice)),
+                  sm_out = "rho_sm_out", direct = "rho_dir", "rho_sm_all"))
+  }
+  # Legacy saved-browser alias denotes selective smoothing, not the default.
+  if (identical(x, "rho_sm")) "rho_sm_out" else x
+}
+
+sae_setup_variance_inputs <- function(inputs = NULL) {
+  if (is.null(inputs)) inputs <- list()
+  inputs$ufh_var_choice <- sae_variance_choice(inputs$ufh_var_choice)
+  inputs$mfh_var_choice <- sae_variance_choice(inputs$mfh_var_choice)
+  inputs$mfh_cov_choice <- sae_covariance_choice(inputs$mfh_cov_choice,
+                                                inputs$mfh_var_choice)
+  inputs
+}
+
 sae_sm_out_variance <- function(direct_variance,
                                 smoothed_variance,
                                 threshold = SAE_SM_OUT_VARIANCE_THRESHOLD) {

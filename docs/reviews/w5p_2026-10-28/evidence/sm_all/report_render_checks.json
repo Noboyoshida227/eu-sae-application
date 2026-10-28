@@ -1,0 +1,22 @@
+{
+  "poverty": {
+    "pages": 50,
+    "exploratory_caption_pages": [
+      1
+    ],
+    "pdf_sha256": "5d53a19394b5d84c38793360747ce02ad2e046d14a1c83f702820ca7207ebc56",
+    "sm_all_text_pages": [
+      2
+    ]
+  },
+  "log": {
+    "pages": 48,
+    "exploratory_caption_pages": [
+      1
+    ],
+    "pdf_sha256": "20d3fcf0282b2d2c7e0286c37b4fe2f69074af58934836052b57d52edc85c2af",
+    "sm_all_text_pages": [
+      2
+    ]
+  }
+}

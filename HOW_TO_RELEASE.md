@@ -1,7 +1,7 @@
 # How to revise the package and make a release
 
 *A plain-language guide for the package maintainer. The compact technical
-rulebook is `docs/RELEASING.md`; this note explains the same process in
+rulebook is `docs/maintenance/RELEASING.md`; this note explains the same process in
 everyday terms.*
 
 ---
@@ -93,7 +93,7 @@ It first checks four things and stops with a plain message if any is wrong:
 
 1. everything is committed in GitHub Desktop;
 2. this version has not been built before;
-3. `docs\CHANGELOG.md` has a note for this version;
+3. `docs\maintenance\CHANGELOG.md` has a note for this version;
 4. every file that should ship is present.
 
 Then it creates `dist\<RELEASE_NAME>\` containing the package copy, the zip,
@@ -125,7 +125,7 @@ Rscript scripts\check_dependency_lock.R
 python tools\bump_version.py <new-version> --release-name <new-release-name>
 ```
 
-**3. Write down what changed.** Open `docs\CHANGELOG.md` in any text editor
+**3. Write down what changed.** Open `docs\maintenance\CHANGELOG.md` in any text editor
 and add a short section at the very top, under a heading that matches the
 version you just stamped:
 ```

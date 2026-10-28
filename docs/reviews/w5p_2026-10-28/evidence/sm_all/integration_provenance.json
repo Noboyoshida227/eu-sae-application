@@ -1,0 +1,716 @@
+{
+  "default": {
+    "scratch": "tmp/w5p_sm_all_integrations/w5p_integration_5af8755f3c69",
+    "policy": "default",
+    "source_hashes": [
+      {
+        "scenario": "poverty",
+        "path": "R/brief_generator.R",
+        "sha256": "a15182132a548a7f9cdb1e38a0b2215c4f4d2ad449224fae3b79235b3fc2b1b5"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/change_comparison.R",
+        "sha256": "247ccdea84e3dcde047f31b3ef4add7dd3f3bdd3a3d750101981d5d2160c73d1"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/comparison_report_ai.R",
+        "sha256": "fe4208eff4599be4c18c18e125b28e0e3f185ee44c8866a31cef3ee7bd2f73f2"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/indicator_helpers.R",
+        "sha256": "cb568a1c0d1cf49cf5fb4bcd11412d774f1f75239ec5e7fc99452e67a54ccfcd"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/input_paths.R",
+        "sha256": "ac1fff5e91b62d875c8adf287c7ba3cbf4e130c744f8752331bb538137a3c7fe"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/input_preflight.R",
+        "sha256": "6d8e0562975e6b12fd06b815571b24f628ece8364514e1dd4b805e3c8282beed"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/input_readers.R",
+        "sha256": "3dbae0325657251338d8ac9d17e293f7120bfdc92e6084abc4e7058106b31e74"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/landing_page.R",
+        "sha256": "291d7a1b4733cfe8e450aa288230094a5959c14ea59644015b5f5c04a02f0626"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/llm_assistant.R",
+        "sha256": "01209fdc4da17cc23be75861a7684a0c2329e8645258acc5c9060a30a0afa82d"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/map_style.R",
+        "sha256": "106354db55c78f145b6796392965f7b7a3e2cb9c6ef636262a0a2cec12267791"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/mfh_bootstrap_helpers.R",
+        "sha256": "dde41adb95c7fbbeffa94f1837c6e91184fd4309a5a56ffc2dddf8bd66f1e188"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/mfh_change_plots.R",
+        "sha256": "02d49f54427529bd500a99bbb6be4b4bd0f7a6d3a380a4ac38a271aea5b19f25"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/mfh_convergence_check.R",
+        "sha256": "79970068e46274d7e99f998de3ecd74d03fcae923345f9d801d5c0d4bc8e9a39"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/mfh_model_selection.R",
+        "sha256": "97560e4d6b93b8e443c26fc575980c94ea4c325cdf19e58058897e6842a9de8f"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/msae_compat.R",
+        "sha256": "9b4baf26585d9ea8445436188cd2ce430f285275a715bb249b2f6ac28c74d0d5"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/multilingual.R",
+        "sha256": "95965a51f07d462088ed96afc05a1caaae3f88be6fc57ba0c73fa3bbfe4df2e4"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/normality_evaluator.R",
+        "sha256": "2982d8b36df042f1a82d93f266b772c31852de1f0367bc82cadfabcb0300ee7a"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/pandoc_bootstrap.R",
+        "sha256": "79b250419654296cc66ea14d3162e96c0db2fb1cd1d95e8b1ae56eda6f5ce5e9"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/pipeline_helpers.R",
+        "sha256": "0b83a778ef89d6c6a5bf6b1355f82fe21ccffbebbd02a2d3956710e9a8e3b357"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/release_controls.R",
+        "sha256": "aec0802e441b337eb31e115201ab316870da8a217e405cededc500bda0a141b9"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/release_packaging.R",
+        "sha256": "c922a52c010cdea99be23fa4aa89c9b08b03de06ade6ead20982293521fb2fce"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/report_export.R",
+        "sha256": "f8a0bd3d72f3a6360f3acb7a70e8dd946136f835271678b52657f421d0d5aa25"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/report_map_picker.R",
+        "sha256": "77bc1c512d6cf7152b5df5cfc398c82fba709dfa96b40851a44b16b973902fee"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/validation_checks.R",
+        "sha256": "4c745d70cfc1fdf56f45e48323e32580303e6e7b88059dd9374b30ad0c4ddcb1"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/variance_policy.R",
+        "sha256": "9fb6af45718ccdb63e9eaf5f1c63dca6788e27f861566e74b33beec8896190b2"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/workbench_ui.R",
+        "sha256": "babd2e8bb25bbda4eb9d5136507ed7063bcd9ac3779608c577ca7f8b7b1796ff"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/zip_permissions.R",
+        "sha256": "e4b6473cc889aa718679549c7e6321b068d3014e5d3e756780667326f98b7dd8"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/01_ufh.R",
+        "sha256": "6d945b1d6a8c37c70cf0d8a01b9a9a715b73be4a643f49efa01ff757fa5ee2a0"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/02_mfh.R",
+        "sha256": "a0ed0f3e0acc7a92f811d03a3cc7e3faae197d6a37d13b9eaa636d1aa2bcccf2"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/03_comparison.R",
+        "sha256": "f5f65a1a4fa12ee7ca30446a18a2bbe9db40329822d2cf84ec842460a7e90313"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/bench_regional_mfh.R",
+        "sha256": "d2af9ffd20dad802e98c9acc4f9a7c2db6be12b45fddc31604f45ab999800781"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/build_clean_release.R",
+        "sha256": "b5e36f6af72a70c2dc5003d9604ff776ff802621fdfcea7abe40916b2c5711ad"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/build_release_manifest.R",
+        "sha256": "064bcbbcf82960370ac3662608e706cef11031fc0a629778465b56303809ee69"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/check_dependency_lock.R",
+        "sha256": "f466ab67de3dd823b221fd7c997c3cbcca1f1aa85af44146408e036584c4dc0b"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/eblupMFH2_robust.R",
+        "sha256": "19662c7791098b4b0e0dc0a60446d5115d947bf5eb23eca1372c8493ca84df51"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/pbmcpeMFH1_with_existing_eblup.R",
+        "sha256": "acf6257dd3a448ae40b4c945f0fac1acad2230fcc9b2f5146504806c6d24c982"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/pbmcpeMFH2_with_existing_eblup.R",
+        "sha256": "c2a8dc72d55eddb71867fae83dc96da4d480621c23b74aaf2db94baa36124012"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/pbmcpeMFH3_with_existing_eblup.R",
+        "sha256": "138d34d8061f454606dcacde532b378f209e2eb0110c90d60f0d7ff509daf98a"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/pbmcpe_with_existing_dispatch.R",
+        "sha256": "959de597ff9247f90118f219b8b86ff65f7647fae379cd6d2d6518905b1c0652"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/population_helpers.R",
+        "sha256": "991360cf51faf8bc1131d778c6c76a8cb0fb3d0a344d43d5e7e84a7c32c61d2c"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/run_pipeline_bg.R",
+        "sha256": "72dfa9a428d828b458e7c9a1c42bdfa70154681de80370dfe0f88c392182cc0c"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/ufh_functions.R",
+        "sha256": "c58b3f1328cf9261ac5eefcf9c7e24e846ee8677f7f9006e58408603190e984a"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/verify_release.R",
+        "sha256": "9957f8006e1e530922ed834a0090c9450fac46b53afb52e88433f64df99c4d1b"
+      },
+      {
+        "scenario": "poverty",
+        "path": "app_support.R",
+        "sha256": "b2f4345372585b0efea40829c874157113ed149f6a86db137a86e949f8c9d457"
+      },
+      {
+        "scenario": "poverty",
+        "path": "report.Rmd",
+        "sha256": "704d38db81d0add78cd176f91210526fa5de08edc1056dced8c621c8030f514f"
+      },
+      {
+        "scenario": "log",
+        "path": "R/brief_generator.R",
+        "sha256": "a15182132a548a7f9cdb1e38a0b2215c4f4d2ad449224fae3b79235b3fc2b1b5"
+      },
+      {
+        "scenario": "log",
+        "path": "R/change_comparison.R",
+        "sha256": "247ccdea84e3dcde047f31b3ef4add7dd3f3bdd3a3d750101981d5d2160c73d1"
+      },
+      {
+        "scenario": "log",
+        "path": "R/comparison_report_ai.R",
+        "sha256": "fe4208eff4599be4c18c18e125b28e0e3f185ee44c8866a31cef3ee7bd2f73f2"
+      },
+      {
+        "scenario": "log",
+        "path": "R/indicator_helpers.R",
+        "sha256": "cb568a1c0d1cf49cf5fb4bcd11412d774f1f75239ec5e7fc99452e67a54ccfcd"
+      },
+      {
+        "scenario": "log",
+        "path": "R/input_paths.R",
+        "sha256": "ac1fff5e91b62d875c8adf287c7ba3cbf4e130c744f8752331bb538137a3c7fe"
+      },
+      {
+        "scenario": "log",
+        "path": "R/input_preflight.R",
+        "sha256": "6d8e0562975e6b12fd06b815571b24f628ece8364514e1dd4b805e3c8282beed"
+      },
+      {
+        "scenario": "log",
+        "path": "R/input_readers.R",
+        "sha256": "3dbae0325657251338d8ac9d17e293f7120bfdc92e6084abc4e7058106b31e74"
+      },
+      {
+        "scenario": "log",
+        "path": "R/landing_page.R",
+        "sha256": "291d7a1b4733cfe8e450aa288230094a5959c14ea59644015b5f5c04a02f0626"
+      },
+      {
+        "scenario": "log",
+        "path": "R/llm_assistant.R",
+        "sha256": "01209fdc4da17cc23be75861a7684a0c2329e8645258acc5c9060a30a0afa82d"
+      },
+      {
+        "scenario": "log",
+        "path": "R/map_style.R",
+        "sha256": "106354db55c78f145b6796392965f7b7a3e2cb9c6ef636262a0a2cec12267791"
+      },
+      {
+        "scenario": "log",
+        "path": "R/mfh_bootstrap_helpers.R",
+        "sha256": "dde41adb95c7fbbeffa94f1837c6e91184fd4309a5a56ffc2dddf8bd66f1e188"
+      },
+      {
+        "scenario": "log",
+        "path": "R/mfh_change_plots.R",
+        "sha256": "02d49f54427529bd500a99bbb6be4b4bd0f7a6d3a380a4ac38a271aea5b19f25"
+      },
+      {
+        "scenario": "log",
+        "path": "R/mfh_convergence_check.R",
+        "sha256": "79970068e46274d7e99f998de3ecd74d03fcae923345f9d801d5c0d4bc8e9a39"
+      },
+      {
+        "scenario": "log",
+        "path": "R/mfh_model_selection.R",
+        "sha256": "97560e4d6b93b8e443c26fc575980c94ea4c325cdf19e58058897e6842a9de8f"
+      },
+      {
+        "scenario": "log",
+        "path": "R/msae_compat.R",
+        "sha256": "9b4baf26585d9ea8445436188cd2ce430f285275a715bb249b2f6ac28c74d0d5"
+      },
+      {
+        "scenario": "log",
+        "path": "R/multilingual.R",
+        "sha256": "95965a51f07d462088ed96afc05a1caaae3f88be6fc57ba0c73fa3bbfe4df2e4"
+      },
+      {
+        "scenario": "log",
+        "path": "R/normality_evaluator.R",
+        "sha256": "2982d8b36df042f1a82d93f266b772c31852de1f0367bc82cadfabcb0300ee7a"
+      },
+      {
+        "scenario": "log",
+        "path": "R/pandoc_bootstrap.R",
+        "sha256": "79b250419654296cc66ea14d3162e96c0db2fb1cd1d95e8b1ae56eda6f5ce5e9"
+      },
+      {
+        "scenario": "log",
+        "path": "R/pipeline_helpers.R",
+        "sha256": "0b83a778ef89d6c6a5bf6b1355f82fe21ccffbebbd02a2d3956710e9a8e3b357"
+      },
+      {
+        "scenario": "log",
+        "path": "R/release_controls.R",
+        "sha256": "aec0802e441b337eb31e115201ab316870da8a217e405cededc500bda0a141b9"
+      },
+      {
+        "scenario": "log",
+        "path": "R/release_packaging.R",
+        "sha256": "c922a52c010cdea99be23fa4aa89c9b08b03de06ade6ead20982293521fb2fce"
+      },
+      {
+        "scenario": "log",
+        "path": "R/report_export.R",
+        "sha256": "f8a0bd3d72f3a6360f3acb7a70e8dd946136f835271678b52657f421d0d5aa25"
+      },
+      {
+        "scenario": "log",
+        "path": "R/report_map_picker.R",
+        "sha256": "77bc1c512d6cf7152b5df5cfc398c82fba709dfa96b40851a44b16b973902fee"
+      },
+      {
+        "scenario": "log",
+        "path": "R/validation_checks.R",
+        "sha256": "4c745d70cfc1fdf56f45e48323e32580303e6e7b88059dd9374b30ad0c4ddcb1"
+      },
+      {
+        "scenario": "log",
+        "path": "R/variance_policy.R",
+        "sha256": "9fb6af45718ccdb63e9eaf5f1c63dca6788e27f861566e74b33beec8896190b2"
+      },
+      {
+        "scenario": "log",
+        "path": "R/workbench_ui.R",
+        "sha256": "babd2e8bb25bbda4eb9d5136507ed7063bcd9ac3779608c577ca7f8b7b1796ff"
+      },
+      {
+        "scenario": "log",
+        "path": "R/zip_permissions.R",
+        "sha256": "e4b6473cc889aa718679549c7e6321b068d3014e5d3e756780667326f98b7dd8"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/01_ufh.R",
+        "sha256": "6d945b1d6a8c37c70cf0d8a01b9a9a715b73be4a643f49efa01ff757fa5ee2a0"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/02_mfh.R",
+        "sha256": "a0ed0f3e0acc7a92f811d03a3cc7e3faae197d6a37d13b9eaa636d1aa2bcccf2"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/03_comparison.R",
+        "sha256": "f5f65a1a4fa12ee7ca30446a18a2bbe9db40329822d2cf84ec842460a7e90313"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/bench_regional_mfh.R",
+        "sha256": "d2af9ffd20dad802e98c9acc4f9a7c2db6be12b45fddc31604f45ab999800781"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/build_clean_release.R",
+        "sha256": "b5e36f6af72a70c2dc5003d9604ff776ff802621fdfcea7abe40916b2c5711ad"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/build_release_manifest.R",
+        "sha256": "064bcbbcf82960370ac3662608e706cef11031fc0a629778465b56303809ee69"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/check_dependency_lock.R",
+        "sha256": "f466ab67de3dd823b221fd7c997c3cbcca1f1aa85af44146408e036584c4dc0b"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/eblupMFH2_robust.R",
+        "sha256": "19662c7791098b4b0e0dc0a60446d5115d947bf5eb23eca1372c8493ca84df51"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/pbmcpeMFH1_with_existing_eblup.R",
+        "sha256": "acf6257dd3a448ae40b4c945f0fac1acad2230fcc9b2f5146504806c6d24c982"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/pbmcpeMFH2_with_existing_eblup.R",
+        "sha256": "c2a8dc72d55eddb71867fae83dc96da4d480621c23b74aaf2db94baa36124012"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/pbmcpeMFH3_with_existing_eblup.R",
+        "sha256": "138d34d8061f454606dcacde532b378f209e2eb0110c90d60f0d7ff509daf98a"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/pbmcpe_with_existing_dispatch.R",
+        "sha256": "959de597ff9247f90118f219b8b86ff65f7647fae379cd6d2d6518905b1c0652"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/population_helpers.R",
+        "sha256": "991360cf51faf8bc1131d778c6c76a8cb0fb3d0a344d43d5e7e84a7c32c61d2c"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/run_pipeline_bg.R",
+        "sha256": "72dfa9a428d828b458e7c9a1c42bdfa70154681de80370dfe0f88c392182cc0c"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/ufh_functions.R",
+        "sha256": "c58b3f1328cf9261ac5eefcf9c7e24e846ee8677f7f9006e58408603190e984a"
+      },
+      {
+        "scenario": "log",
+        "path": "scripts/verify_release.R",
+        "sha256": "9957f8006e1e530922ed834a0090c9450fac46b53afb52e88433f64df99c4d1b"
+      },
+      {
+        "scenario": "log",
+        "path": "app_support.R",
+        "sha256": "b2f4345372585b0efea40829c874157113ed149f6a86db137a86e949f8c9d457"
+      },
+      {
+        "scenario": "log",
+        "path": "report.Rmd",
+        "sha256": "704d38db81d0add78cd176f91210526fa5de08edc1056dced8c621c8030f514f"
+      }
+    ],
+    "report_hashes": [
+      {
+        "scenario": "poverty",
+        "path": "outputs/final_report.docx",
+        "bytes": 6435249,
+        "sha256": "e667a27efb79cbc2ea0edcc79682f02acf24b9ea9d735885a313390c33ddba8e"
+      },
+      {
+        "scenario": "poverty",
+        "path": "outputs/final_report.html",
+        "bytes": 11360555,
+        "sha256": "a803ee15367a9f83b13fc963fdcd5dee7fba44c18e1bb522ea0d31198fbc9562"
+      },
+      {
+        "scenario": "log",
+        "path": "outputs/final_report.docx",
+        "bytes": 7110355,
+        "sha256": "23f4924e52bced33ffd20459f1e8892362c6c0c85898a9717a0a802a001e2caf"
+      },
+      {
+        "scenario": "log",
+        "path": "outputs/final_report.html",
+        "bytes": 12255318,
+        "sha256": "a31ee4cb06ba010fcca1c8b6a0fa48d113e7d7f7a940a7f3e1a5949fb79a5698"
+      }
+    ]
+  },
+  "explicit_sm_out": {
+    "scratch": "tmp/w5p_sm_all_compatibility/w5p_integration_61a047de1e84",
+    "policy": "sm_out",
+    "source_hashes": [
+      {
+        "scenario": "poverty",
+        "path": "R/brief_generator.R",
+        "sha256": "a15182132a548a7f9cdb1e38a0b2215c4f4d2ad449224fae3b79235b3fc2b1b5"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/change_comparison.R",
+        "sha256": "247ccdea84e3dcde047f31b3ef4add7dd3f3bdd3a3d750101981d5d2160c73d1"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/comparison_report_ai.R",
+        "sha256": "fe4208eff4599be4c18c18e125b28e0e3f185ee44c8866a31cef3ee7bd2f73f2"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/indicator_helpers.R",
+        "sha256": "cb568a1c0d1cf49cf5fb4bcd11412d774f1f75239ec5e7fc99452e67a54ccfcd"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/input_paths.R",
+        "sha256": "ac1fff5e91b62d875c8adf287c7ba3cbf4e130c744f8752331bb538137a3c7fe"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/input_preflight.R",
+        "sha256": "6d8e0562975e6b12fd06b815571b24f628ece8364514e1dd4b805e3c8282beed"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/input_readers.R",
+        "sha256": "3dbae0325657251338d8ac9d17e293f7120bfdc92e6084abc4e7058106b31e74"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/landing_page.R",
+        "sha256": "291d7a1b4733cfe8e450aa288230094a5959c14ea59644015b5f5c04a02f0626"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/llm_assistant.R",
+        "sha256": "01209fdc4da17cc23be75861a7684a0c2329e8645258acc5c9060a30a0afa82d"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/map_style.R",
+        "sha256": "106354db55c78f145b6796392965f7b7a3e2cb9c6ef636262a0a2cec12267791"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/mfh_bootstrap_helpers.R",
+        "sha256": "dde41adb95c7fbbeffa94f1837c6e91184fd4309a5a56ffc2dddf8bd66f1e188"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/mfh_change_plots.R",
+        "sha256": "02d49f54427529bd500a99bbb6be4b4bd0f7a6d3a380a4ac38a271aea5b19f25"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/mfh_convergence_check.R",
+        "sha256": "79970068e46274d7e99f998de3ecd74d03fcae923345f9d801d5c0d4bc8e9a39"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/mfh_model_selection.R",
+        "sha256": "97560e4d6b93b8e443c26fc575980c94ea4c325cdf19e58058897e6842a9de8f"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/msae_compat.R",
+        "sha256": "9b4baf26585d9ea8445436188cd2ce430f285275a715bb249b2f6ac28c74d0d5"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/multilingual.R",
+        "sha256": "95965a51f07d462088ed96afc05a1caaae3f88be6fc57ba0c73fa3bbfe4df2e4"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/normality_evaluator.R",
+        "sha256": "2982d8b36df042f1a82d93f266b772c31852de1f0367bc82cadfabcb0300ee7a"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/pandoc_bootstrap.R",
+        "sha256": "79b250419654296cc66ea14d3162e96c0db2fb1cd1d95e8b1ae56eda6f5ce5e9"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/pipeline_helpers.R",
+        "sha256": "0b83a778ef89d6c6a5bf6b1355f82fe21ccffbebbd02a2d3956710e9a8e3b357"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/release_controls.R",
+        "sha256": "aec0802e441b337eb31e115201ab316870da8a217e405cededc500bda0a141b9"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/release_packaging.R",
+        "sha256": "c922a52c010cdea99be23fa4aa89c9b08b03de06ade6ead20982293521fb2fce"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/report_export.R",
+        "sha256": "f8a0bd3d72f3a6360f3acb7a70e8dd946136f835271678b52657f421d0d5aa25"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/report_map_picker.R",
+        "sha256": "77bc1c512d6cf7152b5df5cfc398c82fba709dfa96b40851a44b16b973902fee"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/validation_checks.R",
+        "sha256": "4c745d70cfc1fdf56f45e48323e32580303e6e7b88059dd9374b30ad0c4ddcb1"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/variance_policy.R",
+        "sha256": "9fb6af45718ccdb63e9eaf5f1c63dca6788e27f861566e74b33beec8896190b2"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/workbench_ui.R",
+        "sha256": "babd2e8bb25bbda4eb9d5136507ed7063bcd9ac3779608c577ca7f8b7b1796ff"
+      },
+      {
+        "scenario": "poverty",
+        "path": "R/zip_permissions.R",
+        "sha256": "e4b6473cc889aa718679549c7e6321b068d3014e5d3e756780667326f98b7dd8"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/01_ufh.R",
+        "sha256": "6d945b1d6a8c37c70cf0d8a01b9a9a715b73be4a643f49efa01ff757fa5ee2a0"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/02_mfh.R",
+        "sha256": "a0ed0f3e0acc7a92f811d03a3cc7e3faae197d6a37d13b9eaa636d1aa2bcccf2"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/03_comparison.R",
+        "sha256": "f5f65a1a4fa12ee7ca30446a18a2bbe9db40329822d2cf84ec842460a7e90313"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/bench_regional_mfh.R",
+        "sha256": "d2af9ffd20dad802e98c9acc4f9a7c2db6be12b45fddc31604f45ab999800781"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/build_clean_release.R",
+        "sha256": "b5e36f6af72a70c2dc5003d9604ff776ff802621fdfcea7abe40916b2c5711ad"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/build_release_manifest.R",
+        "sha256": "064bcbbcf82960370ac3662608e706cef11031fc0a629778465b56303809ee69"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/check_dependency_lock.R",
+        "sha256": "f466ab67de3dd823b221fd7c997c3cbcca1f1aa85af44146408e036584c4dc0b"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/eblupMFH2_robust.R",
+        "sha256": "19662c7791098b4b0e0dc0a60446d5115d947bf5eb23eca1372c8493ca84df51"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/pbmcpeMFH1_with_existing_eblup.R",
+        "sha256": "acf6257dd3a448ae40b4c945f0fac1acad2230fcc9b2f5146504806c6d24c982"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/pbmcpeMFH2_with_existing_eblup.R",
+        "sha256": "c2a8dc72d55eddb71867fae83dc96da4d480621c23b74aaf2db94baa36124012"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/pbmcpeMFH3_with_existing_eblup.R",
+        "sha256": "138d34d8061f454606dcacde532b378f209e2eb0110c90d60f0d7ff509daf98a"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/pbmcpe_with_existing_dispatch.R",
+        "sha256": "959de597ff9247f90118f219b8b86ff65f7647fae379cd6d2d6518905b1c0652"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/population_helpers.R",
+        "sha256": "991360cf51faf8bc1131d778c6c76a8cb0fb3d0a344d43d5e7e84a7c32c61d2c"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/run_pipeline_bg.R",
+        "sha256": "72dfa9a428d828b458e7c9a1c42bdfa70154681de80370dfe0f88c392182cc0c"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/ufh_functions.R",
+        "sha256": "c58b3f1328cf9261ac5eefcf9c7e24e846ee8677f7f9006e58408603190e984a"
+      },
+      {
+        "scenario": "poverty",
+        "path": "scripts/verify_release.R",
+        "sha256": "9957f8006e1e530922ed834a0090c9450fac46b53afb52e88433f64df99c4d1b"
+      },
+      {
+        "scenario": "poverty",
+        "path": "app_support.R",
+        "sha256": "b2f4345372585b0efea40829c874157113ed149f6a86db137a86e949f8c9d457"
+      },
+      {
+        "scenario": "poverty",
+        "path": "report.Rmd",
+        "sha256": "704d38db81d0add78cd176f91210526fa5de08edc1056dced8c621c8030f514f"
+      }
+    ],
+    "report_hashes": []
+  }
+}

@@ -1,4 +1,6 @@
-# Start the EU SAE Workbench
+# Launcher help for the EU SAE Workbench
+
+For the short starting guide, language-specific instructions, results and folder map, open [START_HERE.html](../START_HERE.html). This page provides detailed launcher and installation troubleshooting.
 
 Download the application zip from
 <https://github.com/Noboyoshida227/eu-sae-application/releases> (under **Assets**; not the
@@ -119,5 +121,5 @@ before editing. If only the HTML appears, check the run log for a
 Word-conversion warning.
 
 To make a desktop shortcut, point it at a launcher here; do not move the
-launcher out of this folder. See `../docs/README_WIZARD.md` for dependencies and
+launcher out of this folder. See `../docs/instructions/English/README_WIZARD.md` for dependencies and
 archived output locations.

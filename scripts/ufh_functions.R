@@ -566,6 +566,15 @@ mse_emdi <- function(object, indicator = "all", CV = FALSE) {
     }
   }
   all_cv <- sqrt(object$MSE[, -1]) / object$ind[, -1]
+  if (inherits(object, "fh") && "Direct" %in% names(all_cv)) {
+    # A zero/unavailable Direct estimate has no finite relative uncertainty.
+    # Keep this consistent with the exported UFH table and saved model object.
+    direct_se <- sqrt(object$MSE$Direct)
+    direct_estimate <- object$ind$Direct
+    all_cv$Direct <- ifelse(
+      is.finite(direct_se) & is.finite(direct_estimate) & abs(direct_estimate) > 1e-12,
+      direct_se / abs(direct_estimate), NA_real_)
+  }
   
   if (any(indicator == "Quantiles") || any(indicator == "quantiles")) {
     indicator <- c(
@@ -2214,7 +2223,7 @@ sae_ufh_inverse <- function(value, transformation) {
 }
 
 sae_ufh_ratio_benchmark <- function(estimate, direct, region, population,
-                                    fixed_targets = NULL) {
+                                    fixed_targets = NULL, return_diagnostics = FALSE) {
   if (anyNA(region) || any(!is.finite(population) | population <= 0)) {
     stop("UFH benchmarking requires a group and positive population for every domain.")
   }
@@ -2222,6 +2231,7 @@ sae_ufh_ratio_benchmark <- function(estimate, direct, region, population,
     stop("UFH benchmarking requires a finite estimate for every domain in the benchmark groups; check unsampled domains and target coverage.")
   }
   result <- as.numeric(estimate)
+  factors <- list()
   for (group in unique(as.character(region))) {
     rows <- which(as.character(region) == group)
     if (is.null(fixed_targets)) {
@@ -2242,8 +2252,18 @@ sae_ufh_ratio_benchmark <- function(estimate, direct, region, population,
     } else {
       result[rows] <- estimate[rows] * target / average
     }
+    if (isTRUE(return_diagnostics)) {
+      factors[[length(factors) + 1L]] <- data.frame(
+        region = group, B_r = target, FH_bar_r = average,
+        lambda_r = if (abs(average) <= .Machine$double.eps) NA_real_ else target / average,
+        benchmark_operation = if (abs(average) <= .Machine$double.eps) "zero_target_zero_mean" else "ratio",
+        target_source = if (is.null(fixed_targets)) "survey" else "fixed",
+        stringsAsFactors = FALSE)
+    }
   }
-  result
+  if (isTRUE(return_diagnostics)) {
+    list(estimate = result, factors = do.call(rbind, factors))
+  } else result
 }
 
 # Parametric FH bootstrap on the model scale, with the actual point estimator
@@ -2442,6 +2462,23 @@ sae_ufh_fit <- function(fixed, vardir, combined_data, domains = "Domain",
   model
 }
 
+# Restore reporting uncertainty without changing the fit's working variances.
+# emdi can reorder domains, and unsampled domains have no raw Direct variance.
+sae_ufh_restore_direct_variance <- function(model, direct_variance) {
+  if (!all(c("domain", "direct_variance_raw") %in% names(direct_variance)) ||
+      anyDuplicated(as.character(direct_variance$domain))) {
+    stop("Raw UFH Direct variance must have one row per domain.")
+  }
+  if (is.null(model$MSE) || !"Domain" %in% names(model$MSE)) {
+    stop("Cannot restore UFH Direct variance without model MSE domain identifiers.")
+  }
+  rows <- match(as.character(model$MSE$Domain), as.character(direct_variance$domain))
+  raw <- as.numeric(direct_variance$direct_variance_raw[rows])
+  raw[!is.finite(raw) | raw < 0] <- NA_real_
+  model$MSE$Direct <- raw
+  model
+}
+
 # Ratio benchmarking is always performed on the reported indicator scale.
 bench_regional <- function(model, region_df, MSE = FALSE, B = 200,
                             seed = 123, target_source = "survey") {
@@ -2455,8 +2492,11 @@ bench_regional <- function(model, region_df, MSE = FALSE, B = 200,
       values
     }, numeric(1))
   }
-  model$ind$FH_Bench <- sae_ufh_ratio_benchmark(model$ind$FH, model$ind$Direct,
-                                               meta$region, meta$Nd, fixed_targets)
+  benchmark <- sae_ufh_ratio_benchmark(model$ind$FH, model$ind$Direct,
+                                       meta$region, meta$Nd, fixed_targets,
+                                       return_diagnostics = TRUE)
+  model$ind$FH_Bench <- benchmark$estimate
+  model$sae_benchmark_factors <- benchmark$factors
   if (MSE) {
     boot <- sae_ufh_bootstrap(model, region_df, target_source, B, seed)
     if (is.null(model$MSE)) model$MSE <- data.frame(Domain = model$ind$Domain,

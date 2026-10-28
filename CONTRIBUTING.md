@@ -10,7 +10,7 @@ unexpectedly.
 
 This is a **release candidate**. Estimates it produces should be treated as
 experimental and put through your usual validation before any publication.
-Open items are recorded in `docs/RELEASE_CHECKLIST.md`.
+Open items are recorded in `docs/maintenance/RELEASE_CHECKLIST.md`.
 
 ## Reporting a problem
 
@@ -31,7 +31,7 @@ your `app_config.yml` does not contain a file path you would rather not share.
 Changes to estimation, variance, or inference need more than a pull request:
 say which published method you are following, what the current code does
 differently, and what evidence supports the change. Method changes are reviewed
-against `docs/MCPE_VALIDATION_STATUS.md` and the release checklist before they
+against `docs/validation/MCPE_VALIDATION_STATUS.md` and the release checklist before they
 are accepted.
 
 ## Making a code change

@@ -1,0 +1,24 @@
+# w5p follow-up on publication revisions and full smoothing
+
+Owner instruction: retain T=2 principally to control revisions to official annual estimates, and make `sm_all` the default rather than `sm_out`. This instruction supersedes the earlier prompt's requirement to preserve that default. The candidate remains w5p/.5.16; no commit, push, tag or publication is authorized or performed.
+
+The earlier w5p verification ZIP and audit remain intact. This follow-up is identified by its variance-default policy, source hashes, fresh receipt and separate `dist/w5p_verification_build_sm_all` directory. It is not a new committed revision.
+
+| Item | Implementation and evidence |
+|---|---|
+| T=2 rationale | Deviations note, alignment, README and revised Office guidance explain successive windows, provisional/revised/frozen vintages, one scheduled revision of each year's estimate, the NSO's operational controls and mixed-vintage inference limitation. No automatic publication freeze or additional estimator was added. |
+| Defaults | Shared policy helpers resolve new/missing settings to `sm_all`; missing MFH covariance follows the effective variance. New full-smoothing settings pair with `rho_sm_all`. Explicit alternatives and the 0.001 optional threshold remain unchanged. |
+| UFH transformations | Identity/log variance settings are exposed, serialized and honored consistently. Arcsine remains based on effective sample size. Legacy dashboard log setups with previously ignored hidden choices receive a review notice; actual prior run configurations remain the reproduction reference. |
+| Regression validation | 487/0/0 full suite includes 66 new checks; independent reviewer repeated the focused suite. Lock 46/46, background 40 and UI parity pass. Source manifest and logs are retained in the local follow-up evidence. |
+| Default integrations | Two scenarios intentionally omit policy keys. Production artifacts resolve sm_all/rho_sm_all. Each completes 50 accepted/0 failed MFH draws; boundary draws are 3 for household FGT1 and 8 for person-row log welfare. Both original fits are regular. Benchmarks, joint moments, report generation and raw Direct reporting pass. |
+| Explicit-policy continuity | Fresh explicit sm_out household FGT1 run reproduces all four earlier w5p workbooks to 1e-8. Matched fixture-file hashes and normalized configurations were checked. |
+| Intentional result changes | All 80 model domain-year estimates/MSEs in each new-default scenario differ from the earlier sm_out scenario. Raw Direct variances remain unchanged. These sensitivity results are not a superiority or coverage claim. |
+| Documentation and packaging | Office/guide render and translation evidence are recorded separately by the document task. The latest build receipt binds final inventory/source hashes to the new private ZIP. Old receipts remain historical. |
+
+Portable method and validation notes: [deviations](../../MOLINA_ROMERO_DEVIATIONS_w5p.md), [validation](../../W5P_VALIDATION_RECEIPT.md). Follow-up independent review: [review](INDEPENDENT_REVIEW_sm_all.md). Policy effects: [summary](evidence/sm_all/policy_change_summary.csv), [domain-year differences](evidence/sm_all/sm_all_vs_sm_out_results.csv), [explicit-policy continuity](evidence/sm_all/explicit_sm_out_compatibility.csv). [Comparison script](checks/compare_variance_policy_integrations.R) reads isolated artifacts and does not write production outputs.
+
+The retained scratch integrations are `tmp/w5p_sm_all_integrations/w5p_integration_5af8755f3c69` and `tmp/w5p_sm_all_compatibility/w5p_integration_61a047de1e84`. Reproduction uses `tests/test_w5p_integration.R --variance-policy=default` or explicit `sm_out`, `--replicates=50`, and a fresh scratch parent. Input/source/report hashes and scenario counts are under [evidence/sm_all](evidence/sm_all/). Existing outputs are preserved and checked again during packaging.
+
+No new large simulation study was requested or run. The previously disclosed coverage, estimated-input/model-selection uncertainty and MFH1/MFH3 evidence gaps remain. Full smoothing removes the fixed cutoff from the applicable default; it does not establish GVF adequacy or full-workflow coverage.
+
+Final verification build completed successfully. The new ZIP SHA-256 is `a45e49e3130b25b6cecbd4819d65344e948b996555c53683a89e01f07e75166c`. Independent extraction checks verified 195 inventory files plus the manifest, all sizes/hashes, executable launchers, exclusion rules and all 23 links from the shipped deviations/validation notes. The only intentional source/package difference is the builder-generated clean-release notice. All 4,177 existing output/run files, the w5o ZIP and the earlier w5p verification ZIP remain unchanged. The owner release destination remains unused. The separate TEST_BUILD receipt records the uncommitted source inventory, status snapshot, environment and checks; the private ZIP is not for circulation.

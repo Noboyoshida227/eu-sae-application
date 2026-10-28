@@ -382,7 +382,9 @@ assess_data_readiness <- function(survey_data,
                                   save_to        = "output/Diagnostics",
                                   fgt_alpha      = 0L,
                                   indicator_type = "poverty",
-                                  log_transform  = FALSE) {
+                                  log_transform  = FALSE,
+                                  mfh_requested  = FALSE,
+                                  years_keep     = NULL) {
 
   msgs <- character()
 
@@ -490,7 +492,15 @@ assess_data_readiness <- function(survey_data,
     }
   }
 
-  years <- sort(unique(survey_data$year))
+  years <- if (is.null(years_keep)) sort(unique(survey_data$year)) else years_keep
+  if (isTRUE(mfh_requested)) {
+    panel_error <- tryCatch({
+      sae_require_complete_mfh_panel(survey_data, aux_data, years, indicator_type, fgt_alpha)
+      NULL
+    }, error = function(e) conditionMessage(e))
+    if (!is.null(panel_error)) return(empty_readiness_result(
+      c(msgs, paste("Test 3: ERROR --", panel_error)), cor_target_label = cor_target_label))
+  }
 
   # Domain-level target (weighted) per year. Column is named `poverty_rate`
   # for back-compat with downstream code, but for indicator_type ==

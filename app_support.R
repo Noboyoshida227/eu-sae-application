@@ -19,6 +19,10 @@ if (!exists("sae_write_run_metadata", mode = "function")) {
   if (file.exists(.release_control_path)) source(.release_control_path)
 }
 
+source(file.path("scripts", "population_helpers.R"))
+source(file.path("R", "input_preflight.R"))
+source(file.path("R", "variance_policy.R"))
+
 source(file.path("R", "report_export.R"))
 source(file.path("R", "pandoc_bootstrap.R"))
 
@@ -70,12 +74,12 @@ validate_app_config <- function(cfg) {
     errs <- c(errs, "`benchmarking.level` must be one of: national, custom.")
   }
 
-  mfh_var <- cfg$mfh$var_choice %||% "sm_out"
+  mfh_var <- sae_variance_choice(cfg$mfh$var_choice)
   if (!mfh_var %in% c("direct", "sm_out", "sm_all")) {
     errs <- c(errs, "`mfh.var_choice` must be one of: direct, sm_out, sm_all.")
   }
 
-  mfh_cov <- cfg$mfh$cov_choice %||% "rho_sm_out"
+  mfh_cov <- sae_covariance_choice(cfg$mfh$cov_choice, mfh_var)
   if (!mfh_cov %in% c("direct", "rho_dir", "rho_sm_out", "rho_sm_all", "zero")) {
     errs <- c(errs, "`mfh.cov_choice` must be one of: direct, rho_dir, rho_sm_out, rho_sm_all, zero.")
   }
@@ -111,14 +115,20 @@ validate_app_config <- function(cfg) {
       }
     }
   }
-  optional_paths <- c(
-    benchmark_target_path = cfg$benchmarking$target_path,
-    ufh_benchmark_target_path = cfg$ufh$benchmark_target_path %||% cfg$ufh$regional_benchmark_path,
-    mfh_regional_benchmark_path = cfg$mfh$regional_benchmark_path,
-    mfh_benchmark_target_path = cfg$mfh$benchmark_target_path,
-    mfh_population_path = cfg$mfh$population_path,
-    ufh_population_path = cfg$ufh$population_path
-  )
+  # Optional files matter only to selected estimation steps with benchmarking
+  # enabled; a saved but unused path must not prevent an otherwise valid run.
+  optional_paths <- list()
+  for (method in intersect(tolower(steps), c("ufh", "mfh"))) {
+    mc <- tryCatch(sae_resolve_method_input_config(cfg, method), error = identity)
+    if (inherits(mc, "error")) {
+      errs <- c(errs, conditionMessage(mc))
+      next
+    }
+    if (!isTRUE(mc$do_benchmark)) next
+    optional_paths[[paste0(method, ".population_path")]] <- mc$population_path
+    optional_paths[[paste0(method, ".benchmark_target_path")]] <-
+      mc$benchmark_target_path
+  }
   for (nm in names(optional_paths)) {
     p <- optional_paths[[nm]]
     if (!is.null(p) && length(p) > 0 && isTRUE(nzchar(p)) && !file.exists(p)) {
@@ -181,8 +191,8 @@ validate_app_config <- function(cfg) {
   }
 
   # Variance smoothing option for UFH (mirrors MFH menu). Only meaningful
-  # when transformation == "no"; arcsin and log already stabilize variances.
-  ufh_var <- cfg$ufh$var_choice %||% "sm_out"
+  # on identity or log scales; arcsin uses effective-sample-size variance.
+  ufh_var <- sae_variance_choice(cfg$ufh$var_choice)
   if (!ufh_var %in% c("direct", "sm_out", "sm_all")) {
     errs <- c(errs, "`ufh.var_choice` must be one of: direct, sm_out, sm_all.")
   }
@@ -1222,6 +1232,32 @@ run_pipeline_from_config <- function(config_path, logger = message,
 
   steps <- cfg$run$steps %||% c("UFH", "MFH", "Comparison")
   check_pipeline_packages(steps)
+
+  # Background/saved-config entry repeats the same read-only checks as the UI.
+  # This happens before directory creation and output cleanup, so a changed
+  # upload or an incomplete MFH panel cannot destroy prior results.
+  for (method in intersect(tolower(steps), c("ufh", "mfh"))) {
+    mc <- sae_resolve_method_input_config(cfg, method)
+    years <- mc$years_keep
+    vm <- utils::modifyList(list(year = "year", domain = "prov", psu = "ea_id",
+      weight = "weight", hh_size = "hhsize", welfare = "income", povline = "povline",
+      strata = "", benchmark_level = "", region = "", hh_id = "", survey_unit = "household"), mc$var_map %||% list())
+    level <- mc$benchmark_level
+    level_var <- mc$benchmark_level_variable
+    vm$benchmark_level <- if (identical(level, "national")) "" else level_var
+    harmonized <- load_and_harmonize(
+      sae_resolve_input_path(mc$survey_path, root = getwd()),
+      sae_resolve_input_path(mc$rhs_path, root = getwd()), vm,
+      mc$rhs_domain %||% vm$domain, cfg$povline_type %||% "column", cfg$povline_value,
+      cfg$indicator_type %||% "poverty", cfg$price_index, years)
+    if (is.null(harmonized)) stop("Could not load ", toupper(method), " inputs for pre-run validation.", call. = FALSE)
+    sae_validate_relevant_analysis_inputs(harmonized$survey, harmonized$rhs, years,
+      steps = toupper(method), do_benchmark = isTRUE(mc$do_benchmark),
+      population_path = mc$population_path %||% "",
+      target_path = mc$benchmark_target_path,
+      benchmark_level = level, level_col = level_var,
+      indicator_type = cfg$indicator_type %||% "poverty", fgt_alpha = cfg$fgt_alpha %||% 0L)
+  }
 
   # Set SAE_APP_CONFIG so the sourced R scripts can read the config
   old_cfg <- Sys.getenv("SAE_APP_CONFIG", unset = "")

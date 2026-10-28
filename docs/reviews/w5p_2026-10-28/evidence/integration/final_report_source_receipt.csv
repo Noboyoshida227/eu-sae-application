@@ -1,0 +1,5 @@
+"scenario","path","integrated_sha256","final_sha256","reason"
+"poverty","report.Rmd","704d38db81d0add78cd176f91210526fa5de08edc1056dced8c621c8030f514f","704d38db81d0add78cd176f91210526fa5de08edc1056dced8c621c8030f514f","Narration only: exploratory pointwise counts and familywide qualification"
+"poverty","R/comparison_report_ai.R","fe4208eff4599be4c18c18e125b28e0e3f185ee44c8866a31cef3ee7bd2f73f2","fe4208eff4599be4c18c18e125b28e0e3f185ee44c8866a31cef3ee7bd2f73f2","Narration only: exploratory pointwise counts and familywide qualification"
+"log","report.Rmd","68b2c69a35906cd723a4442ad820a53f712c901458b48f21a6b081f4e332519f","704d38db81d0add78cd176f91210526fa5de08edc1056dced8c621c8030f514f","Narration only: exploratory pointwise counts and familywide qualification"
+"log","R/comparison_report_ai.R","404a1ae854aaf31a48e204ddbdc004ad27f9670a4b9596ea9fae8e2bb8df2252","fe4208eff4599be4c18c18e125b28e0e3f185ee44c8866a31cef3ee7bd2f73f2","Narration only: exploratory pointwise counts and familywide qualification"

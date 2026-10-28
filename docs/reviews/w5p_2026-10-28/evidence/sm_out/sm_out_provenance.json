@@ -1,0 +1,140 @@
+{
+  "settings": {
+    "Spain": {
+      "input": "Data/Spain/survey.rds",
+      "sha256": "b86ac348be3898075aa7df07c0d37798255daf22d79f89e8d1c1d2755544ad32",
+      "years": [2012, 2013],
+      "survey_unit": "household",
+      "weight": "weight * hh_size",
+      "psu": "ea_id",
+      "strata": "none",
+      "lonely_psu": "adjust",
+      "poverty_line": "supplied povline column; no recomputation",
+      "transformation": "identity",
+      "variance_policy": "sm_out",
+      "threshold": 0.001,
+      "seed": "none; deterministic Direct/GVF calculation",
+      "model_fits": 0,
+      "bootstrap_draws": 0
+    },
+    "simulated": {
+      "input": "Data/simulated/survey_example.csv",
+      "sha256": "e8a8b4324c036ca1d3fc8b4019b69ab350c491aeaa79abd087cd59a8fc55c056",
+      "years": [2022, 2023],
+      "survey_unit": "household",
+      "weight": "weight * hh_size",
+      "psu": "psu",
+      "strata": "strata (nest = TRUE)",
+      "lonely_psu": "adjust",
+      "poverty_line": "supplied povline column; no recomputation",
+      "transformation": "identity",
+      "variance_policy": "sm_out",
+      "threshold": 0.001,
+      "seed": "none; deterministic Direct/GVF calculation",
+      "model_fits": 0,
+      "bootstrap_draws": 0
+    }
+  },
+  "events": {
+    "Spain_UFH_2012_0": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_UFH_2013_0": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_MFH_2012_0": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_MFH_2013_0": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_UFH_2012_1": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_UFH_2013_1": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_MFH_2012_1": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_MFH_2013_1": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_UFH_2012_2": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_UFH_2013_2": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_MFH_2012_2": {
+      "error": "",
+      "warnings": []
+    },
+    "Spain_MFH_2013_2": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_UFH_2022_0": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_UFH_2023_0": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_MFH_2022_0": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_MFH_2023_0": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_UFH_2022_1": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_UFH_2023_1": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_MFH_2022_1": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_MFH_2023_1": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_UFH_2022_2": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_UFH_2023_2": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_MFH_2022_2": {
+      "error": "",
+      "warnings": []
+    },
+    "simulated_MFH_2023_2": {
+      "error": "",
+      "warnings": []
+    }
+  },
+  "source_sha256": ["5cc9457db7f7540a9d0cb797dd6f958092d8455eb46aa66b019c11f426c90146", "fb02795d860e95ad908daaf23ce1dc3cb904f925053fd62d3e4ed4a0692bb5ec", "c58b3f1328cf9261ac5eefcf9c7e24e846ee8677f7f9006e58408603190e984a", "991360cf51faf8bc1131d778c6c76a8cb0fb3d0a344d43d5e7e84a7c32c61d2c", "0b83a778ef89d6c6a5bf6b1355f82fe21ccffbebbd02a2d3956710e9a8e3b357", "b06616f4109df47456b6bbc68258e6116ceaae6315106fc9f18a08f109941ff8"],
+  "R": "R version 4.5.2 (2025-10-31 ucrt)",
+  "package_versions": ["4.4.8", "1.2.0", "1.3.2", "1.2.1", "3.3.1", "1.18.2.1"],
+  "interpretation": "Illustrative synthetic examples only; counts do not establish country-wide replacement prevalence or coverage."
+}

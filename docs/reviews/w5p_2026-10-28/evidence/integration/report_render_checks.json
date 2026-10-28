@@ -1,0 +1,14 @@
+[
+  {
+    "scenario": "poverty",
+    "pages": 50,
+    "caption_present": true,
+    "familywide_qualification_present": true
+  },
+  {
+    "scenario": "log",
+    "pages": 48,
+    "caption_present": true,
+    "familywide_qualification_present": true
+  }
+]

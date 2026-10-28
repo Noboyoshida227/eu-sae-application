@@ -52,54 +52,37 @@ sae_natural_key <- function(x) {
   }, character(1), USE.NAMES = FALSE)
 }
 
-# The guides shipped in the package; where several versions of a guide are
-# present, the one with the highest version number in its name. Each entry is
+# The shared catalogue selects the current packaged guides. Each entry is
 # list(label, href, note); only files that exist are listed.
 sae_resource_links <- function(app_dir) {
-  docs <- file.path(app_dir, "docs")
-  pick <- function(sub, pattern, exclude = NULL) {
-    f <- list.files(file.path(docs, sub), pattern = pattern, full.names = FALSE)
-    if (!is.null(exclude)) f <- f[!grepl(exclude, f)]
-    if (!length(f)) return(NULL)
-    f <- f[order(sae_natural_key(f), decreasing = TRUE)][1]
-    paste(c(sub, f)[nzchar(c(sub, f))], collapse = "/")
+  catalogue <- file.path(app_dir, "docs", "maintenance", "navigation.json")
+  if (!file.exists(catalogue)) return(list())
+  data <- jsonlite::fromJSON(catalogue, simplifyVector = FALSE)
+  items <- Filter(function(x) isTRUE(x$menu), data$items)
+  links <- list()
+  if (file.exists(file.path(app_dir, "docs", "INDEX.html"))) {
+    links <- list(list(label = "Start here, guides and results",
+                       href = "eusae-docs/INDEX.html", note = "", group = ""))
   }
-  # The three short guides (w5o): the PDF when present, else the PowerPoint.
-  # English files have no language suffix; translations end in _PL or _GR.
-  guide <- function(n, label, lang = "", group = "") {
-    stem <- sprintf("^EU_SAE_Workbench_Guide_%d_.*%s", n, if (nzchar(lang)) paste0("_", lang) else "")
-    excl <- if (nzchar(lang)) NULL else "_(PL|GR)\\.(pdf|pptx)$"
-    pdf <- pick("instructions", paste0(stem, "\\.pdf$"), excl)
-    if (!is.null(pdf)) return(list(label, pdf, "", group))
-    list(paste(label, "(PowerPoint)"),
-         pick("instructions", paste0(stem, "\\.pptx$"), excl), "downloads", group)
+  groups <- c(instructions = "", guidance = "Methods", validation = "Validation",
+              maintenance = "Maintainers")
+  for (item in items) {
+    path <- item$path
+    if (!is.character(path) || length(path) != 1L || !startsWith(path, "docs/") ||
+        grepl("(^|/)\\.\\.(/|$)", path)) next
+    if (grepl("\\.md$", path)) path <- sub("\\.md$", ".html", path)
+    if (!file.exists(file.path(app_dir, path))) next
+    group <- if (identical(item$group, "instructions")) item$language else groups[[item$group]]
+    links[[length(links) + 1L]] <- list(
+      label = item$title,
+      href = paste0("eusae-docs/", utils::URLencode(sub("^docs/", "", path))),
+      note = if (grepl("\\.pdf$", path)) "PDF" else "",
+      group = group %||% "")
   }
-  pl <- "Polski"
-  gr <- "\u0395\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac"
-  items <- list(
-    guide(1L, "Guide 1: Install and start"),
-    guide(2L, "Guide 2: Running the Workbench"),
-    guide(3L, "Guide 3: Estimating poverty and welfare"),
-    guide(1L, "Przewodnik 1: Instalacja i uruchomienie", "PL", pl),
-    guide(2L, "Przewodnik 2: Praca z aplikacj\u0105 Workbench", "PL", pl),
-    guide(3L, "Przewodnik 3: Szacowanie ub\u00f3stwa i dobrobytu", "PL", pl),
-    guide(1L, "\u0395\u03b3\u03c7\u03b5\u03b9\u03c1\u03af\u03b4\u03b9\u03bf 1: \u0395\u03b3\u03ba\u03b1\u03c4\u03ac\u03c3\u03c4\u03b1\u03c3\u03b7 \u03ba\u03b1\u03b9 \u03b5\u03ba\u03ba\u03af\u03bd\u03b7\u03c3\u03b7", "GR", gr),
-    guide(2L, "\u0395\u03b3\u03c7\u03b5\u03b9\u03c1\u03af\u03b4\u03b9\u03bf 2: \u03a7\u03c1\u03ae\u03c3\u03b7 \u03c4\u03bf\u03c5 Workbench", "GR", gr),
-    guide(3L, "\u0395\u03b3\u03c7\u03b5\u03b9\u03c1\u03af\u03b4\u03b9\u03bf 3: \u0395\u03ba\u03c4\u03af\u03bc\u03b7\u03c3\u03b7 \u03c6\u03c4\u03ce\u03c7\u03b5\u03b9\u03b1\u03c2 \u03ba\u03b1\u03b9 \u03b5\u03c5\u03b7\u03bc\u03b5\u03c1\u03af\u03b1\u03c2", "GR", gr),
-    list("Download and installation instructions (PDF)", pick("instructions", "^EU_SAE_Download_Instructions_.*\\.pdf$"), "", ""),
-    list("Guidelines (PDF)", pick("guidance", "^guidelines_.*\\.pdf$"), "", ""),
-    list("Methodology mapping", pick("", "^METHODOLOGY_ALIGNMENT\\.md$"), "text", ""),
-    list("Validation status", pick("", "^MCPE_VALIDATION_STATUS\\.md$"), "text", ""),
-    list("Changes in each version", pick("", "^CHANGELOG\\.html$"), "", "")
-  )
-  items <- Filter(function(x) !is.null(x[[2]]), items)
-  lapply(items, function(x) list(
-    label = x[[1]],
-    href = paste0("eusae-docs/", utils::URLencode(x[[2]])),
-    note = x[[3]],
-    group = x[[4]]))
+  order <- match(vapply(links, function(x) x$group, character(1)),
+                 c("", "English", "Polish", "Greek", "Methods", "Validation", "Maintainers"))
+  links[base::order(order, seq_along(links), na.last = TRUE)]
 }
-
 sae_resource_menu <- function(app_dir, button_class = "btn btn-default btn-sm") {
   links <- sae_resource_links(app_dir)
   htmltools::tags$div(

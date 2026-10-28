@@ -49,6 +49,7 @@ options(survey.lonely.psu = "adjust")
 
 source(here::here("scripts", "ufh_functions.R"))
 source(here::here("scripts", "population_helpers.R"))
+source(here::here("R", "input_preflight.R"))
 source(here::here("R", "input_readers.R"))
 source(here::here("R", "input_paths.R"))
 source(here::here("R", "pipeline_helpers.R"))
@@ -100,6 +101,8 @@ if (nzchar(cfg_path) && file.exists(cfg_path)) {
   .app_cfg <- yaml::read_yaml(cfg_path)
   if (!is.null(.app_cfg$ufh)) ufh_cfg <- .app_cfg$ufh
 }
+ufh_cfg <- sae_resolve_method_input_config(.app_cfg, "ufh")
+.app_cfg$ufh <- ufh_cfg
 
 # ---- Indicator: poverty (FGT) or mean welfare ----------------------------
 # Read indicator-related fields from the top-level config. Default is the
@@ -412,16 +415,16 @@ cat("LASSO screening (UFH):",
 
 # ---- Variance smoothing choice (only meaningful when arcsin is NOT used) ----
 # Options mirror the MFH menu:
-#   "sm_out"  - smooth only non-finite or below-0.001 variances (default)
-#   "sm_all"  - replace ALL sampling variances with smoothed values
+#   "sm_out"  - smooth only non-finite or below-0.001 variances
+#   "sm_all"  - replace ALL sampling variances with smoothed values (default)
 #   "direct"  - use raw direct variances as-is (NA/0 still backfilled)
 # Arcsin uses the effective-sample-size working variance 1/(4*n_eff),
 # independently of this setting, and retains original direct variances.
-ufh_var_choice <- cfg_or_default(ufh_cfg$var_choice, "sm_out")
+ufh_var_choice <- sae_variance_choice(ufh_cfg$var_choice)
 if (!ufh_var_choice %in% c("direct", "sm_out", "sm_all")) {
   warning("Unknown ufh_cfg$var_choice '", ufh_var_choice,
-          "' - falling back to 'sm_out'.")
-  ufh_var_choice <- "sm_out"
+          "' - falling back to 'sm_all'.")
+  ufh_var_choice <- "sm_all"
 }
 if (identical(ufh_transformation, "arcsin")) {
   cat("Variance smoothing option: (ignored under arcsin transformation)\n")
@@ -659,83 +662,8 @@ make_sae_design <- function(data) {
   if (length(hit) == 0) NULL else nms[hit[1]]
 }
 
-.targets_from_optional_benchmark <- function(path, group_vec, years_keep,
-                                             level_col = "") {
-  obj <- .read_optional_benchmark_table(path)
-  if (is.null(obj)) return(NULL)
-
-  group_ids <- sort(unique(as.character(group_vec[!is.na(group_vec)])))
-  year_chr <- as.character(years_keep)
-
-  if (is.matrix(obj)) {
-    mat <- obj
-    if (is.null(rownames(mat))) stop("Benchmark target matrix must have group row names.")
-    missing_groups <- setdiff(group_ids, rownames(mat))
-    if (length(missing_groups) > 0) {
-      stop("Benchmark target matrix is missing group(s): ",
-           paste(missing_groups, collapse = ", "))
-    }
-    mat <- mat[group_ids, , drop = FALSE]
-    if (ncol(mat) != length(years_keep)) {
-      stop("Benchmark target matrix must have one column per analysis year.")
-    }
-    storage.mode(mat) <- "double"
-    colnames(mat) <- year_chr
-    if (any(!is.finite(mat))) stop("Benchmark target matrix contains missing/non-finite targets.")
-    return(mat)
-  }
-
-  df <- as.data.frame(obj, check.names = FALSE)
-  nms <- names(df)
-  group_col <- .pick_col(nms, c(level_col, "benchmark_level", "level",
-                                "group", "group_id", "region", "reg", "region_id"))
-  year_col <- .pick_col(nms, c("year", "time", "period"))
-  value_col <- .pick_col(nms, c("benchmark", "target", "B_r",
-                                "benchmark_target", "regional_benchmark",
-                                "direct", "direct_rate", "poverty_rate"))
-  if (is.null(group_col)) {
-    if (length(group_ids) == 1L) {
-      group_col <- ".benchmark_level"
-      df[[group_col]] <- group_ids[1]
-    } else {
-      stop("Benchmark Target Database must contain a benchmark-level column ",
-           "(for example '",
-           if (nzchar(level_col)) level_col else "benchmark_level",
-           "') or matrix row names.")
-    }
-  }
-
-  mat <- matrix(NA_real_, nrow = length(group_ids), ncol = length(years_keep),
-                dimnames = list(group_ids, year_chr))
-
-  if (!is.null(year_col) && !is.null(value_col)) {
-    for (tt in seq_along(years_keep)) {
-      idx <- as.character(df[[year_col]]) == year_chr[tt]
-      ids <- as.character(df[[group_col]][idx])
-      vals <- as.numeric(df[[value_col]][idx])
-      mat[intersect(group_ids, ids), tt] <- vals[match(intersect(group_ids, ids), ids)]
-    }
-  } else {
-    for (tt in seq_along(years_keep)) {
-      candidates <- c(
-        year_chr[tt],
-        paste0("B_r_", year_chr[tt]),
-        paste0("benchmark_", year_chr[tt]),
-        paste0("target_", year_chr[tt]),
-        paste0("direct_", year_chr[tt]),
-        paste0("poor_", year_chr[tt])
-      )
-      col <- .pick_col(nms, candidates)
-      if (is.null(col)) stop("Benchmark Target Database is missing a column for year ", year_chr[tt], ".")
-      ids <- as.character(df[[group_col]])
-      mat[group_ids, tt] <- as.numeric(df[[col]][match(group_ids, ids)])
-    }
-  }
-
-  if (any(!is.finite(mat))) {
-    stop("Benchmark Target Database is missing targets for at least one benchmark level/year.")
-  }
-  mat
+.targets_from_optional_benchmark <- function(path, group_vec, years_keep, level_col = "") {
+  sae_benchmark_targets_from_file(path, group_vec, years_keep, level_col)
 }
 
 # ---- Benchmark grouping map ----------------------------------------------
@@ -773,6 +701,12 @@ if (do_benchmark) {
   }
 }
 
+# Recheck relevant uploads before removing any prior UFH results.
+sae_validate_relevant_analysis_inputs(survey_all, rhs_dt_raw, years_keep,
+  steps = "UFH", do_benchmark = do_benchmark, population_path = population_path,
+  target_path = benchmark_target_path, benchmark_level = benchmark_level,
+  level_col = var_map$benchmark_level, indicator_type = indicator_type, fgt_alpha = fgt_alpha)
+
 # ---- Invalidate stale UFH output artifacts -------------------------------
 # If a previous UFH render failed mid-way, its output files from an even
 # EARLIER successful render will still be in output/UFH/ and will be picked
@@ -791,6 +725,7 @@ if (do_benchmark) {
   here::here("outputs", "tables", "statistical_significance_results.csv"),
   here::here("outputs", "tables", "statistical_significance_results_unbench.csv"),
   here::here("outputs", "tables", "ufh_shapiro_results.csv"),
+  here::here("outputs", "tables", "ufh_variance_audit.csv"),
   here::here("outputs", "tables", "ufh_selection_diagnostics.csv"),
   here::here("outputs", "tables", "ufh_model_diagnostics.csv")
 )
@@ -819,7 +754,7 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
                         backtransformation = "bc",
                         formula_override = NULL,
                         candidate_vars_override = NULL,
-                        var_choice = "sm_out",
+                        var_choice = "sm_all",
                         do_benchmark = FALSE,
                         population_path = "",
                         benchmark_target_path = "",
@@ -827,6 +762,7 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
                         lasso_enabled = FALSE,
                         lasso_lambda = "lambda.1se") {
 
+  var_choice <- sae_variance_choice(var_choice)
   # This argument controls arcsin selection. Log mean-welfare selection is
   # done on log(direct mean), and its final back-transform is set below from
   # ufh_bias_correction. Identity-scale selection has no back-transform.
@@ -878,6 +814,13 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
     mutate(vardir = SD^2,
            CV = .safe_cv(SD, direct_povrate)) |>
     merge(sampsize_dt, by = "domain")
+  # Preserve survey-design uncertainty on the reported indicator scale before
+  # any transformation, smoothing or model-only backfill changes vardir.
+  raw_direct_variance <- data.frame(
+    domain = as.character(direct_dt$domain),
+    direct_estimate_raw = direct_dt$direct_povrate,
+    direct_variance_raw = direct_dt$vardir,
+    stringsAsFactors = FALSE)
 
   log_mean_run <- identical(indicator_type, "mean_welfare") && isTRUE(log_transform)
   if (log_mean_run) {
@@ -1075,8 +1018,17 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
     domains = "Domain", transformation = fit_transformation,
     backtransformation = fit_backtransformation, eff_smpsize = "n_eff",
     B = ufh_bootstrap_nB, seed = model_seed, bootstrap_mse = !do_benchmark)
+  fh_model <- sae_ufh_restore_direct_variance(fh_model, raw_direct_variance)
+  variance_audit <- data.frame(
+    domain = as.character(fh_dt$Domain), year = yr,
+    variance_policy = if (identical(transformation, "arcsin")) "effective_sample_size" else var_choice,
+    working_scale = if (log_mean_run) "log" else if (identical(transformation, "arcsin")) "arcsin" else "identity",
+    working_variance = if (identical(transformation, "arcsin")) 1 / (4 * fh_dt$n_eff) else fh_dt$vardir,
+    stringsAsFactors = FALSE)
+  variance_audit <- variance_audit |>
+    left_join(raw_direct_variance, by = "domain")
+  fh_model$sae_direct_variance_audit <- variance_audit
   if (log_mean_run) {
-    fh_model$MSE$Direct <- model_data$SD_arith^2
     if (any(fh_model$ind$Out == 1L) && isTRUE(ufh_bias_correction)) {
       cat("EMDI Slud-Maiti log-FH returns estimates only for sampled domains; unsampled domains have missing estimates.\n")
     }
@@ -1200,6 +1152,7 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
     fh_bench   = fh_bench,
     fh_dt      = fh_dt,
     direct_dt  = direct_dt,
+    variance_audit = variance_audit,
     selection_diagnostics = selection_diag
   )
 }
@@ -1231,7 +1184,7 @@ plot_mse_comparison <- function(pov_fh_year, year_label) {
     theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6))
 }
 build_mse_decomposition <- function(res_year) {
-  if (!isTRUE(do_benchmark) ||
+  if (is.null(res_year$fh_bench) ||
       !"region" %in% names(res_year$fh_dt) ||
       !"Nd" %in% names(res_year$fh_dt)) {
     return(
@@ -1252,22 +1205,19 @@ build_mse_decomposition <- function(res_year) {
   }
 
   region_diag <- res_year$fh_dt %>%
-    select(domain, region, Nd, direct_povrate) %>%
+    select(domain, region) %>%
     distinct()
 
-  fh_ind <- res_year$fh_model$ind %>%
-    select(Domain, FH) %>%
-    rename(domain = Domain)
-
-  lambda_by_region <- region_diag %>%
-    left_join(fh_ind, by = "domain") %>%
-    group_by(region) %>%
-    summarize(
-      B_r = weighted.mean(direct_povrate, Nd, na.rm = TRUE),
-      FH_bar_r = weighted.mean(FH, Nd, na.rm = TRUE),
-      lambda_r = if_else(abs(FH_bar_r) < 1e-8, NA_real_, B_r / FH_bar_r),
-      .groups = "drop"
-    )
+  # These factors were recorded by the actual reported-scale benchmark.
+  # Recomputing from fh_dt would ignore uploaded targets and use logged
+  # Direct means in log-welfare fits, even though FH is already in currency.
+  lambda_by_region <- res_year$fh_bench$sae_benchmark_factors
+  if (is.null(lambda_by_region)) {
+    lambda_by_region <- data.frame(
+      region = unique(as.character(region_diag$region)),
+      B_r = NA_real_, FH_bar_r = NA_real_, lambda_r = NA_real_,
+      benchmark_operation = "factor_metadata_unavailable", stringsAsFactors = FALSE)
+  }
 
   res_year$pov_fh %>%
     select(domain, Direct_MSE, FH_MSE, FH_Bench_MSE) %>%
@@ -1947,6 +1897,11 @@ ufh_model_diagnostics <- bind_rows(
 write.csv(
   ufh_model_diagnostics,
   here::here("outputs", "tables", "ufh_model_diagnostics.csv"),
+  row.names = FALSE
+)
+write.csv(
+  bind_rows(res_y1$variance_audit, res_y2$variance_audit),
+  here::here("outputs", "tables", "ufh_variance_audit.csv"),
   row.names = FALSE
 )
 

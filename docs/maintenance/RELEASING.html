@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RELEASING</title><style>
+:root{--ink:#182d40;--muted:#526476;--teal:#006b70;--line:#d8e2e8;--wash:#f1f6f8}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:17px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{background:var(--ink);color:white;padding:42px max(24px,calc((100vw - 1080px)/2)) 34px}
+header p{max-width:820px;margin:9px 0}header .eyebrow{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#b7dadd}
+h1{font-size:38px;line-height:1.2;margin:10px 0}h2{font-size:27px;line-height:1.3;margin:42px 0 16px}h3{font-size:21px;margin:20px 0 8px}
+main{max-width:1128px;margin:auto;padding:0 24px 48px}nav{display:flex;flex-wrap:wrap;gap:10px 22px;padding:19px 0;border-bottom:1px solid var(--line)}
+a{color:var(--teal);text-underline-offset:3px}a:hover{text-decoration-thickness:2px}a:focus-visible{outline:3px solid #ecb900;outline-offset:3px}
+.intro{font-size:20px}.note{background:var(--wash);border-left:4px solid var(--teal);padding:16px 20px;margin:20px 0}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:8px 34px}.step{border-top:2px solid var(--line)}
+table{border-collapse:collapse;width:100%;margin:14px 0 24px}th,td{text-align:left;vertical-align:top;padding:13px 12px;border-bottom:1px solid var(--line)}th{background:var(--wash);font-size:15px}
+td:first-child{width:33%}code{font:14px/1.5 Consolas,monospace;overflow-wrap:anywhere;background:var(--wash);padding:2px 4px}p{margin:8px 0 14px}
+.meta{font-size:14px;color:var(--muted)}.format{display:inline-block;margin:4px 14px 0 0;font-size:15px}.language{font-weight:600;font-size:19px}.catalogue-item{padding:18px 0;border-bottom:1px solid var(--line)}
+.catalogue-item h3{margin:0;font-size:20px}.catalogue-item p{margin:6px 0}.badge{font-size:12px;padding:2px 7px;border:1px solid var(--line);border-radius:3px;margin-left:7px}
+details{margin:22px 0;padding:15px 20px;background:var(--wash)}summary{cursor:pointer;font-size:19px;font-weight:600}footer{border-top:1px solid var(--line);padding-top:22px;margin-top:34px;font-size:14px;color:var(--muted)}
+@media(max-width:700px){h1{font-size:30px}.steps{grid-template-columns:1fr}th,td{padding:10px 6px}td:first-child{width:38%}body{font-size:16px}}
+@media print{header{padding:10px 0;background:white;color:black}nav{display:none}main{padding:0}a{color:black}h2,h3{break-after:avoid}.catalogue-item,tr{break-inside:avoid}.steps{display:block}}
+</style></head><body><main><nav><a href="../INDEX.html">Documentation catalogue</a></nav><h1 id="making-a-release">Making a release</h1>
+<p>One version, one commit, one folder, one zip. Everything below exists to make those four things line up automatically, so that any archive anyone has ever received can be traced to the exact commit that produced it and rebuilt from it.</p>
+<h2 id="the-five-rules">The five rules</h2>
+<ol type="1">
+<li><strong>The version lives in one place.</strong> <code>WIZARD_VERSION</code> is the only file you edit. <code>tools/bump_version.py</code> copies it everywhere else it is embedded — the app's title bar, the launchers, the tests, the release inventory, the notes, the text inside the slide deck and the guidelines note, and the <em>names</em> of the two instruction files — and regenerates the download-instructions PDF.</li>
+<li><strong>A release is a commit.</strong> <code>Release.ps1</code> refuses to build if anything is uncommitted, and writes the commit hash into <code>RELEASE_INFO.txt</code>. A zip built from uncommitted files matches nothing on GitHub and can never be rebuilt.</li>
+<li><strong>One version is built once.</strong> The release folder is <code>dist\&lt;RELEASE_NAME&gt;\</code>; if it already exists, the version must change. Two archives with the same name and different contents cannot be told apart by the people who receive them.</li>
+<li><strong>Every version has a CHANGELOG entry.</strong> <code>Release.ps1</code> and the test suite both check for a <code>## &lt;version&gt;</code> heading in <code>docs/maintenance/CHANGELOG.md</code>.</li>
+<li><strong>Tag the commit.</strong> <code>v&lt;version&gt;</code> on the commit named in <code>RELEASE_INFO.txt</code>; publish the GitHub release from that tag with the zip attached.</li>
+</ol>
+<h2 id="the-steps">The steps</h2>
+<p>Edit files at the repository root. Never edit anything under <code>dist\</code>.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Replace this example with your local repository folder.</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">Set-Location</span> <span class="op">-</span>LiteralPath <span class="st">&#39;C:\path\to\eu-sae-personal&#39;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. bump the version everywhere (use --dry-run first to see what it will touch)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>python tools\bump_version<span class="op">.</span><span class="fu">py</span> <span class="op">&lt;</span>new-version<span class="op">&gt;</span> <span class="op">--</span>release-name <span class="op">&lt;</span>new-release-name<span class="op">&gt;</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. write the CHANGELOG entry under  ## &lt;new-version&gt; - &lt;date&gt;</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">#    (docs\maintenance\CHANGELOG.md - describe what changed and why)</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. commit everything in GitHub Desktop, then push</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. build</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>powershell <span class="op">-</span>ExecutionPolicy Bypass <span class="op">-</span>File <span class="op">.</span>\Release<span class="op">.</span><span class="fu">ps1</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="co"># 5. tag and push the tag (Release.ps1 prints these with the right values)</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>git tag <span class="op">-</span>a v<span class="op">&lt;</span>version<span class="op">&gt;</span> <span class="op">-</span>m <span class="st">&quot;EU SAE &lt;version&gt;&quot;</span> <span class="op">&lt;</span>commit<span class="op">&gt;</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>git push origin v<span class="op">&lt;</span>version<span class="op">&gt;</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="co"># 6. on GitHub (https://github.com/Noboyoshida227/eu-sae-application/releases):</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="co">#    Draft a new release -&gt; choose the tag, title &quot;EU SAE &lt;version&gt; (&lt;RELEASE_NAME&gt;)&quot;,</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="co">#    paste the CHANGELOG entry, attach the .zip, quote the SHA-256,</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="co">#    tick &quot;pre-release&quot; while the package is a release candidate.</span></span></code></pre></div>
+<p>Send recipients the link to the release page; it carries the zip and its SHA-256.</p>
+<h2 id="what-the-build-enforces">What the build enforces</h2>
+<p><code>Release.ps1</code> stops, with a plain-language message, if:</p>
+<ul>
+<li>the working tree has uncommitted changes (use <code>-AllowDirty</code> only for a private test build — it is labelled <em>UNCOMMITTED</em> and must not be sent out);</li>
+<li><code>dist\&lt;RELEASE_NAME&gt;\</code> already exists;</li>
+<li><code>docs/maintenance/CHANGELOG.md</code> has no entry for the version;</li>
+<li>any file in <code>scripts/release_inventory.csv</code> is missing — in particular <code>Data/Spain/survey.rds</code> and <code>auxiliary.rds</code>, which are kept out of the repository on purpose (GPL-2) and must be present locally;</li>
+<li>the built archive lacks a package folder, a zip, or the executable bit on the macOS/Linux launchers.</li>
+</ul>
+<h2 id="things-that-are-easy-to-get-wrong">Things that are easy to get wrong</h2>
+<p><strong>Adding a new file.</strong> Only files listed in <code>scripts/release_inventory.csv</code> go into a release. A new file that is not listed is silently left out. Add a row.</p>
+<p><strong>Editing a document in more than one place.</strong> Launch instructions appear in <code>Start_Here/README.md</code>, <code>README.md</code>, <code>docs/instructions/English/README_WIZARD.md</code>, <code>docs/instructions/English/SUPPORTED_PLATFORMS.md</code>, <code>docs/maintenance/WIZARD_RELEASE_NOTICE.txt</code>, the download-instructions PDF (generated from <code>tools/build_instruction_pdf.py</code>), the user-guide slides, and the guidelines note. <code>Start_Here/README.md</code> is the authoritative one; keep the others short and pointing to it.</p>
+<p><strong>The download-instructions PDF.</strong> Do not edit the PDF. Edit the text in <code>tools/build_instruction_pdf.py</code> and run it (<code>bump_version.py</code> runs it for you).</p>
+<p><strong>Building from a fresh clone.</strong> A clone lacks <code>Data/Spain/survey.rds</code> and <code>auxiliary.rds</code> by design. Copy them in from a previous release archive before building; <code>Release.ps1</code> will tell you if they are missing.</p>
+<p><strong>Country data.</strong> Real survey or auxiliary data (for example <code>Data/Greece/</code>) never go into the repository or a release: <code>.gitignore</code> excludes them and the release inventory does not list them. Keep them in an ignored folder or outside the repository folder.</p>
+<p><strong>Scratch folders.</strong> <code>tmp\</code> and <code>dist\</code> are ignored by git and are yours to delete. Nothing in them is needed to rebuild a release.</p>
+<h2 id="short-release-names">Short release names</h2>
+<p><code>RELEASE_NAME</code> controls the local release folder, application folder, and ZIP basename. The current name is in <code>RELEASE_NAME</code>; the full version remains in <code>WIZARD_VERSION</code>. <code>bump_version.py</code> also replaces the old release name in the documents that mention it. For the next build use <code>python tools/bump_version.py &lt;new-version&gt; --release-name &lt;new-short-name&gt;</code>. The builder refuses to overwrite an existing destination. Existing release archives are unchanged.</p>
+</main></body></html>

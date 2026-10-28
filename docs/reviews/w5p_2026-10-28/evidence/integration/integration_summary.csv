@@ -1,0 +1,4 @@
+"scenario","domains","requested_model","selected_model","inference_status","ufh_rows","mfh_rows","comparison_rows","bootstrap_successes","bootstrap_failures","bootstrap_covariance_boundaries"
+"poverty",40,"MFH2","MFH2","regular",80,80,80,50,0,6
+"log",40,"MFH2","MFH2","regular",80,80,80,50,0,0
+"baseline_poverty",40,"MFH2","MFH2","regular",80,80,80,50,0,6

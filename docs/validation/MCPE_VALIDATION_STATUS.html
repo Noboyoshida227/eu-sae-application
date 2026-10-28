@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MCPE_VALIDATION_STATUS</title><style>
+:root{--ink:#182d40;--muted:#526476;--teal:#006b70;--line:#d8e2e8;--wash:#f1f6f8}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:17px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{background:var(--ink);color:white;padding:42px max(24px,calc((100vw - 1080px)/2)) 34px}
+header p{max-width:820px;margin:9px 0}header .eyebrow{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#b7dadd}
+h1{font-size:38px;line-height:1.2;margin:10px 0}h2{font-size:27px;line-height:1.3;margin:42px 0 16px}h3{font-size:21px;margin:20px 0 8px}
+main{max-width:1128px;margin:auto;padding:0 24px 48px}nav{display:flex;flex-wrap:wrap;gap:10px 22px;padding:19px 0;border-bottom:1px solid var(--line)}
+a{color:var(--teal);text-underline-offset:3px}a:hover{text-decoration-thickness:2px}a:focus-visible{outline:3px solid #ecb900;outline-offset:3px}
+.intro{font-size:20px}.note{background:var(--wash);border-left:4px solid var(--teal);padding:16px 20px;margin:20px 0}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:8px 34px}.step{border-top:2px solid var(--line)}
+table{border-collapse:collapse;width:100%;margin:14px 0 24px}th,td{text-align:left;vertical-align:top;padding:13px 12px;border-bottom:1px solid var(--line)}th{background:var(--wash);font-size:15px}
+td:first-child{width:33%}code{font:14px/1.5 Consolas,monospace;overflow-wrap:anywhere;background:var(--wash);padding:2px 4px}p{margin:8px 0 14px}
+.meta{font-size:14px;color:var(--muted)}.format{display:inline-block;margin:4px 14px 0 0;font-size:15px}.language{font-weight:600;font-size:19px}.catalogue-item{padding:18px 0;border-bottom:1px solid var(--line)}
+.catalogue-item h3{margin:0;font-size:20px}.catalogue-item p{margin:6px 0}.badge{font-size:12px;padding:2px 7px;border:1px solid var(--line);border-radius:3px;margin-left:7px}
+details{margin:22px 0;padding:15px 20px;background:var(--wash)}summary{cursor:pointer;font-size:19px;font-weight:600}footer{border-top:1px solid var(--line);padding-top:22px;margin-top:34px;font-size:14px;color:var(--muted)}
+@media(max-width:700px){h1{font-size:30px}.steps{grid-template-columns:1fr}th,td{padding:10px 6px}td:first-child{width:38%}body{font-size:16px}}
+@media print{header{padding:10px 0;background:white;color:black}nav{display:none}main{padding:0}a{color:black}h2,h3{break-after:avoid}.catalogue-item,tr{break-inside:avoid}.steps{display:block}}
+</style></head><body><main><nav><a href="../INDEX.html">Documentation catalogue</a></nav><h1 id="mcpe-bootstrap-validation-status">MCPE bootstrap validation status</h1>
+<p>Date: 2026-08-24, updated 2026-10-10 Build: 5.2.0-rc.6-wizard.5.14 / EU_SAE_520_w5n</p>
+<h2 id="purpose-and-provenance">Purpose and provenance</h2>
+<p>The package estimates the mean crossed-product error (MCPE) needed for uncertainty about changes over time by parametric bootstrap, adapted for MFH1/MFH2/MFH3 dispatch, reproducible seeds, refit handling, diagnostics, and reporting. Responsibility for the adapted implementation and its validation remains with the package team.</p>
+<h2 id="checks-completed-in-this-revision">Checks completed in this revision</h2>
+<ul>
+<li>Corrected the MFH3 bootstrap data-generating process so the first simulated random effect contains the initial state: <code>u0 ~ N(0, 1)</code> and <code>u1 = rho * u0 + a1</code>.</li>
+<li>Added a large-sample moment test comparing the empirical MFH3 random-effect covariance with its theoretical covariance. The test uses 100,000 simulations and a 0.02 absolute tolerance.</li>
+<li>Added deterministic tests for the MFH3-selected Molina-Romero procedure and explicit MFH3 non-convergence fallback; MFH2 remains the application default.</li>
+<li>Added run-level Monte Carlo diagnostics: requested and successful replications, attempts, refit failures, covariance-matrix repairs, seed, and Monte Carlo standard errors for MSE and MCPE.</li>
+<li>Confirmed that, in the current two-year workflow, raw, Bonferroni-adjusted, and BH-adjusted MFH reference-variance-test p-values are identical because there is only one variance contrast.</li>
+<li>All targeted package tests passed. The runtime compatibility check for <code>msae::eblupMFH3()</code> and the execution test for deterministic LASSO were skipped in the test environment because <code>msae</code> and <code>glmnet</code> were not installed.</li>
+</ul>
+<h2 id="update-2026-09-01">Update 2026-09-01</h2>
+<ul>
+<li>The first complete run of <code>tests/run_tests.R</code> in continuous integration (previously it had never run to completion there) found that <code>.safe_sym_inverse()</code> in <code>scripts/eblupMFH2_robust.R</code> could report an inverse as <em>available</em> for a matrix containing non-finite values on R/LAPACK builds where <code>chol()</code> does not signal an error for such input. The resulting all-NaN inverse would have propagated silently into g3 and MSE. Non-finite input is now rejected before any decomposition and reported unavailable, making the behaviour identical on every platform. No estimates in earlier builds are known to have been affected; the condition arises only when a Fisher-information or covariance matrix already contains NaN/Inf.</li>
+</ul>
+<h2 id="qer-implementation-and-validation-update--2026-10-10">QER implementation and validation update — 2026-10-10</h2>
+<p>The source changes and departures from the supplied references are documented in <a href="../guidance/METHODOLOGY_ALIGNMENT.html">Methodology alignment</a>. MFH2 remains the default. The implementation now uses one joint bootstrap for annual MSE and MCPE, repeats inverse transformations and final benchmarking inside each replicate, and rejects invalid numerical endpoints and incoherent prediction-error moments. These repairs can change estimates and significance.</p>
+<p>Completed on R 4.5.2, emdi 2.2.3 and msae 0.1.5:</p>
+<ul>
+<li>The aggregate <code>tests/run_tests.R</code> passes, including 19 UFH methodology checks, 23 MFH bootstrap checks and 12 convergence checks. Installed emdi predictions and analytical log MSE are checked directly against the wrapper.</li>
+<li>Independent block REML calculations agree with dense matrix algebra; stationary minima, stale approvals and inferior refits are rejected. Zero variance and both near-unit correlation boundaries are exercised.</li>
+<li>With 30,000 independent known-parameter draws per model, Gaussian change interval coverage was 95.037% (MFH1), 94.927% (MFH2), and 94.967% (MFH3). Exact transformed-normal annual interval coverage ranged from 95.003% to 95.230%. Original-scale MSE/MCPE agree with independent lognormal identities within Monte Carlo tolerance. These are <strong>oracle checks</strong>, not coverage results for estimated models or the production delta-method change interval.</li>
+<li>All three installed MFH estimators complete intercept-only bootstrap checks on identity and log scales (20 accepted draws each). MFH3 rejected four of 24 attempts in this fixture; those rejections are visible diagnostics. Survey-derived and fixed-target log benchmarking checks also pass.</li>
+<li>Isolated full Spanish pipeline runs (UFH, MFH2, Comparison) pass for poverty and log mean welfare with national benchmarking: 52 domains, 104 annual rows, 50 accepted MFH draws and no rejected draws per scenario. Exported annual estimates/MSE match the joint bootstrap. These isolated runs left repository output hashes unchanged when completed. They check execution and consistency, not coverage.</li>
+</ul>
+<p>Reproduce the targeted tests with <code>Rscript tests/run_tests.R</code>; the installed packages are required. CI now installs emdi, msae, survey and dplyr so these statistical regressions cannot silently skip. For local integration use <code>Rscript tests/test_pipeline_methodology.R</code>; the Spanish example data and full application dependencies must be installed. For fitted-model simulation use <code>Rscript tests/test_methodology_simulation.R --coverage --outer=100 --bootstrap=100</code>. The scripts accept <code>--library=/path/to/R/library</code> where documented.</p>
+<h2 id="initial-fitted-model-pilot--2026-10-10">Initial fitted-model pilot — 2026-10-10</h2>
+<p>The final frozen implementation also completed 20 independent outer samples, 30 accepted bootstrap draws per outer sample, and 60 domains, for each of six model/scale combinations. All original fits and bootstrap runs completed.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th style="text-align: right;">Gaussian absolute-change coverage</th>
+<th style="text-align: right;">Currency absolute-change coverage after log fit</th>
+<th style="text-align: right;">Percentage-change coverage after log fit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MFH1</td>
+<td style="text-align: right;">94.75%</td>
+<td style="text-align: right;">93.50%</td>
+<td style="text-align: right;">97.08%</td>
+</tr>
+<tr>
+<td>MFH2</td>
+<td style="text-align: right;">92.00%</td>
+<td style="text-align: right;">91.08%</td>
+<td style="text-align: right;">93.50%</td>
+</tr>
+<tr>
+<td>MFH3</td>
+<td style="text-align: right;">93.25%</td>
+<td style="text-align: right;">92.67%</td>
+<td style="text-align: right;">95.92%</td>
+</tr>
+</tbody>
+</table>
+<p>All intervals target 95%. Percentage-change coverage Monte Carlo standard errors, computed across independent outer samples, were 0.43, 0.84 and 0.56 percentage points respectively. MFH1/MFH2 rejected no bootstrap draws; MFH3 rejected 79 of 679 attempts (11.63%) per scale. Failed draws are not counted as successes or silently reused.</p>
+<p>Estimated/empirical absolute-change MSE ratios were 0.992/1.125 for MFH1, 0.885/0.885 for MFH2, and 0.950/1.198 for MFH3 (identity/log scales). The pilot therefore exposes <strong>undercoverage of normal absolute-change intervals in this scenario</strong>. This is not a successful coverage-validation result. Thirty bootstrap draws are below the production recommendation; 20 outer samples, sizeable log-scale variation and fixed known sampling covariances also limit interpretation. These results do not by themselves identify an additional coding defect or justify an arbitrary MSE inflation. The larger MFH2 study below supersedes this pilot for its tested scenarios. The MFH1/MFH3 pilot remains too small for strong coverage claims.</p>
+<h2 id="larger-mfh2-study-completed--2026-10-10">Larger MFH2 study completed — 2026-10-10</h2>
+<p>The study uses 60 domains, two time periods, an intercept and one fixed covariate per period, normal random effects/sampling errors, and known sampling covariance. It re-estimates both regression coefficients and covariance parameters in every outer and bootstrap sample. Log predictions use the implemented conditional-lognormal correction. Annual and change intervals use the same uncentered bootstrap error moments as the application; percentage intervals use its first-order log-ratio variance. No selection, GVF fitting or benchmarking is included in this coverage experiment.</p>
+<p>Four balanced scenarios each use <strong>500 independent outer samples and 1,000 bootstrap draws</strong>, also recording the first 500 draws for a paired count comparison. The heterogeneous log scenario uses <strong>100 outer samples and 500 draws</strong>. Its sampling variances vary 25-fold in year one and 40.6-fold across both years. These are designed model experiments, not replications of a particular country's survey. Seeds, model parameters, software version, source hashes, outer-sample statistics and summaries are saved under <a href="QER/evidence/">QER/evidence</a>.</p>
+<p>The table reports coverage percentages and Monte Carlo standard errors (MCSE) in percentage points. Standard errors use independent <strong>outer samples</strong>, accounting for shared fitted parameters across domains. Target coverage is 95%; the estimates below do not establish uniform coverage.</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th style="text-align: right;">Outer / bootstrap</th>
+<th style="text-align: right;">Annual coverage ± MCSE</th>
+<th style="text-align: right;">Absolute-change coverage ± MCSE</th>
+<th style="text-align: right;">Percentage-change coverage ± MCSE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Identity</td>
+<td style="text-align: right;">500 / 1,000</td>
+<td style="text-align: right;">95.01 ± 0.10</td>
+<td style="text-align: right;">94.64 ± 0.17</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td>Moderate log variation</td>
+<td style="text-align: right;">500 / 1,000</td>
+<td style="text-align: right;">94.68 ± 0.10</td>
+<td style="text-align: right;">94.44 ± 0.15</td>
+<td style="text-align: right;">94.61 ± 0.15</td>
+</tr>
+<tr>
+<td>Large log variation</td>
+<td style="text-align: right;">500 / 1,000</td>
+<td style="text-align: right;">94.57 ± 0.09</td>
+<td style="text-align: right;">94.32 ± 0.12</td>
+<td style="text-align: right;">96.60 ± 0.11</td>
+</tr>
+<tr>
+<td>Low signal, frequent covariance boundaries</td>
+<td style="text-align: right;">500 / 1,000</td>
+<td style="text-align: right;">92.59 ± 0.35</td>
+<td style="text-align: right;"><strong>87.40 ± 0.66</strong></td>
+<td style="text-align: right;"><strong>87.26 ± 0.66</strong></td>
+</tr>
+<tr>
+<td>Heterogeneous sampling variances, moderate log variation</td>
+<td style="text-align: right;">100 / 500</td>
+<td style="text-align: right;">94.66 ± 0.23</td>
+<td style="text-align: right;">94.93 ± 0.32</td>
+<td style="text-align: right;">95.13 ± 0.30</td>
+</tr>
+</tbody>
+</table>
+<p>Estimated/empirical absolute-change MSE ratios (and MCSEs) are respectively 0.997 (0.010), 0.980 (0.009), 1.035 (0.015), 0.956 (0.026), and 1.029 (0.025). Average point-estimate biases are within two MCSEs of zero in all five designs. This average-bias check is not an area-specific bias guarantee. Increasing the balanced runs from 500 to 1,000 draws changes average absolute-change coverage by at most 0.14 percentage points and mean estimated change MSE by at most 0.044%. More draws improve Monte Carlo precision; they do <strong>not</strong> remove the boundary-inference problem.</p>
+<h3 id="independent-fitting-checks-and-computation">Independent fitting checks and computation</h3>
+<p>The large study uses simulation-only, independently derived two-period MFH2 fitters. Balanced designs diagonalize into sum/difference regressions, with exact REML variance solutions and one-dimensional optimization at the same correlation bounds as production. Heterogeneous designs use the full block REML likelihood and analytic gradient, with constrained multiple-start optimization. Neither fitter enters the application or changes its estimator.</p>
+<ul>
+<li>All 42 production-equivalence fixtures pass the production endpoint gate, including zero variance and both correlation limits. Restricted likelihood differences are below 2e-8. Balanced and block predictions differ by less than 7e-9. Production-point differences below 5e-5 are consistent with the native msae rounding of returned predictions.</li>
+<li>Three same-seed production/bootstrap comparisons, 30 draws each, complete without rejected draws. Maximum MSE differences are below 0.1%; MCPE differences are below 0.06% of mean annual MSE. These checks quantify the small numerical/rounding difference rather than assert bitwise identity.</li>
+<li>An additional 300 heterogeneous-study fits—all 100 original fits and the first/last bootstrap fit from each—pass the production REML endpoint validator. All requested outer samples and bootstrap samples complete; none is silently replaced. File completeness and source hashes also pass.</li>
+</ul>
+<p>See <a href="QER/evidence/mfh2_fitter_equivalence.csv">fitter equivalence</a>, <a href="QER/evidence/mfh2_bootstrap_equivalence.csv">bootstrap equivalence</a>, <a href="QER/evidence/heterogeneous_endpoint_audit.csv">endpoint audit</a>, <a href="QER/evidence/balanced_summary.csv">balanced results</a>, <a href="QER/evidence/heterogeneous_summary.csv">heterogeneous results</a>, and <a href="QER/evidence/bootstrap_count_sensitivity.csv">bootstrap-count sensitivity</a>.</p>
+<h3 id="why-the-remaining-coverage-differences-occur">Why the remaining coverage differences occur</h3>
+<p>An independent oracle calculation uses <strong>300,000 draws per scenario</strong>, known parameters, precision-addition posterior formulas and exact analytic unconditional MSE/MCPE. With large log variation, ordinary normal absolute-change coverage is 94.319% (MCSE 0.043 points) and delta-method percentage-change coverage is 96.803% (0.032 points). The fitted-model results are similar even though their MSE estimates are slightly above empirical MSE. The interval approximations therefore account for this discrepancy; arbitrary MSE inflation would not repair both directions. Exact Gaussian model-scale change intervals achieve approximately 95% in the same oracle. See <a href="QER/evidence/oracle_inference.csv">oracle evidence</a>.</p>
+<p>In the low-signal design, 22.2% of original fits reach a covariance boundary; 28.9% of bootstrap fits do so. Among the <strong>110 original correlation-limit fits</strong>, absolute-change coverage is <strong>65.21% (MCSE 0.89 points)</strong>. Among the 389 interior fits it is 93.74% (0.43 points). There is only one original zero-variance fit, insufficient to estimate its separate coverage. These post-fit conditional rates describe this experiment and are not universal boundary coverage rates. They nevertheless show why a satisfactory numerical endpoint is not sufficient evidence for nominal interval coverage. The known-parameter oracle for this design has 95.04% absolute-change coverage. At the positive correlation limit, the fitted model assigns almost no domain-specific random-effect variance to change. The plug-in bootstrap generates data from that estimated covariance; refitting those draws does not guarantee adequate allowance for a small but nonzero true change variance. This explains the poor conditional coverage without treating a legitimate constrained likelihood maximum as a numerical failure. See <a href="QER/evidence/boundary_stratification.csv">boundary stratification</a>.</p>
+<p>No additional arithmetic defect was identified by these experiments. They identify limitations of plug-in inference with estimated covariance near a boundary, and of normal/delta approximations for nonlinear outcomes. Such limitations are recognized in <a href="https://math.umd.edu/~plahiri/pdfs/ChatterjeeLahiriLi2008.pdf">Chatterjee, Lahiri and Li (2008)</a>. An exploratory studentized model-scale bootstrap comparison is recorded in the CSVs, following the construction of <a href="https://arxiv.org/html/2006.14820v1">Saegusa, Sugasawa and Lahiri (2020), section 2.3</a>. It is <strong>not a production repair</strong>: the reference requires positive-definite estimated random-effect covariance, and the diagnostic is unavailable for most low-signal outer samples because some refits have zero variance. Results conditional on its availability cannot validate the omitted cases. It also does not solve general currency differences or final benchmarking.</p>
+<h3 id="reproduction">Reproduction</h3>
+<p>From the repository root, with application packages installed, run:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>Rscript tests<span class="sc">/</span>run_qer_coverage.R <span class="sc">--</span>mode<span class="ot">=</span>equivalence <span class="sc">--</span>library<span class="ot">=</span><span class="er">/</span>path<span class="sc">/</span>to<span class="sc">/</span>R<span class="sc">/</span>library</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>Rscript tests<span class="sc">/</span>run_qer_coverage.R <span class="sc">--</span>mode<span class="ot">=</span>balanced <span class="sc">--</span>outer<span class="ot">=</span><span class="dv">500</span> <span class="sc">--</span>bootstrap<span class="ot">=</span><span class="dv">1000</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>Rscript tests<span class="sc">/</span>run_qer_coverage.R <span class="sc">--</span>mode<span class="ot">=</span>heterogeneous <span class="sc">--</span>outer<span class="ot">=</span><span class="dv">100</span> <span class="sc">--</span>bootstrap<span class="ot">=</span><span class="dv">500</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>Rscript tests<span class="sc">/</span>run_qer_oracle_inference.R</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>Rscript tests<span class="sc">/</span>summarize_qer_coverage.R</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>Rscript tests<span class="sc">/</span>test_qer_evidence.R <span class="sc">--</span>library<span class="ot">=</span><span class="er">/</span>path<span class="sc">/</span>to<span class="sc">/</span>R<span class="sc">/</span>library</span></code></pre></div>
+<p>These evidence scripts write only the documented <code>docs/validation/QER/evidence</code> files (or the explicit <code>--output</code> directory accepted by the main runner). They do not run the production pipeline or overwrite analysis outputs. No external packages were installed for this study.</p>
+<h2 id="validation-limits">Validation limits</h2>
+<p>A fitted-model simulation is separate from oracle checks. Neither software regression tests nor exact-parameter identities certify nominal coverage of plug-in bootstrap/normal-approximation intervals. The completed MFH2 study tests fixed known sampling covariances and five designs. Coverage with actual complex survey designs, estimated sampling covariances, variable selection, GVF fitting, final benchmarking and simultaneous/multiple-testing procedures remains unestablished. Larger MFH1/MFH3 fitted-model studies are also pending. Polish production inputs were not rerun in this repair session. Runtime compatibility has been exercised on the versions above; other dependency versions and operating systems need their normal release checks.</p>
+<h2 id="operational-recommendation">Operational recommendation</h2>
+<p>This implementation is suitable for QER methodological review with these limitations disclosed. Retain MFH2 as default and MFH3 as an optional starting model. Use at least 500 bootstrap replications, check Monte Carlo stability, and retain MCPE and covariance-boundary diagnostics. Boundary estimates can be numerically valid while their normal/delta intervals substantially understate uncertainty about change. Flag such inference as provisional; do not present unqualified significance conclusions. Compare Direct results and alternative admissible models before external conclusions, and report sensitivity when results are near a decision threshold. Increasing draw counts is not a remedy for this limitation. Do not describe the process as uniformly validated or certified, and do not inflate MSEs to fit this study.</p>
+</main></body></html>

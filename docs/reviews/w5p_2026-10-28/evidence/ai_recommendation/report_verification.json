@@ -1,0 +1,47 @@
+{
+  "cases": [
+    {
+      "mode": "on",
+      "docx_content_check": "PASS",
+      "unchanged_numeric_artifact_count": 186,
+      "html_sha256": "5346f7661b2668c0d5c764cd35c662474cecda5e6bc921d03ba1539e0d4f742c",
+      "docx_sha256": "2d702705c0983085d839c6ea3b08e71305348d4c70e160bd4501cd32b2d6b810"
+    },
+    {
+      "mode": "off",
+      "docx_content_check": "PASS",
+      "unchanged_numeric_artifact_count": 186,
+      "html_sha256": "db29abe5ddbd83d74af62a3cae8f79f5cf0a084bf51f0860fd52a9ea07a8793e",
+      "docx_sha256": "1237ccca5cf0430430d3650e994142260b82c0de5718a0d92e80fd05ebe4293a"
+    },
+    {
+      "mode": "failure",
+      "docx_content_check": "PASS",
+      "unchanged_numeric_artifact_count": 186,
+      "html_sha256": "21f04a00fda5ce569bb279d152d56d613890e8e1b1aeaac80627b041b2ebb102",
+      "docx_sha256": "de6cba23929eba92b0ef64d5afed42b3e9b0166f47260880a0e399a19167a1d1"
+    }
+  ],
+  "pdf_sha256": "3b4d2da9f007ffd07d176d1519efa6bc684984aac8668ae48b5f9448140d28a2",
+  "pdf_pages": 53,
+  "recommendation_pages": [
+    51
+  ],
+  "layout_review": "PASS: all 53 pages inspected in four contact sheets; recommendation page 51 inspected at full-page resolution; title/status separator readable, no clipping or overlap.",
+  "no_live_provider": true,
+  "source_checks": [
+    {
+      "mode": "on",
+      "production_source_files_match": 51
+    },
+    {
+      "mode": "off",
+      "production_source_files_match": 51
+    },
+    {
+      "mode": "failure",
+      "production_source_files_match": 51
+    }
+  ],
+  "preliminary_harness_correction": "Initial failure assertion did not normalize Pandoc line wrapping; assertion corrected and all three scenarios rerun successfully. No provider-failure implementation defect was found."
+}

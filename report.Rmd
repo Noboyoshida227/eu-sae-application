@@ -212,8 +212,8 @@ if (!is.null(sig_summary)) {
                                        summary_labels[names(sig_summary_display)], names(sig_summary_display))
   kable(sig_summary_display, digits = 0,
         caption = if (mfh_boundary_sensitive)
-          "Number of domains with nominally significant changes (MFH significance is provisional)" else
-          "Number of domains with statistically significant changes")
+          "Exploratory counts of pointwise-significant domains; adjusted counts separate (MFH inference is provisional)" else
+          "Exploratory counts of pointwise-significant domains; BH and Bonferroni counts separate")
 }
 ```
 
@@ -887,7 +887,8 @@ undercoverage or invalid boundary-sensitive p-values. The significance
 figures below draw a change in red when its 95% confidence interval excludes
 zero; the table gives the pointwise, BH and Bonferroni results for every domain,
 and the summary at the top of the report counts the significant domains under
-each rule.
+each rule. Pointwise counts summarize exploratory findings across domains;
+familywide conclusions must use a prespecified family and error-control rule.
 `r if (mfh_rule_applied) "They are separate from the MFH3 reference-variance test adjustment, which applies only to pairwise time-variance contrasts when MFH3 is fitted." else ""`
 
 `r if (change_is_percent) paste("For mean welfare, each change is the percentage change of the estimated mean: 100 x (mean in the later year / mean in the earlier year - 1). Its 95% interval and p-value are computed on the log of that ratio, from the MSEs of the two estimates and their covariance (from the MCPE for MFH; UFH treats the two years as independent), so the interval is not symmetric around the estimate. The change in currency units is kept in the Excel tables (columns ending in _eur).", price_sentence) else ""`
@@ -1193,6 +1194,14 @@ if (length(change_files) > 0) {
 ```{r ai-change-maps, results='asis'}
 cat(comparison_ai_section_html(ai_state, "change_maps",
                                include_ai = isTRUE(params$include_ai)))
+```
+
+```{r ai-model-recommendation, results='asis'}
+if (isTRUE(params$include_ai)) {
+  cat("\n# AI Recommendation: UFH or MFH\n\n")
+  cat("This is advisory interpretation for analyst review, not automatic model selection or official statistical approval. The numerical results remain unchanged.\n\n")
+  cat(comparison_ai_section_html(ai_state, "recommendation", include_ai = TRUE))
+}
 ```
 
 # Session Information

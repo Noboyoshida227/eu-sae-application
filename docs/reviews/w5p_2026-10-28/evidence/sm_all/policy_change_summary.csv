@@ -1,0 +1,9 @@
+"scenario","field","domain_years","changed_above_1e_10","max_absolute_change"
+"poverty","UFH",80,80,0.0618678290634685
+"poverty","UFH_MSE",80,80,0.000420495288349413
+"poverty","MFH",80,80,0.0641919132565708
+"poverty","MFH_MSE",80,80,0.00044685995271941
+"log","UFH",80,80,1450.03051797024
+"log","UFH_MSE",80,80,1445018.54099832
+"log","MFH",80,80,1591.52016781228
+"log","MFH_MSE",80,80,1192443.55889937

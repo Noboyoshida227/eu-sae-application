@@ -1,0 +1,484 @@
+{
+  "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx": [
+    {
+      "old": "5.2.0-rc.6-wizard.5.15",
+      "new": "5.2.0-rc.6-wizard.5.16",
+      "locator": "Current full candidate version (historical short release labels retained)",
+      "count": 4
+    },
+    {
+      "old": "EU_SAE_520_w5o/",
+      "new": "EU_SAE_520_w5p/",
+      "locator": "Section 11.1, current extracted package folder",
+      "count": 1
+    },
+    {
+      "old": "Benchmarking can be viewed as a constrained adjustment of the model estimates so that their population-weighted aggregate reproduces the trusted higher-level total. For poverty rates and mean welfare, the Workbench applies a region-level (or national) ratio adjustment: a common multiplicative factor within each benchmark area, used to keep benchmarked rates non-negative and preserve the proportional ordering of areas. This is an implementation choice, not the only possibility: ratio/raking adjustments, additive or difference benchmarking adjustments, and more general constrained benchmarking schemes are available in the small-area estimation benchmarking literature (Datta et al., 2011; Bell, Datta, and Ghosh, 2013).",
+      "new": "Benchmarking applies a common ratio factor within each national or grouped benchmark area so that the population-weighted aggregate matches the target. A positive factor preserves nonnegativity and ordering only for predictions that are already nonnegative. It does not repair negative predictions or ensure an upper bound of one; check both bounds for poverty estimates. Ratio benchmarking is an implementation choice among alternatives including additive, difference and more general constrained adjustments (Datta et al., 2011; Bell, Datta, and Ghosh, 2013).",
+      "locator": "Section 7.12, ratio interpretation",
+      "count": 1
+    },
+    {
+      "old": "Within the benchmarking step, if a target or the model aggregate is missing, or the aggregate is close to zero, the factor is set to 1, so the target is not guaranteed to be met. And the ratio does not keep poverty rates at or below 1.",
+      "new": "Nonfinite inputs are rejected. A zero model aggregate with a nonzero target cannot satisfy the constraint and is an error. For a zero target and zero model aggregate within numerical tolerance, UFH sets the group predictions to zero and records an undefined ratio; MFH retains them with factor 1. These are explicit degenerate-case conventions. Inspect any recorded unavailable-benchmark status rather than assuming that a unit adjustment was applied. The ratio does not keep poverty rates at or below 1.",
+      "locator": "Section 7.12, invalid benchmark inputs",
+      "count": 1
+    },
+    {
+      "old": "This cross-year dependence has a concrete source. Households in the same primary sampling unit (PSU) share a persistent cluster effect, so whenever a survey reuses the same PSUs across rounds – through rotating panels, retained clusters, or a panel component – the two years’ direct estimates for an area become positively correlated; the covariance is zero when the two waves are drawn independently. A practical consequence is that the covariance should be estimated from the full survey design in both rounds, not only from the re-interviewed (panel) households, because every household in a shared PSU carries the cluster effect; restricting the calculation to the linked households discards most of the covariance and understates it. With the PSUs declared as the first-stage units, an ordinary survey-design covariance command (for example, R’s survey package) estimates this quantity directly and consistently (Yoshida, 2025).",
+      "new": "Under a persistent positive cluster-effect model, reused PSUs can induce positive cross-year covariance even when different households are sampled. Its actual magnitude and sign depend on the joint survey design, population evolution and overlap; PSU reuse alone does not establish either. Estimate covariance using the correctly specified joint design, stable PSU identifiers and the full relevant sample, including non-panel households in shared PSUs. Independent sampling supports zero design covariance. Review design assumptions and sensitivity to the working covariance specification (Yoshida, 2025).",
+      "locator": "Section 8.7, dependence from reused PSUs",
+      "count": 1
+    },
+    {
+      "old": "estimates autocorrelation in sampling errors following Boonstra and van den Brakel (2019)",
+      "new": "adapts the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence",
+      "locator": "Sections 8.7 and Annex H, pooled-correlation attribution",
+      "count": 4,
+      "already_applied": [
+        "The variances entering this formula can be the direct variances (rho_dir); sm_out variances, for which a finite direct variance is retained when it is at least 0.001 and a missing, non-finite, or smaller value is replaced with its GVF-smoothed value (rho_sm_out); or fully smoothed variances (rho_sm_all). The national-correlation options adapt the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence, for situations in which area-level covariance estimates are too unstable to use directly: the national sampling-error correlation is estimated from the full sample and combined with domain variances on the selected basis. New configurations pair sm_all with rho_sm_all; rho_sm_out remains an optional sensitivity. Annex G.8 describes the calculation, and Annex H explains its relationship to the published framework.",
+        "The package offers direct domain covariance, zero covariance, and national-correlation options. The default rho_sm_all combines a national sampling-error correlation with fully smoothed variances; rho_sm_out remains optional with selective smoothing. These options adapt the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence when domain covariance estimates are unstable. This pooled construction remains an application extension, even though full variance smoothing now follows the paper's illustration more closely.",
+        "Responsibility. The core UFH/MFH framework follows Molina and Romero (2025); the national-correlation options, including the rho_sm_all default, adapt the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence. The package team is responsible for the software integration, safeguards, documentation, and validation of the resulting implementation."
+      ]
+    },
+    {
+      "old": "the rho_sm_out option for autocorrelation in sampling errors is based on Boonstra and van den Brakel (2019).",
+      "new": "the rho_sm_out option adapts the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence.",
+      "locator": "Annex H, responsibility and adaptation",
+      "count": 1,
+      "already_applied": [
+        "Responsibility. The core UFH/MFH framework follows Molina and Romero (2025); the national-correlation options, including the rho_sm_all default, adapt the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence. The package team is responsible for the software integration, safeguards, documentation, and validation of the resulting implementation."
+      ]
+    },
+    {
+      "old": "The MSE note, like this guidance, treats pointwise significance as primary and BH as supplementary.",
+      "new": "The MSE note, like this guidance, treats pointwise significance as primary and exports BH and Bonferroni alternatives. Counts across areas summarize exploratory pointwise results.",
+      "locator": "Technical-note roadmap",
+      "count": 1
+    },
+    {
+      "old": "The Benjamini-Hochberg-adjusted p_value_bh and significant_bh fields are retained as supplementary multiplicity-sensitive outputs, but they do not control the primary figures or headline counts.",
+      "new": "The p_value_bh/significant_bh and p_value_bonferroni/significant_bonferroni fields provide BH and Bonferroni results. They do not control primary figures or headline counts, which summarize exploratory pointwise results rather than familywide evidence.",
+      "locator": "Section 8.12, exported fields",
+      "count": 1
+    },
+    {
+      "old": "Interpretation box: Pointwise and Benjamini-Hochberg (BH) significance",
+      "new": "Interpretation box: Pointwise, BH and Bonferroni significance",
+      "locator": "Section 8.12, interpretation heading",
+      "count": 1
+    },
+    {
+      "old": "Why BH differs: when many areas are tested, some small raw p-values will occur by chance. The BH procedure orders all area-level p-values and adjusts them to control the expected false-discovery rate among the changes declared significant, under its assumptions.",
+      "new": "Multiplicity. BH controls the expected false-discovery rate under its assumptions; Bonferroni controls familywise error for the declared family of tests. Molina and Romero (2025, p37) accept individual-area comparisons, explain that a family of area tests needs correction such as Bonferroni, and caution against many-area testing because power becomes poor. Neither correction repairs invalid underlying p-values.",
+      "locator": "Section 8.12, multiplicity interpretation",
+      "count": 1
+    },
+    {
+      "old": "How to read the outputs. p_value and significant_unadjusted are pointwise results. p_value_bh and significant_bh are BH-adjusted results. An area can have a pointwise interval that excludes zero but fail the BH criterion; this is expected and is not a contradiction.",
+      "new": "How to read the outputs. p_value and significant_unadjusted are pointwise results; p_value_bh and significant_bh are BH results; p_value_bonferroni and significant_bonferroni are Bonferroni results. The primary significant flag follows the pointwise rule. Different decisions are expected because the methods answer different inferential questions.",
+      "locator": "Section 8.12, output interpretation",
+      "count": 1
+    },
+    {
+      "old": "Recommended reporting. Show the pointwise estimate and 95% interval for each area, and report the BH status or a BH sensitivity count whenever conclusions are drawn across many areas. Pre-specify which convention supports the main policy conclusion. The Workbench currently uses pointwise status for its primary red/gray figures and retains BH results as supplementary evidence.",
+      "new": "Recommended reporting. Discuss a prespecified individual area pointwise when the interval assumptions are credible. Label broad scans and counts of pointwise findings exploratory. For a familywide claim, define the family and error-control rule in advance and use the corresponding adjusted results. Retain boundary-sensitive or unavailable-inference qualifications; software completion does not establish calibrated coverage.",
+      "locator": "Section 8.12, reporting guidance",
+      "count": 1
+    },
+    {
+      "old": "and retains BH results as supplementary evidence.",
+      "new": "and retains BH and Bonferroni results as supplementary evidence. Counts across areas are exploratory pointwise summaries.",
+      "locator": "Section 15, comparison limitations",
+      "count": 1
+    },
+    {
+      "old": "H.4 Pointwise and BH reporting",
+      "new": "H.4 Pointwise, BH and Bonferroni reporting",
+      "locator": "Annex H.4 and contents heading",
+      "count": 2
+    },
+    {
+      "old": "The package intentionally shows both inferential views. Pointwise intervals answer an area-specific question and are appropriate when a particular area was selected independently of its result. BH adjustment addresses the different question created by reviewing many area-level tests together: it controls the expected false-discovery rate among rejected hypotheses, under its assumptions (Benjamini and Hochberg, 1995). The two classifications can therefore differ without either calculation being wrong.",
+      "new": "Pointwise intervals answer an individual-area question when the area was selected independently of its result. BH controls the false-discovery rate under its assumptions (Benjamini and Hochberg, 1995); Bonferroni controls familywise error for a declared family. Molina and Romero (2025, p37) explain the family correction and caution that many-area testing has poor power. These inferential questions must remain distinct.",
+      "locator": "Annex H.4, inferential questions",
+      "count": 1
+    },
+    {
+      "old": "The primary figures continue to use pointwise significance, consistent with whether each pointwise 95% confidence interval excludes zero. Tables retain p_value_bh and significant_bh so reviewers can assess multiplicity sensitivity. Reports should identify which rule supports the headline conclusion and should not describe a large set of pointwise findings as family-wide evidence. See the interpretation box in Section 8.12.",
+      "new": "Primary figures use pointwise significance, consistent with whether a usable pointwise 95% interval excludes zero. Their counts across areas are exploratory. Tables retain p_value_bh/significant_bh and p_value_bonferroni/significant_bonferroni. Identify the inferential family and rule for any familywide conclusion. Neither adjustment repairs boundary-sensitive undercoverage. See Section 8.12 and docs/MOLINA_ROMERO_DEVIATIONS_w5p.md.",
+      "locator": "Annex H.4, reported fields and deviations note",
+      "count": 1
+    },
+    {
+      "old": "The paper describes a pointwise normal interval for a selected area's change. The paper also warns that testing many areas creates a multiple-testing problem.",
+      "new": "The paper supports an approximate pointwise comparison for an individual area. Page 37 explains that testing a family of areas requires correction such as Bonferroni, then cautions against many-area testing because power becomes poor.",
+      "locator": "Annex H comparison table, manuscript multiplicity",
+      "count": 1
+    },
+    {
+      "old": "The package reports both pointwise and Benjamini-Hochberg results. Pointwise 95% intervals drive the primary red/gray figures; BH-adjusted p-values and flags are retained as multiplicity-sensitive supplementary results.",
+      "new": "Pointwise, BH and Bonferroni results are exported. Pointwise 95% intervals drive primary figures; counts across areas are exploratory. BH addresses false-discovery rate and Bonferroni familywise error under the relevant assumptions. The departure is the prominence of pointwise counts, not absence of Bonferroni.",
+      "locator": "Annex H comparison table, implementation multiplicity",
+      "count": 1
+    },
+    {
+      "old": "The package follows the same model structure, fitting each year separately with emdi. Model selection, diagnostics, and output automation extend the basic procedure.",
+      "new": "The package fits each year separately with emdi. Original-scale and arcsine UFH use REML; log UFH uses ML with Slud-Maiti correction where selected. Log-MFH uses a distinct conditional-lognormal predictor. Selection and diagnostic automation add implementation choices.",
+      "locator": "Annex H comparison table, UFH fitting",
+      "count": 1
+    },
+    {
+      "old": "sm_all is closest to the paper's full-smoothing illustration. Under sm_out, a finite direct variance is retained when it is at least 0.001; missing, non-finite, or smaller values are replaced with the GVF-smoothed value. This threshold rule is practical.",
+      "new": "sm_all follows the full-smoothing illustration most closely. sm_out retains finite variances at least 0.001 and replaces nonfinite or smaller values; the scale-specific cutoff is an application policy. The GVF uses exp(predicted log variance + residual variance/2), an additional conditional-mean correction under suitable lognormal, homoscedastic residual assumptions.",
+      "locator": "Annex H comparison table, GVF policy",
+      "count": 1,
+      "already_applied": [
+        "sm_all is now the default for untransformed and log working variances and follows the paper's full-smoothing illustration most closely. Optional sm_out retains finite variances at least 0.001 and replaces nonfinite or smaller values; the scale-specific cutoff remains an application policy. Arcsine retains its separate effective-sample-size treatment. The GVF uses exp(predicted log variance + residual variance/2), an additional conditional-mean correction under suitable lognormal, homoscedastic residual assumptions."
+      ]
+    },
+    {
+      "old": "Auxiliary variables, selected formulas, populations and estimated sampling covariance inputs are held fixed; variable-selection and variance-smoothing uncertainty are not included.",
+      "new": "Auxiliary variables, selected formulas, selected MFH type, populations and estimated sampling covariance inputs are held fixed. Variable selection, MFH3/MFH2 selection, GVF fitting and sampling-covariance estimation are not repeated in each draw; their uncertainty is excluded.",
+      "locator": "Conditional bootstrap statements including Annex G",
+      "count": 3
+    },
+    {
+      "old": "3. Refit the selected MFH variant to each bootstrap sample. Failed or non-converged refits are counted and retried, subject to a maximum-attempt limit.",
+      "new": "3. Refit the selected MFH variant to each bootstrap sample, holding the selected formulas and input covariance matrices fixed. Do not repeat model/variable selection, GVF fitting or sampling-covariance estimation. Failed or non-converged refits are counted and retried subject to a maximum-attempt limit; review the failure rate.",
+      "locator": "Annex H.2, conditional bootstrap process",
+      "count": 1
+    },
+    {
+      "old": "pointwise and BH error behavior.",
+      "new": "pointwise, BH and Bonferroni error behavior.",
+      "locator": "Annex H.3, validation priorities",
+      "count": 1
+    },
+    {
+      "old": "The fixed below-0.001 sm_out rule stated here is the current implementation and supersedes the note's older description of replacing high outliers.",
+      "new": "The fixed below-0.001 sm_out rule is an application policy and does not replace large variances; the companion note now states the same rule.",
+      "locator": "Annex G.8, superseded high-outlier description",
+      "count": 1
+    },
+    {
+      "old": "The population file may be in long or wide format.",
+      "new": "The population file may be in long or wide format. Require one row per domain-year in long form or per domain in wide form, including when duplicate values agree. Supply aggregate totals rather than sex/age rows. Named matrix years are matched by label; fully unnamed year columns must exactly match the selected-year order, with a warning. Preserve leading zeros in domain identifiers.",
+      "locator": "Section 3.7, population input grain",
+      "count": 1
+    },
+    {
+      "old": "Not read from the benchmark-target file: aggregation populations come from the population file or are estimated from the survey (Section 3.7).",
+      "new": "Aggregation populations come from the population file or survey (Section 3.7), not the target file. Targets require one row per group-year in long form or group in wide form. Duplicate keys are errors even when values agree. Matrix year labels are matched by name; fully unnamed columns require exactly the selected years in their selected order and generate a warning.",
+      "locator": "Section 3.8, benchmark target grain",
+      "count": 1
+    },
+    {
+      "old": "Some other changes, including the variance and covariance options, the MFH model choice, the covariate lists and the run label, do not, so run the check again after any change (Section 11.8).",
+      "new": "Some other changes, including the variance and covariance options, the MFH model choice, the covariate lists and the run label, do not, so run the check again after any change (Section 11.8). At execution entry, consumed population/target inputs are validated again before output cleanup. MFH requires supported Direct cells in both years; missing cells block that run. Unused optional paths do not block a run.",
+      "locator": "Section 11.2, pre-run checks",
+      "count": 1
+    },
+    {
+      "old": "The data readiness check reports both (Tests 0f and 0g), and changes to the price settings of mean welfare now also require a new check (Section 11.2).",
+      "new": "The data readiness check reports both (Tests 0f and 0g), and changes to the price settings of mean welfare now also require a new check (Section 11.2). The w5p input, reporting and inference-qualification revisions are explained in the separate Molina and Romero deviations note.",
+      "locator": "Opening release-update paragraph",
+      "count": 1
+    },
+    {
+      "old": "The files listed below are supplied in the docs/guidance/Technical notes folder. They support implementation rather than providing instructions for running the Workbench. This guidance incorporates their stable methodological conclusions while identifying one release-specific rule that supersedes older wording in the notes: sm_out replaces only missing, non-finite, or strictly below-0.001 direct variances. The MSE note, like this guidance, treats pointwise significance as primary and exports BH and Bonferroni alternatives. Counts across areas summarize exploratory pointwise results.",
+      "new": "The files listed below are supplied in the docs/guidance/Technical notes folder. They support implementation rather than providing instructions for running the Workbench. Where GVF smoothing applies, new configurations use sm_all variances and matching rho_sm_all MFH covariance. Explicit saved settings are retained. Optional sm_out replaces only missing, non-finite, or strictly below-0.001 direct variances. The MSE note, like this guidance, treats pointwise significance as primary and exports BH and Bonferroni alternatives. Counts across areas summarize exploratory pointwise results.",
+      "locator": "Section 1.5, companion technical notes",
+      "snapshot_paragraph_index": 243,
+      "count": 1
+    },
+    {
+      "old": "Derives the cross-year sampling-error covariance from the full survey design, explains why a panel-household-only shortcut can understate covariance, and motivates a stable nationally pooled correlation when domain covariance estimates are noisy. The current fixed below-0.001 sm_out replacement rule in this guidance supersedes the note's older outlier wording.",
+      "new": "Derives the cross-year sampling-error covariance from the full survey design, explains why a panel-household-only shortcut can understate covariance, and motivates a stable nationally pooled correlation when domain covariance estimates are noisy. The note and guidance use sm_all with rho_sm_all as the default, retaining sm_out with its fixed below-0.001 rule as a sensitivity option.",
+      "locator": "Section 1.5, sampling-covariance note summary",
+      "snapshot_paragraph_index": 251,
+      "count": 1
+    },
+    {
+      "old": "Recommended practice is to use direct variances when they are stable and credible; use sm_out when very small direct variances risk overstating precision; use sm_all when direct variance estimates are broadly unstable; compare results under alternative variance options as a sensitivity check; and document the variance treatment used in the final model. Under the implemented sm_out rule, a finite direct variance is retained when it is at least 0.001, while a missing, non-finite, or smaller value is replaced with its GVF-smoothed value. Large direct variances are not replaced by sm_out.",
+      "new": "Start with sm_all, which replaces all working sampling variances with GVF predictions and follows the full-smoothing illustration in Molina and Romero (2025) most closely. Compare with direct when design variances are credible and with sm_out as an optional sensitivity, and document the chosen treatment. Under sm_out, a finite direct variance at least 0.001 is retained; a missing, non-finite, or strictly smaller value is replaced with its GVF prediction. Large direct variances are not replaced. Full smoothing still requires suitable GVF fit and diagnostics.",
+      "locator": "Section 6.6, recommended variance treatment",
+      "snapshot_paragraph_index": 634,
+      "count": 1
+    },
+    {
+      "old": "A practical default is to start with sm_out, then compare results with direct and sm_all where feasible.",
+      "new": "New configurations default to sm_all. Explicit variance choices in saved configurations are preserved; compare with direct and sm_out where feasible.",
+      "locator": "Section 6.6, practical default",
+      "snapshot_paragraph_index": 646,
+      "count": 1
+    },
+    {
+      "old": "When no transformation is used, the app allows the following variance options:",
+      "new": "With no transformation or a log transformation, the app allows the following UFH variance options:",
+      "locator": "Section 7.9, transformations and variance options",
+      "snapshot_paragraph_index": 732,
+      "count": 1
+    },
+    {
+      "old": "When UFH uses no transformation, start with sm_out, compare with direct when raw sampling variances are reliable, and consider sm_all when many variances are unstable. sm_out replaces missing, non-finite, or strictly below-0.001 variances; a variance equal to 0.001 is retained. Document the setting used.",
+      "new": "UFH defaults to sm_all with no transformation and with log mean welfare. The selected option is honored and saved. Compare with direct when raw design variances are credible and with sm_out as an optional sensitivity. sm_out replaces missing, non-finite, or strictly below-0.001 variances; a variance equal to 0.001 is retained. With logs, the option and cutoff apply to the sampling variance of the log area mean. Document the setting used.",
+      "locator": "Section 7.9, UFH default",
+      "snapshot_paragraph_index": 743,
+      "count": 1
+    },
+    {
+      "old": "The UFH variance selector applies only with no transformation. With arcsin, the implementation backfills missing or zero sampling variances rather than applying the below-0.001 rule. With log, the pipeline uses sm_out and ignores the selector. MFH has its own variance and covariance controls, which remain available with log mean welfare. Review the direct variances and the actual settings recorded in the run.",
+      "new": "The UFH variance selector is available for no transformation and log mean welfare. Arcsine remains separate: fitting uses the effective-sample-size variance 1/(4 n_eff), with a fallback to the observed sample size if the design-effect-based effective sample size is invalid; sm_all does not replace that analytical treatment. MFH has its own variance and covariance controls, including for log mean welfare. Explicit saved choices are retained. Review the raw Direct uncertainty and actual working-variance settings recorded in the run.",
+      "locator": "Section 7.9, variance selector and arcsine",
+      "snapshot_paragraph_index": 744,
+      "count": 1
+    },
+    {
+      "old": "The variances entering this formula can be the direct variances (rho_dir); sm_out variances, for which a finite direct variance is retained when it is at least 0.001 and a missing, non-finite, or smaller value is replaced with its GVF-smoothed value (rho_sm_out); or fully smoothed variances (rho_sm_all). The rho_sm_out option adapts the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence, for situations in which area-level covariance estimates are too unstable to use directly: the national sampling-error correlation is estimated from the full sample and combined with stabilized domain variances. Annex G.8 describes the calculation, and Annex H explains its relationship to the published framework.",
+      "new": "The variances entering this formula can be the direct variances (rho_dir); sm_out variances, for which a finite direct variance is retained when it is at least 0.001 and a missing, non-finite, or smaller value is replaced with its GVF-smoothed value (rho_sm_out); or fully smoothed variances (rho_sm_all). The national-correlation options adapt the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence, for situations in which area-level covariance estimates are too unstable to use directly: the national sampling-error correlation is estimated from the full sample and combined with domain variances on the selected basis. New configurations pair sm_all with rho_sm_all; rho_sm_out remains an optional sensitivity. Annex G.8 describes the calculation, and Annex H explains its relationship to the published framework.",
+      "locator": "Section 8.7, national-correlation covariance",
+      "snapshot_paragraph_index": 854,
+      "count": 1
+    },
+    {
+      "old": "As a recommended default, use a covariance option that allows cross-year correlation when PSU codes are consistent over time and sample overlap is plausible; if samples are independent across years, the zero option may be reasonable; if direct variance–covariance estimates are unstable, use the smoothed covariance options; and if unsure, run sensitivity checks using alternative covariance assumptions.",
+      "new": "New MFH configurations default to sm_all variances with rho_sm_all covariance, combining a national sampling-error correlation with fully smoothed domain variances. Review whether PSU codes are consistent and sampling dependence is plausible. Use zero covariance for independent rounds or a documented sensitivity. Compare direct domain covariance and other compatible variance–covariance choices when supported by the design and diagnostics.",
+      "locator": "Section 8.7, default covariance",
+      "snapshot_paragraph_index": 874,
+      "count": 1
+    },
+    {
+      "old": "Two practical cautions apply. First, the variances used on the diagonal of the covariance matrix and the variances used inside its off-diagonal covariances should share the same basis; the Workbench ties covariance choices to the variance option for this reason. Second, non-zero covariance inputs can make a multivariate fit more difficult. If convergence fails, first verify year and PSU identifiers and inspect the covariance estimates; then consider moving from unstable direct domain covariances to rho_sm_out or another documented stabilized specification. The rho_sm_out option adapts the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence. Setting covariance to zero should be a last resort unless survey rounds are genuinely independent, because doing so can misstate the uncertainty of changes over time (Yoshida, 2025).",
+      "new": "Two practical cautions apply. First, the variances used on the diagonal of the covariance matrix and the variances used inside its off-diagonal covariances should share the same basis; the Workbench offers compatible covariance choices for this reason. An omitted covariance setting is derived from the effective variance choice (sm_all with rho_sm_all, sm_out with rho_sm_out, direct with rho_dir); explicit saved settings are preserved. Second, non-zero covariance inputs can make a multivariate fit more difficult. If convergence fails, first verify year and PSU identifiers and inspect the covariance estimates; then consider moving from unstable direct domain covariances to rho_sm_all or another documented stabilized specification. The national-correlation approach adapts the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence. Setting covariance to zero should be a last resort unless survey rounds are genuinely independent, because doing so can misstate the uncertainty of changes over time (Yoshida, 2025).",
+      "locator": "Section 8.7, two practical cautions",
+      "snapshot_paragraph_index": 876,
+      "count": 1
+    },
+    {
+      "old": "When MFH estimates are produced under the two-year rolling rule, the report should state clearly which estimates are preliminary and which are final, identify the two-year data window used for each release, and avoid presenting long-period changes across finalized estimates from different MFH windows as formal, statistically tested changes.",
+      "new": "When MFH estimates are produced under the two-year rolling publication policy, state which estimates are provisional or final, archive each release's estimation window and vintage, and record the once-only routine revision. The NSO must enforce freezing and document exceptional reopening. A within-run MSE/MCPE change test does not apply automatically to published estimates retained from different windows.",
+      "locator": "Section 13.4, reporting rolling-window estimates",
+      "snapshot_paragraph_index": 1327,
+      "count": 1
+    },
+    {
+      "old": "Use arcsine with package bias correction for UFH headcounts, BIC for UFH selection, AIC for MFH selection and MFH2 as starting settings; review diagnostics and sensitivity. Log mean-welfare models target arithmetic area means. UFH uses emdi Slud–Maiti correction and MFH uses conditional-lognormal correction. For MFH, sm_out with rho_sm_out is a starting choice when sampling dependence is plausible and Direct covariance estimates are unstable. The 0.001 variance threshold is an application rule, on the modeled response scale. Use zero covariance only for independent rounds or a documented sensitivity. The shared Bootstrap replicates default is 500; inspect Monte Carlo error, convergence and boundary sensitivity.",
+      "new": "Use arcsine with package bias correction for UFH headcounts, BIC for UFH selection, AIC for MFH selection and MFH2 as starting settings; review diagnostics and sensitivity. New configurations use sm_all for UFH with no transformation or log mean welfare, and sm_all with rho_sm_all for MFH. Explicit saved choices are retained. Arcsine retains its effective-sample-size variance. Log models target arithmetic area means: UFH uses emdi Slud–Maiti correction and MFH uses conditional-lognormal correction. Optional sm_out keeps its 0.001 cutoff on the modeled response scale. Use zero covariance for independent rounds or a documented sensitivity. The bootstrap default is 500; inspect Monte Carlo error, convergence and boundary sensitivity.",
+      "locator": "Section 14.2, recommended default app settings",
+      "snapshot_paragraph_index": 1334,
+      "count": 1
+    },
+    {
+      "old": "A further limitation is specific to annual production. MFH requires at least two years of data, and because it jointly estimates several years, the poverty estimate for any given year depends on the data window used in the model run. The same year can therefore receive a slightly different estimate depending on which years are included. In annual production, this creates a practical revision issue. A 2025 poverty map, for example, may first be produced from a 2024–2025 data window; once 2026 data become available, the 2025 estimate can be updated using a 2025–2026 data window.",
+      "new": "MFH estimates for a given year depend on the data window used to fit the joint model. The two-period implementation supports a manageable official-statistics revision policy: each newly reported year is provisional, is routinely revised once when it becomes the earlier year in the next window, and is then frozen. This operational rationale for T = 2 does not change the general multivariate model in Molina and Romero (2025).",
+      "locator": "Section 15.2, official-statistics revision rationale",
+      "snapshot_paragraph_index": 1347,
+      "count": 1
+    },
+    {
+      "old": "Policy 1: finalize the first year of each two-year MFH run. Under this policy, the second-year estimate is published as preliminary and replaced by the first-year estimate from the following run. For example, the 2025 poverty rate from the 2024-2025 run is preliminary. The 2025 rate from the 2025-2026 run becomes final, while the 2026 rate is preliminary. Once finalized, an estimate is retained unless an exceptional data correction or methodological change requires revision.",
+      "new": "Policy 1: finalize the earlier year of each two-year MFH run. For successive windows (2022, 2024), (2024, 2025), and (2025, 2026), publish 2024 provisionally from the first run, revise and finalize it in the second, then retain that frozen 2024 estimate. Publish 2025 provisionally in the second run, revise and finalize it in the third, and publish 2026 provisionally. At each release, at most one previously published year is routinely revised. The initial window need not contain consecutive calendar years; the initial earlier year's publication status requires an NSO decision.",
+      "locator": "Section 15.2, Policy 1",
+      "snapshot_paragraph_index": 1348,
+      "count": 1,
+      "new_text_nodes": [
+        "Policy 1: finalize the earlier year of each two-year MFH run.",
+        " For successive windows (2022, 2024), (2024, 2025), and (2025, 2026), publish 2024 provisionally from the first run, revise and finalize it in the second, then retain that frozen 2024 estimate. Publish 2025 provisionally in the second run, revise and finalize it in the third, and publish 2026 provisionally. At each release, at most one previously published year is routinely revised. The initial window need not contain consecutive calendar years; the initial earlier year's publication status requires an NSO decision."
+      ]
+    },
+    {
+      "old": "Longer windows make this policy harder to manage. If the oldest year is finalized and newer years are published provisionally, a three-year window leaves two preliminary years in each release. The 2024 rate first appears in the 2022-2024 run, is revised in the 2023-2025 run, and becomes final in the 2024-2026 run. Finalization therefore waits for two subsequent years of data, and each annual release updates two previously published preliminary rates. A four-year window increases the delay to three years and updates three preliminary rates. Already-final estimates need not be revised. This increases the revision history that users must understand and the statistical office must maintain.",
+      "new": "With T > 2, a rolling-window policy that finalizes the oldest year can leave several overlapping years provisional. Those years may be revised repeatedly before finalization, increasing publication delays and the revision history to maintain. T = 2 limits that routine revision burden under Policy 1. Window length alone neither freezes past estimates nor prevents reopening them: the NSO must maintain a vintage archive, enforce the agreed freeze, and document exceptional data corrections or methodological revisions.",
+      "locator": "Section 15.2, longer windows",
+      "snapshot_paragraph_index": 1349,
+      "count": 1
+    },
+    {
+      "old": "The current Package supports two-year MFH runs. The publication policy should be agreed before releasing results. Record the estimation window and retain the uncertainty measures associated with each published estimate. Policy 1 allows subsequent-year information to revise the latest estimate before finalization; Policy 2 provides a final latest-year estimate without routine revision. Longer windows could offer additional borrowing, but under Policy 1 they add delays and provisional revisions, while under Policy 2 more estimates from each run remain outside the published series. Neither policy removes the need for model validation or a coherent uncertainty calculation.",
+      "new": "The Workbench fits exactly two selected years, but it does not enforce adjacency, a rolling release schedule, or a publication freeze. Agree the publication policy before releasing results and archive each published estimate with its window, vintage and uncertainty. Policy 1 uses one subsequent window to revise the latest year before freezing it; Policy 2 publishes the latest year as final without routine revision. Longer windows may offer more borrowing, but can increase overlapping provisional revisions under Policy 1. Neither policy removes model-validation requirements or supplies uncertainty for differences between estimates from different runs.",
+      "locator": "Section 15.2, software scope and publication policy",
+      "snapshot_paragraph_index": 1353,
+      "count": 1
+    },
+    {
+      "old": "The Workbench operationalizes a two-year comparison window. This is an implementation scope limit, not a different statistical model.",
+      "new": "The Workbench uses T = 2 to support an official-statistics policy with one routine revision per newly reported year: publish provisionally, revise when it becomes the earlier year in the next window, then freeze. At most one prior year is routinely revised per release. This avoids repeated revisions of several overlapping years possible with longer windows. Freezing, exceptional reopening and the vintage archive remain NSO policy, not automatic consequences of T = 2 (Section 15.2).",
+      "locator": "Annex H alignment table, Scope and time periods",
+      "snapshot_paragraph_index": 1747,
+      "count": 1
+    },
+    {
+      "old": "sm_all follows the full-smoothing illustration most closely. sm_out retains finite variances at least 0.001 and replaces nonfinite or smaller values; the scale-specific cutoff is an application policy. The GVF uses exp(predicted log variance + residual variance/2), an additional conditional-mean correction under suitable lognormal, homoscedastic residual assumptions.",
+      "new": "sm_all is now the default for untransformed and log working variances and follows the paper's full-smoothing illustration most closely. Optional sm_out retains finite variances at least 0.001 and replaces nonfinite or smaller values; the scale-specific cutoff remains an application policy. Arcsine retains its separate effective-sample-size treatment. The GVF uses exp(predicted log variance + residual variance/2), an additional conditional-mean correction under suitable lognormal, homoscedastic residual assumptions.",
+      "locator": "Annex H alignment table, Sampling-variance smoothing",
+      "snapshot_paragraph_index": 1759,
+      "count": 1
+    },
+    {
+      "old": "The package offers direct domain covariance, zero covariance, and national-correlation options. rho_sm_out combines a national sampling-error correlation with sm_out variances. The rho_sm_out option adapts the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence, particularly when domain covariance estimates are unstable.",
+      "new": "The package offers direct domain covariance, zero covariance, and national-correlation options. The default rho_sm_all combines a national sampling-error correlation with fully smoothed variances; rho_sm_out remains optional with selective smoothing. These options adapt the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence when domain covariance estimates are unstable. This pooled construction remains an application extension, even though full variance smoothing now follows the paper's illustration more closely.",
+      "locator": "Annex H alignment table, Sampling-error covariance",
+      "snapshot_paragraph_index": 1768,
+      "count": 1
+    },
+    {
+      "old": "For a run that is closest to the paper's untransformed examples, analysts can use no UFH transformation, no benchmarking, a documented direct or fully smoothed variance specification, and either direct domain covariance or zero covariance according to the survey design. That configuration is a sensitivity analysis rather than the only defensible specification: the Workbench's arcsine UFH default and rho_sm_out option address practical poverty-rate and covariance-instability concerns. The rho_sm_out option adapts the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence.",
+      "new": "For a run that is closest to the paper's untransformed examples, analysts can use no UFH transformation, no benchmarking, a documented direct or fully smoothed variance specification, and either direct domain covariance or zero covariance according to the survey design. That configuration is a sensitivity analysis rather than the only defensible specification: the Workbench's arcsine UFH default and rho_sm_all default address practical poverty-rate and covariance-instability concerns. The national-correlation approach adapts the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence.",
+      "locator": "Annex H.1, closest-to-paper sensitivity configuration",
+      "snapshot_paragraph_index": 1783,
+      "count": 1
+    },
+    {
+      "old": "Responsibility. The core UFH/MFH framework follows Molina and Romero (2025); the rho_sm_out option adapts the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence. The package team is responsible for the software integration, safeguards, documentation, and validation of the resulting implementation.",
+      "new": "Responsibility. The core UFH/MFH framework follows Molina and Romero (2025); the national-correlation options, including the rho_sm_all default, adapt the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence. The package team is responsible for the software integration, safeguards, documentation, and validation of the resulting implementation.",
+      "locator": "Annex H, Responsibility",
+      "snapshot_paragraph_index": 1741,
+      "count": 1,
+      "new_text_nodes": [
+        "Responsibility",
+        ". ",
+        "The core UFH/MFH framework follows Molina and Romero (2025); the national-correlation options, including the rho_sm_all default, adapt the nationally pooled sampling-correlation strategy of Boonstra and van den Brakel (2019) to PSU-level dependence. The package team is responsible for the software integration, safeguards, documentation, and validation of the resulting implementation."
+      ]
+    },
+    {
+      "old": "The implementation returns exp(fitted log variance + residual variance/2), a lognormal correction to the displayed basic GVF. With too little training variation, a constant-variance fallback is flagged. The sm_out threshold of 0.001 is application-specific; for log means it applies to the sampling variance of the log area mean. Arcsine fitting instead uses 1/(4 n_eff). Estimated working variances remain fixed in the bootstrap.",
+      "new": "The implementation returns exp(fitted log variance + residual variance/2), a lognormal correction to the displayed basic GVF. With too little training variation, a constant-variance fallback is flagged. New configurations use sm_all; the selected UFH option is honored for log mean welfare. The optional sm_out threshold of 0.001 is application-specific; for log means it applies to the sampling variance of the log area mean. Arcsine fitting instead uses 1/(4 n_eff). Estimated working variances remain fixed in the bootstrap.",
+      "locator": "Annex G.3, GVF retransformation and variance scale",
+      "snapshot_paragraph_index": 1687,
+      "count": 1
+    },
+    {
+      "old": "QER methodology revision. This manual describes candidate 5.2.0-rc.6-wizard.5.16 (w5o) of the EU SAE Workbench. It keeps the methods of the QER revision of w5n (5.2.0-rc.6-wizard.5.14), which corrected log-area estimation, bootstrap benchmarking, numerical convergence and joint uncertainty, and adds the interface and data checks summarized in the release-candidate update below. The screenshots in Section 11 show this version; country-example figures illustrate the workflow, so regenerate country results with this revision before using their numerical conclusions. The implementation checks and simulation evidence are documented in docs/METHODOLOGY_ALIGNMENT.md and docs/MCPE_VALIDATION_STATUS.md. Numerical agreement and Monte Carlo precision do not certify interval coverage for all survey designs. Review model assumptions, boundary sensitivity and any undercoverage before dissemination. Use the latest validation status for current experiment counts and results.",
+      "new": "QER methodology revision. This manual describes candidate 5.2.0-rc.6-wizard.5.16 (w5p) of the EU SAE Workbench. It keeps the methods of the QER revision of w5n (5.2.0-rc.6-wizard.5.14), which corrected log-area estimation, bootstrap benchmarking, numerical convergence and joint uncertainty, and adds the interface and data checks summarized in the release-candidate update below. Section 11 retains historical w5o screenshots and country examples; displayed sm_out choices and example results do not represent the new sm_all / rho_sm_all defaults. Regenerate results under the chosen settings before using numerical conclusions. The implementation checks and simulation evidence are documented in docs/METHODOLOGY_ALIGNMENT.md and docs/MCPE_VALIDATION_STATUS.md. Numerical agreement and Monte Carlo precision do not certify interval coverage for all survey designs. Review model assumptions, boundary sensitivity and any undercoverage before dissemination. Use the latest validation status for current experiment counts and results.",
+      "locator": "Introduction, release identification and historical screenshots",
+      "snapshot_paragraph_index": 196,
+      "count": 1
+    },
+    {
+      "old": "The guided version of the EU SAE Workbench takes you through the full workflow: direct estimation, UFH, MFH, comparison, benchmarking, maps, diagnostics, and reports. Sections 11.1 to 11.9 explain the general workflow from installation to retaining outputs. Read it once, then use one of the three examples in Sections 11.10 to 11.12 to set the indicator and price basis; Section 11.13 explains how to read the change outputs. The classic dashboard remains available, with the same settings on one page; the guided version is recommended for routine use. These instructions refer to application 5.2.0-rc.6-wizard.5.16 (w5o). The screenshots use the simulated example in Data/simulated (survey years 2022 and 2023), as do the worked examples.",
+      "new": "The guided version of the EU SAE Workbench takes you through the full workflow: direct estimation, UFH, MFH, comparison, benchmarking, maps, diagnostics, and reports. Sections 11.1 to 11.9 explain the general workflow from installation to retaining outputs. Read it once, then use one of the three examples in Sections 11.10 to 11.12 to set the indicator and price basis; Section 11.13 explains how to read the change outputs. The classic dashboard remains available, with the same settings on one page; the guided version is recommended for routine use. These instructions refer to application 5.2.0-rc.6-wizard.5.16 (w5p). The screenshots and worked examples retain historical w5o runs on Data/simulated (survey years 2022 and 2023). Displayed sm_out / rho_sm_out choices and numerical results are historical; current new configurations default to sm_all / rho_sm_all where GVF applies, and the UFH log variance selector is now available.",
+      "locator": "Section 11 introduction, current version and historical examples",
+      "snapshot_paragraph_index": 1106,
+      "count": 1
+    },
+    {
+      "old": "The multivariate model adds parameters, and estimating them reliably requires a reasonably large number of areas. With too few areas, the estimation can fail to converge or can return inadmissible values, such as a zero random-effect variance or an autocorrelation outside its valid range. The model’s gains also depend on its covariance assumptions: if the AR(1) structure of MFH2 or MFH3 does not describe the data, the borrowed strength may be misapplied. This is why the note recommends starting with the most parsimonious variant and confirming every step against the diagnostics and the univariate benchmark.",
+      "new": "The multivariate model adds parameters, and estimating them reliably requires a reasonably large number of areas. With too few areas, the estimation can fail to converge, reach a valid zero random-effect variance boundary, or return inadmissible values such as an autocorrelation outside its valid range. Boundary estimates require the inferential qualifications described in Section 8.9. The model’s gains also depend on its covariance assumptions: if the AR(1) structure of MFH2 or MFH3 does not describe the data, the borrowed strength may be misapplied. This is why the note recommends starting with the most parsimonious variant and confirming every step against the diagnostics and the univariate benchmark.",
+      "locator": "Section 15.2, valid zero boundary and inadmissible values",
+      "snapshot_paragraph_index": 1346,
+      "count": 1
+    },
+    {
+      "old": "Candidate 5.2.0-rc.6-wizard.5.16 (w5o)",
+      "new": "Candidate 5.2.0-rc.6-wizard.5.16 (w5p)",
+      "locator": "Title page, current candidate label (outer and nested paragraph)",
+      "count": 2
+    },
+    {
+      "old": "When requested, the seven interpretation sections are stored with provider, model, timestamp, language, and generated/failed/disabled status in outputs/data/ai_interpretations.rds and are interleaved with the corresponding statistical sections in final_report.html and final_report.docx. Failed sections appear explicitly rather than as silent gaps. AI text is advisory, the numeric-provenance check is warning-only, and human review is required before dissemination.",
+      "new": "When requested, AI sections are saved in outputs/data/ai_interpretations.rds with provider, model, timestamp, language and generated/failed/disabled status. Both report formats include AI recommendation on UFH or MFH: an advisory recommendation grounded in available aggregate diagnostics, precision and change uncertainty, distinguishing levels from changes where appropriate. Missing or weak evidence and boundary-sensitive or unavailable uncertainty qualify the advice; no firm preference may be justified. It never reruns estimation or switches the fitted model. Failed sections remain visible. Numeric-provenance checks are warning-only; human review is required before dissemination.",
+      "locator": "Section 11.7 Step 5, interpretation storage and advisory model recommendation",
+      "snapshot_paragraph_index": 1151,
+      "count": 1
+    },
+    {
+      "old": "After a successful run, review outputs/final_report.html in a browser. The application also creates outputs/final_report.docx for editing in Word. Both formats contain the same run setup, estimates, diagnostics, precision comparisons, maps, and pointwise change-significance results. Optional AI interpretations are labeled beside the corresponding statistical sections in both formats; their warning and human-review status must be retained. If AI is disabled, the statistical report remains complete.",
+      "new": "Review outputs/final_report.html and the editable outputs/final_report.docx after a successful run. Both contain the same setup, estimates, diagnostics, precision comparisons, maps and pointwise change-significance results. Optional AI interpretations accompany the statistical sections; AI recommendation on UFH or MFH appears near the end. Retain its evidence limitations, warnings and human-review status. With AI disabled, both statistical reports remain complete.",
+      "locator": "Section 11.9 Reviewing and retaining outputs, HTML and Word recommendation section",
+      "snapshot_paragraph_index": 1163,
+      "count": 1
+    }
+  ],
+  "docs/guidance/Technical notes/Note on Estimating the Sampling-Error Covariance Matrix (revised).docx": [
+    {
+      "old": "The EU SAE package operationalizes the two-year sampling-error covariance input in scripts/02_mfh.R. Direct estimates and sampling variances are computed using a survey design with ids = ~psu and weights = ~weight. Domain-level covariance is obtained from svyby(..., covmat = TRUE) and extracted with vcov(). A national cross-time correlation is also computed from a national svyby(..., covmat = TRUE) result and applied to domain-level variance choices.",
+      "new": "The two-year covariance implementation in scripts/02_mfh.R uses survey::svydesign with ids = ~psu, optional supplied strata, and weights = ~population_weight. For household rows, population_weight = weight × household size; for person rows it equals weight alone. Domain covariance comes from the correctly specified joint survey design via svyby(..., covmat = TRUE) and vcov(). A national cross-time correlation can be combined with the chosen domain variances.",
+      "locator": "Section 8, survey weights and design",
+      "count": 1
+    },
+    {
+      "old": "The diagonal variances also scale the off-diagonal, so the same variance concept must be used in both places. The package builds these variances in three ways. The direct option keeps the raw design-based variances, backfilling only missing or zero values. The fully smoothed option (sm_all) replaces every variance with a smoothed value. The outlier-smoothed option (sm_out), which is the default, replaces only problematic variances (those near zero, or far above the smoothed value) and leaves the remaining direct variances unchanged.",
+      "new": "The same variance concept must scale the diagonal and off-diagonal. direct keeps raw design variances subject to explicit missing/zero safety backfills. sm_all replaces all variances with GVF predictions. sm_out retains a finite direct variance at least 0.001 and replaces missing, nonfinite or strictly smaller values with GVF predictions; it does not replace large variances. This cutoff is an application policy requiring indicator/scale sensitivity checks. For log means it applies on the log-mean variance scale. Raw Direct uncertainty remains separate from these model inputs.",
+      "locator": "Section 8, variance policy",
+      "count": 1,
+      "already_applied": [
+        "The same variance concept must scale the diagonal and off-diagonal. direct keeps raw design variances subject to explicit missing/zero safety backfills. sm_all is the default and replaces all working variances with GVF predictions. Optional sm_out retains a finite direct variance at least 0.001 and replaces missing, nonfinite or strictly smaller values with GVF predictions; it does not replace large variances. This cutoff is an application policy requiring indicator/scale sensitivity checks. For log means it applies on the log-mean variance scale. Raw Direct uncertainty remains separate from these model inputs."
+      ]
+    },
+    {
+      "old": "outlier-smoothed",
+      "new": "selectively smoothed (sm_out)",
+      "locator": "Sections 8 and 10, sm_out terminology",
+      "count": 3,
+      "already_applied": [
+        "The dashboard offers matching variance–covariance choices (sm_all with rho_sm_all, sm_out with rho_sm_out, and direct with rho_dir), with direct and zero covariance also available. New configurations default to sm_all with rho_sm_all. An omitted covariance setting is derived from the effective variance choice; explicit saved choices are preserved. UFH also honors the selected variance option with log mean welfare, on the log-mean variance scale. Arcsine UFH retains its separate effective-sample-size analytical variance, with a fallback to observed sample size when its estimated effective sample size is invalid."
+      ]
+    },
+    {
+      "old": "Welfare is strongly clustered geographically, so the intra-PSU correlation is large rather than negligible. The main source of cross-time dependence is the shared PSU, not the few re-interviewed households, and a unit-level overlap correlation would miss most of it.",
+      "new": "Welfare may be geographically clustered, making persistent PSU-level dependence plausible. Its magnitude and sign must be checked for the application using the joint design and population evolution. Shared PSUs can matter beyond re-interviewed households; a matched-unit correlation alone need not capture all relevant dependence. This is an application-specific expectation, not a universal large-correlation claim.",
+      "locator": "Relation to Boonstra and van den Brakel, application assumptions",
+      "count": 1
+    },
+    {
+      "old": "construct population_weight = weight × household size;",
+      "new": "construct population_weight = weight × household size for household rows, or population_weight = weight for person rows;",
+      "locator": "Section 12, row-unit weighting",
+      "count": 1
+    },
+    {
+      "old": "The same variance concept must scale the diagonal and off-diagonal. direct keeps raw design variances subject to explicit missing/zero safety backfills. sm_all replaces all variances with GVF predictions. sm_out retains a finite direct variance at least 0.001 and replaces missing, nonfinite or strictly smaller values with GVF predictions; it does not replace large variances. This cutoff is an application policy requiring indicator/scale sensitivity checks. For log means it applies on the log-mean variance scale. Raw Direct uncertainty remains separate from these model inputs.",
+      "new": "The same variance concept must scale the diagonal and off-diagonal. direct keeps raw design variances subject to explicit missing/zero safety backfills. sm_all is the default and replaces all working variances with GVF predictions. Optional sm_out retains a finite direct variance at least 0.001 and replaces missing, nonfinite or strictly smaller values with GVF predictions; it does not replace large variances. This cutoff is an application policy requiring indicator/scale sensitivity checks. For log means it applies on the log-mean variance scale. Raw Direct uncertainty remains separate from these model inputs.",
+      "locator": "Variance choices on the diagonal, same variance concept",
+      "snapshot_paragraph_index": 81,
+      "count": 1
+    },
+    {
+      "old": "Use rho_sm_out as the practical default when sample overlap is plausible but domain-level covariances are noisy.",
+      "new": "Use rho_sm_all with sm_all as the default when sampling dependence is plausible and domain covariances are noisy; assess the GVF fit and covariance assumptions.",
+      "locator": "Recommended use, practical default",
+      "snapshot_paragraph_index": 93,
+      "count": 1
+    },
+    {
+      "old": "Use rho_sm_all when many domain-level variances are unstable.",
+      "new": "Use rho_sm_out with sm_out as an optional sensitivity. Its unchanged 0.001 cutoff is scale-specific and does not replace large variances.",
+      "locator": "Recommended use, selective-smoothing sensitivity",
+      "snapshot_paragraph_index": 94,
+      "count": 1
+    },
+    {
+      "old": "In the dashboard these choices are linked automatically: selecting a variance option sets the matching covariance option (sm_out with rho_sm_out, sm_all with rho_sm_all, and direct with rho_dir), with direct and zero also available throughout. The package default pairs the selectively smoothed (sm_out) variances with rho_sm_out.",
+      "new": "The dashboard offers matching variance–covariance choices (sm_all with rho_sm_all, sm_out with rho_sm_out, and direct with rho_dir), with direct and zero covariance also available. New configurations default to sm_all with rho_sm_all. An omitted covariance setting is derived from the effective variance choice; explicit saved choices are preserved. UFH also honors the selected variance option with log mean welfare, on the log-mean variance scale. Arcsine UFH retains its separate effective-sample-size analytical variance, with a fallback to observed sample size when its estimated effective sample size is invalid.",
+      "locator": "Covariance choices, dashboard defaults and saved configurations",
+      "snapshot_paragraph_index": 99,
+      "count": 1
+    }
+  ],
+  "docs/guidance/Technical notes/Note on MSE Estimation - Levels and Changes.docx": [
+    {
+      "old": "The ratio form keeps benchmarked rates non-negative and preserves proportional differences among domains within an area.",
+      "new": "A positive ratio factor preserves nonnegativity and ordering only for already nonnegative predictions. It does not repair negative predictions or ensure an upper bound of one; inspect both poverty-rate bounds.",
+      "locator": "Part I, ratio interpretation",
+      "count": 1
+    },
+    {
+      "old": "Auxiliary variables, selected formulas, populations and estimated sampling covariance inputs are held fixed; variable-selection and variance-smoothing uncertainty are not included.",
+      "new": "Auxiliary variables, selected formulas, selected MFH type, populations and estimated sampling covariance inputs are held fixed. Variable selection, MFH3/MFH2 selection, GVF fitting and covariance estimation are not repeated in each draw; their uncertainty is excluded.",
+      "locator": "Opening and validation section, conditional bootstrap",
+      "count": 2
+    },
+    {
+      "old": "BH and Bonferroni adjusted p-values and significance flags support sensitivity statements across areas.",
+      "new": "BH and Bonferroni adjusted p-values and flags answer different multiplicity questions. Counts of pointwise results across areas are exploratory and do not have familywise error control.",
+      "locator": "Change uncertainty, multiplicity",
+      "count": 1
+    },
+    {
+      "old": "raw p-values, BH-adjusted p-values, and both significance fields",
+      "new": "raw, BH-adjusted and Bonferroni-adjusted p-values, and the corresponding significance fields",
+      "locator": "MSE note Part III, change helper output fields"
+    }
+  ]
+}

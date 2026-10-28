@@ -1,8 +1,8 @@
 # Known-parameter inference diagnosis. This does not validate fitted inference.
-# Writes only docs/QER/evidence/oracle_inference.csv, using the saved designs.
+# Writes only docs/validation/QER/evidence/oracle_inference.csv, using the saved designs.
 # Independent precision-addition posterior and analytic unconditional lognormal
 # error moments identify approximation error remaining even without estimation.
-out <- "docs/QER/evidence"
+out <- "docs/validation/QER/evidence"
 outer <- 5000L
 n <- 60L
 X <- cbind(1, seq(-1, 1, length.out = n))

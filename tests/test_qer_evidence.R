@@ -6,7 +6,21 @@ if (length(lib)) .libPaths(c(sub("^--library=", "", lib[1]), .libPaths()))
 source("tests/qer_simulation_helpers.R")
 source("R/mfh_bootstrap_helpers.R")
 source("R/mfh_convergence_check.R")
-out <- "docs/QER/evidence"
+out <- "docs/validation/QER/evidence"
+# Saved runs retain the hash of the runner that produced them. The navigation
+# revision changed only its default output directory. Verify the exact original
+# bytes after reversing that one literal; never rewrite historical design hashes.
+runner_path <- "tests/run_qer_coverage.R"
+runner_bytes <- readBin(runner_path, "raw", n = file.info(runner_path)$size)
+runner_text <- rawToChar(runner_bytes)
+new_default <- 'out <- option("output", "docs/validation/QER/evidence")'
+old_default <- 'out <- option("output", "docs/QER/evidence")'
+matches <- gregexpr(new_default, runner_text, fixed = TRUE)[[1L]]
+stopifnot(length(matches) == 1L, matches[1L] > 0L)
+legacy_runner <- tempfile(fileext = ".R")
+writeBin(charToRaw(sub(new_default, old_default, runner_text, fixed = TRUE)), legacy_runner)
+runner_hashes <- unname(tools::md5sum(c(runner_path, legacy_runner)))
+unlink(legacy_runner)
 names <- c("identity", "log_realistic", "log_stress", "boundary", "heterogeneous")
 for (name in names) {
   des <- read.csv(file.path(out, paste0(name, "_design.csv")))
@@ -15,7 +29,7 @@ for (name in names) {
   stopifnot(all(is.finite(tab$change_coverage)), all(tab$estimated_mse >= 0),
     all(tab$estimated_change_mse >= 0), all(tab$level_coverage >= 0 & tab$level_coverage <= 1),
     des$helper_md5 == unname(tools::md5sum("tests/qer_simulation_helpers.R")),
-    des$runner_md5 == unname(tools::md5sum("tests/run_qer_coverage.R")))
+    des$runner_md5 %in% runner_hashes)
 }
 n <- 60L; X <- cbind(1, seq(-1, 1, length.out = n))
 sc <- read.csv(file.path(out, "heterogeneous_design.csv"))

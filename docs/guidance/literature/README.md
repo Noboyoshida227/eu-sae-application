@@ -40,4 +40,4 @@ not authorize redistribution of a previously downloaded publisher PDF.
    authors or an authorized institutional source.
 
 Historical Git objects and the v5.1.0 release are covered in
-`docs/HISTORY_REMEDIATION.md`.
+`docs/maintenance/HISTORY_REMEDIATION.md`.

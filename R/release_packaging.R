@@ -19,8 +19,10 @@ sae_release_inventory <- function(root = ".") {
   forbidden <- "(^|/)(\\.git|\\.env[^/]*|\\.Renviron|\\.Rhistory|\\.RData|Rplots\\.pdf|app_runs|r_local_library|node_modules|renv|tmp|dist|secrets\\.yml|api_keys\\.yml|package_versions\\.local\\.csv)(/|$)|^docs/internal/|^outputs/(?!.*\\.gitkeep$)|^docs/guidance/literature/(?!README\\.md$)"
   if (any(grepl(forbidden, paths, perl = TRUE, ignore.case = TRUE))) stop("Forbidden file in release inventory.")
   required <- c("VERSION", "WIZARD_VERSION", "RELEASE_NAME", "app.R", "app_wizard.R", "report.Rmd",
-                "README.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md",
-                "docs/MCPE_VALIDATION_STATUS.md", "docs/SUPPORTED_PLATFORMS.md",
+                "README.md", "START_HERE.html", "docs/INDEX.html",
+                "docs/maintenance/navigation.json", "docs/instructions/English/QUICK_START.pdf",
+                "docs/templates/report_reference.docx", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md",
+                "docs/validation/MCPE_VALIDATION_STATUS.md", "docs/instructions/English/SUPPORTED_PLATFORMS.md",
                 "Data/README.md", "scripts/release_inventory.csv")
   if (length(setdiff(required, paths))) stop("Release inventory lacks required package files.")
   sort(paths, method = "radix")

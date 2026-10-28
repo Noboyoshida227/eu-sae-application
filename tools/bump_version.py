@@ -18,8 +18,9 @@ What it changes
   1. WIZARD_VERSION
   2. Every tracked text file that contains the old version, in either form
      ("5.2.0-rc.6-wizard.3-pointwise" or "5_2_0_rc_6_wizard_3_pointwise").
-     docs/CHANGELOG.md is deliberately excluded: it is history.
-  3. Renames docs/instructions/EU_SAE_Download_Instructions_<old token>.pdf
+     Historical reviews, QER evidence and mixed historical/current registers
+     are excluded; update their current-candidate addenda explicitly.
+  3. Renames docs/instructions/English/EU_SAE_Download_Instructions_<old token>.pdf
      to the new token.
   4. Rewrites the version text inside the guidelines note (.docx) and the
      release name inside the three Workbench guides (.pptx) - these are ZIP
@@ -45,10 +46,13 @@ os.chdir(ROOT)
 
 TEXT_EXT = {".R", ".Rmd", ".md", ".txt", ".csv", ".bat", ".command", ".sh",
             ".yml", ".yaml", ".json", ".ps1", ".py", ".lua", ".gitattributes"}
-SKIP_DIRS = {".git", "dist", "tmp", "outputs", "app_runs", "r_local_library",
+SKIP_DIRS = {".git", "dist", "tmp", "outputs", "app_runs", "_private_build", "r_local_library",
              "node_modules", ".Rproj.user", ".claude", "Claude outputs"}
-SKIP_FILES = {"docs/CHANGELOG.md",           # history - never rewritten
-              "tools/bump_version.py"}       # this file quotes versions as examples
+SKIP_FILES = {"docs/maintenance/CHANGELOG.md",           # history - never rewritten
+              "tools/bump_version.py",       # this file quotes versions as examples
+              "docs/guidance/METHODOLOGY_ALIGNMENT.md", "docs/validation/REVISION_STATUS.md",
+              "docs/validation/MCPE_VALIDATION_STATUS.md"}
+HISTORICAL_PREFIXES = ("docs/reviews/", "docs/validation/QER/")
 OFFICE_TARGETS = [                            # (path pattern, XML parts to patch)
     ("docs/guidance/guidelines_v5_2_0_rc6_wizard.docx", r"word/document\.xml"),
 ]
@@ -56,10 +60,10 @@ OFFICE_TARGETS = [                            # (path pattern, XML parts to patc
 # release name inside them (e.g. the ZIP name in Guide 1) is updated when
 # present. Their PDFs are exported from the decks, so re-export after a change.
 OPTIONAL_OFFICE_GLOBS = [
-    ("docs/instructions/EU_SAE_Workbench_Guide_*.pptx", r"ppt/slides/slide\d+\.xml"),
+    ("docs/instructions/*/EU_SAE_Workbench_Guide_*.pptx", r"ppt/slides/slide\d+\.xml"),
 ]
 RENAME_TARGETS = [
-    "docs/instructions/EU_SAE_Download_Instructions_{tok}.pdf",
+    "docs/instructions/English/EU_SAE_Download_Instructions_{tok}.pdf",
 ]
 
 def token(v):  return re.sub(r"[.-]", "_", v)
@@ -72,7 +76,7 @@ def tracked_text_files():
         for f in fns:
             p = Path(dp, f)
             rel = p.as_posix().lstrip("./")
-            if rel in SKIP_FILES: continue
+            if rel in SKIP_FILES or rel.startswith(HISTORICAL_PREFIXES): continue
             if p.suffix in TEXT_EXT or p.name in ("WIZARD_VERSION", "VERSION", ".gitattributes", ".gitignore"):
                 yield p
 
@@ -183,6 +187,16 @@ def main():
         if r.returncode != 0: die("PDF regeneration failed:\n" + r.stdout + r.stderr)
         say("  " + r.stdout.strip().replace("\n", "\n  "))
 
+    # Navigation pages and the quick-start PDF share the catalogue and version.
+    if dry:
+        say("Navigation: would regenerate via tools/build_navigation.py")
+    elif a.skip_pdf:
+        say("Navigation: regenerate tools/build_navigation.py before packaging.")
+    else:
+        r = subprocess.run([sys.executable, "tools/build_navigation.py"], capture_output=True, text=True)
+        if r.returncode != 0: die("Navigation regeneration failed:\n" + r.stdout + r.stderr)
+        say(r.stdout.strip())
+
     # ---- leftover scan: partial or truncated forms of the OLD version --------
     # e.g. a launcher header saying "5.2.0-rc.6-wizard.3" without its suffix.
     old_base = re.sub(r"-[A-Za-z]+$", "", old)          # 5.2.0-rc.6-wizard.3-pointwise -> 5.2.0-rc.6-wizard.3
@@ -202,7 +216,7 @@ def main():
     # ---- what is left for a human ------------------------------------------
     say(f"\nDone. {'Nothing was changed.' if dry else 'Now:'}")
     if not dry:
-        say(f"  1. Add an entry to docs/CHANGELOG.md under:   ## {new} - <date>")
+        say(f"  1. Add an entry to docs/maintenance/CHANGELOG.md under:   ## {new} - <date>")
         say(f"  2. Review the changes in GitHub Desktop and commit.")
         say(f"  3. Run Release.ps1 - it builds dist\\{short_name}\\")
 

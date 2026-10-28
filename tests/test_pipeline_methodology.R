@@ -69,8 +69,8 @@ for (scenario in scenarios) {
   for (path in c("report.Rmd", "app_support.R", "VERSION", "WIZARD_VERSION")) {
     stopifnot(file.copy(file.path(repository, path), file.path(work, path)))
   }
-  dir.create(file.path(work, "docs"))
-  stopifnot(file.copy(file.path(repository, "docs", "report_reference.docx"), file.path(work, "docs")))
+  dir.create(file.path(work, "docs", "templates"), recursive = TRUE)
+  stopifnot(file.copy(file.path(repository, "docs", "templates", "report_reference.docx"), file.path(work, "docs", "templates")))
   log_run <- identical(scenario, "log")
   shared <- list(
     survey_path = inputs[1L], rhs_path = inputs[2L], shp_path = inputs[3L],

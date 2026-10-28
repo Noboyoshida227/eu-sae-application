@@ -17,10 +17,10 @@ parse_ok <- vapply(r_files, function(path) {
 check(all(parse_ok), "all R sources parse")
 check(identical(trimws(readLines("VERSION", warn = FALSE)[1]), "5.2.0-rc.6"), "VERSION is the candidate version")
 check(identical(trimws(readLines("WIZARD_VERSION", warn = FALSE)[1]),
-                "5.2.0-rc.6-wizard.5.15"),
+                "5.2.0-rc.6-wizard.5.16"),
       "WIZARD_VERSION identifies the rc.6 wizard overlay")
 wizard_version <- trimws(readLines("WIZARD_VERSION", warn = FALSE)[1])
-changelog_text <- read_all("docs/CHANGELOG.md")
+changelog_text <- read_all("docs/maintenance/CHANGELOG.md")
 check(grepl(paste0("## ", wizard_version), changelog_text, fixed = TRUE),
       "CHANGELOG has an entry for the current WIZARD_VERSION")
 check(!grepl("\n\\+", changelog_text),
@@ -124,12 +124,12 @@ source("R/workbench_ui.R", local = TRUE)
 .res_links <- vapply(sae_resource_links("."), function(l) l$href, character(1))
 wizard_resources <- c(
   "docs/guidance/guidelines_v5_2_0_rc6_wizard.pdf",
-  "docs/instructions/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_15.pdf",
-  "docs/instructions/EU_SAE_Workbench_Guide_1_Install_and_Start.pdf",
-  "docs/instructions/EU_SAE_Workbench_Guide_2_Running_the_Workbench.pdf",
-  "docs/instructions/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare.pdf",
+  "docs/instructions/English/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_16.pdf",
+  "docs/instructions/English/EU_SAE_Workbench_Guide_1_Install_and_Start.pdf",
+  "docs/instructions/English/EU_SAE_Workbench_Guide_2_Running_the_Workbench.pdf",
+  "docs/instructions/English/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare.pdf",
   # Polish (_PL) and Greek (_GR) versions of the three guides
-  paste0("docs/instructions/EU_SAE_Workbench_Guide_",
+  paste0("docs/instructions/", c("Polish", "Greek"), "/EU_SAE_Workbench_Guide_",
          rep(c("1_Install_and_Start", "2_Running_the_Workbench",
                "3_Estimating_Poverty_and_Welfare"), each = 2),
          c("_PL", "_GR"), ".pdf")
@@ -378,7 +378,6 @@ check(!isTRUE(inv_bad$available) && is.null(inv_bad$inverse),
       "non-finite matrix is reported unavailable")
 
 bootstrap_files <- c(
-  "scripts/mcpe_functions.R",
   "scripts/pbmcpeMFH1_with_existing_eblup.R",
   "scripts/pbmcpeMFH2_with_existing_eblup.R",
   "scripts/pbmcpeMFH3_with_existing_eblup.R",
@@ -1264,7 +1263,7 @@ check(grepl('radioButtons("price_income_period"', .app_txt, fixed = TRUE) &&
       "'Incomes refer to' setting in the shared price inputs, saved with the setup (default: the survey year)")
 check({
   .p_saved <- regexpr(".welfare_prices_saved <- sae_setup_welfare_prices(setup$inputs)", .app_txt, fixed = TRUE)
-  .p_merge <- regexpr("setup$inputs <- modifyList(defaults$inputs, setup$inputs %||% list())", .app_txt, fixed = TRUE)
+  .p_merge <- regexpr("setup$inputs <- modifyList(defaults$inputs,", .app_txt, fixed = TRUE)
   .p_saved > 0 && .p_merge > 0 && .p_saved < .p_merge &&
     grepl('updateRadioButtons(session, "welfare_prices", selected = .welfare_prices_saved)', .app_txt, fixed = TRUE)
 }, "apply_dashboard_setup reads the prices choice before merging defaults")
@@ -1321,7 +1320,7 @@ check(!grepl("Forces specific covariates", .wiz_help, fixed = TRUE) &&
       "wizard covariate help describes candidate pools (LASSO on) and fixed specifications (LASSO off)")
 check(!any(grepl("stays on the EUR scale", c(.wiz_help, read_all("app.R")), fixed = TRUE)),
       "MFH log help no longer says change analysis stays on the EUR scale")
-.rw <- read_all("docs/README_WIZARD.md")
+.rw <- read_all("docs/instructions/English/README_WIZARD.md")
 check(grepl("With current prices\nand no conversion they include inflation", .rw, fixed = TRUE) &&
         grepl("repeats fitting, back-transformation", .rw, fixed = TRUE) &&
         !grepl("estimated-change distribution", .rw, fixed = TRUE),
@@ -1337,7 +1336,7 @@ check(!grepl("direct arithmetic mean divided by its direct geometric mean", .hel
 check(!grepl("Affects how cross-year covariance of sampling errors is estimated", .help_all, fixed = TRUE),
       "PSU-consistency help no longer claims an effect on the estimates")
 check(!grepl("this choice is ignored because the transformation", .help_all, fixed = TRUE) &&
-        lengths(regmatches(.help_all, gregexpr("under log it applies 'sm_out' to the log-scale variances",
+        lengths(regmatches(.help_all, gregexpr("Under log, the selected policy applies to log-scale variances.",
                                                .help_all, fixed = TRUE))) == 2L,
       "UFH variance help states the arcsin and log behaviour in both interfaces")
 check(!grepl("value, poverty_rate, rate, or mean", .help_all, fixed = TRUE),
@@ -1362,7 +1361,9 @@ check(sum(gregexpr("pointwise_significant = sae_count_flags(significant_unadjust
 
 # Statistical regression checks require and exercise the installed emdi/msae estimators.
 for (.method_test in c("test_ufh_methodology.R", "test_mfh_bootstrap_methodology.R",
-                       "test_mfh_convergence.R", "test_methodology_simulation.R")) {
+                       "test_mfh_convergence.R", "test_methodology_simulation.R",
+                       "test_ufh_reporting.R", "test_w5p_mfh_plots.R",
+                       "test_input_preflight.R", "test_variance_defaults.R", "test_ai_recommendation.R", "test_navigation.R")) {
   source(file.path("tests", .method_test), local = new.env(parent = globalenv()))
 }
 

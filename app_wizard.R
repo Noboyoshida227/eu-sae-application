@@ -646,7 +646,7 @@ ui <- fluidPage(
             ,
             fileInput("population_file",
               tip_label("Domain population sizes (optional)",
-                        "Optional RDS/CSV/XLSX file with domain population sizes. Supports long domain-year-population format or wide domain-by-year format; leave blank to estimate domain populations from the survey as the sum of the population weights (weight * household size when each row is a household, weight when each row is a person).")),
+                        "Optional RDS/CSV/XLSX file with domain population sizes. Requires one row per domain/year in long format or one row per domain in wide format. Duplicate keys (including sex/age rows) are rejected; supply aggregate population totals. Named matrix columns match years; completely unnamed columns must follow the selected year order. Leave blank to estimate domain populations from the survey as the sum of the population weights (weight * household size when each row is a household, weight when each row is a person).")),
             uiOutput("population_active_file")
           ),
           tags$div(class = "wiz-col",
@@ -852,13 +852,13 @@ ui <- fluidPage(
                             "For log: 'bc_sm' uses the Slud-Maiti correction implemented by emdi, with maximum-likelihood variance estimation. 'none' uses exp(eta_hat) without bias correction. Both target the area's arithmetic mean welfare; the naive prediction can be biased downwards. Corrected predictions are unavailable for areas without a direct estimate.")),
                 choices = c("bc", "none"), selected = "bc")
             ),
-            # Variance smoothing menu is only meaningful when no transformation
-            # is used (arcsin/log already stabilize variances).
+            # Identity and log models honor the selected variance policy.
+            # Arcsin instead uses effective-sample-size working variances.
             conditionalPanel(
-              condition = "input.ufh_transformation == 'no'",
+              condition = "input.ufh_transformation == 'no' || input.ufh_transformation == 'log'",
             selectInput("ufh_var_choice",
-              tip_label("Variance option (UFH)", "Sampling variance input for UFH when no transformation is used. 'sm_out' replaces a direct variance with its smoothed (GVF-based) variance only when the direct variance is missing/non-finite or below 0.001; 'sm_all' replaces all variances; 'direct' retains raw survey variances except safety backfills. This choice is shown only when no transformation is used: under arcsin the app fills only missing or zero variances, and under log it applies 'sm_out' to the log-scale variances."),
-                choices = c("sm_out", "sm_all", "direct"), selected = "sm_out")
+              tip_label("Variance option (UFH)", "Sampling variance input for identity or log UFH. The default 'sm_all' replaces all working variances with GVF predictions. 'sm_out' replaces only missing/non-finite or below-0.001 variances; 'direct' retains survey variances except missing/zero safety backfills. Under log, the selected policy applies to log-scale variances. Arcsin uses effective-sample-size working variance 1/(4*n_eff) independently of this choice. Raw Direct uncertainty is reported separately."),
+                choices = c("sm_all", "sm_out", "direct"), selected = "sm_all")
             ),
             ic_criterion_input("ufh", selected = "BIC",
               tip_text = "Information criterion used for stepwise covariate selection. BIC penalizes complexity more heavily and tends to select simpler models. AIC favours predictive accuracy. Not used when covariates are entered for both years with LASSO off."),
@@ -926,11 +926,11 @@ ui <- fluidPage(
                 choices = c("lambda.1se", "lambda.min"), selected = "lambda.1se")
             ),
             selectInput("mfh_var_choice",
-              tip_label("Variance option (MFH)", "Sampling variance input: 'sm_out' replaces a direct variance with its smoothed (GVF-based) variance only when the direct variance is missing/non-finite or below 0.001; 'sm_all' replaces all variances; 'direct' retains raw survey variances except safety backfills. The covariance options below update automatically to match."),
-              choices = c("sm_out", "sm_all", "direct"), selected = "sm_out"),
+              tip_label("Variance option (MFH)", "Sampling variance input: the default 'sm_all' replaces all variances with GVF predictions; 'sm_out' replaces only missing/non-finite or below-0.001 variances; 'direct' retains survey variances except missing/zero safety backfills. For log means, the policy applies on the log-mean variance scale. The covariance options below update automatically to match."),
+              choices = c("sm_all", "sm_out", "direct"), selected = "sm_all"),
             selectInput("mfh_cov_choice",
               tip_label("Covariance option", "How the covariance of sampling errors over time is estimated. Available options depend on the variance choice above. 'rho_sm_out' multiplies the national average autocorrelation with outlier-smoothed variances (available with sm_out). 'rho_sm_all' multiplies it with fully smoothed variances (available with sm_all). 'rho_dir' multiplies it with direct variances. 'direct' uses the direct variance-covariance matrix. 'zero' assumes no cross-year sampling correlation."),
-              choices = c("rho_sm_out", "rho_dir", "direct", "zero"), selected = "rho_sm_out"),
+              choices = c("rho_sm_all", "direct", "zero"), selected = "rho_sm_all"),
             selectInput("mfh_diag_model",
               tip_label("Selected MFH model", "MFH2 is the package default. If MFH3 is selected, the package follows Molina and Romero: fit MFH3, use MFH2 if MFH3 does not converge or errors, and otherwise use the MFH3 random-effect variance homogeneity test to choose MFH3 or MFH2. MFH1 remains an additional sensitivity model."),
               choices = c(
@@ -989,7 +989,7 @@ ui <- fluidPage(
               ),
               fileInput("regional_benchmark_file",
                 tip_label("Benchmark Target Database (optional)",
-                          "Optional RDS/CSV/XLSX file with benchmark targets by year. Leave blank to estimate targets from the survey with the population weights (weight * household size when each row is a household, weight when each row is a person).")),
+                          "Optional RDS/CSV/XLSX file with one target per group/year (or one per year nationally). Duplicate keys are rejected, even when values agree. Named matrix columns match years; completely unnamed columns must follow the selected year order. Leave blank to estimate targets from the survey with the population weights (weight * household size when each row is a household, weight when each row is a person).")),
               tags$details(
                 class = "benchmark-format-note",
                 tags$summary(class = "note-title", "External benchmark file format"),

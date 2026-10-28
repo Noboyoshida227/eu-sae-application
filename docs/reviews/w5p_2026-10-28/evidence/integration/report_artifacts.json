@@ -1,0 +1,38 @@
+[
+  {
+    "scenario": "poverty",
+    "path": "tmp/w5p_integrations/w5p_integration_7ae059ef1b4c/poverty/outputs/final_report.html",
+    "bytes": 11518608,
+    "sha256": "793ef7d274e9b1375949b75b6764eaaaa4c18efe8486ffc297ccde0e17f247fd"
+  },
+  {
+    "scenario": "poverty",
+    "path": "tmp/w5p_integrations/w5p_integration_7ae059ef1b4c/poverty/outputs/final_report.docx",
+    "bytes": 6552985,
+    "sha256": "34a526b3047aaa0a7f53f13af9532e991318995ddb06443d9dd6cbdbe2323bf5"
+  },
+  {
+    "scenario": "poverty",
+    "path": "tmp/w5p_integrations/w5p_integration_7ae059ef1b4c/poverty/report_render_final/final_report.pdf",
+    "bytes": 6350016,
+    "sha256": "b1d1f7c3d572e0b461efb544d8e6ea526753a49871cf8ae239c760f12be48d7f"
+  },
+  {
+    "scenario": "log",
+    "path": "tmp/w5p_integrations/w5p_integration_7ae059ef1b4c/log/outputs/final_report.html",
+    "bytes": 12131975,
+    "sha256": "d6a6d08de70a3a14f33449526616b7619b6798e42ee8d2ddc7ef0fd7c13ca3ae"
+  },
+  {
+    "scenario": "log",
+    "path": "tmp/w5p_integrations/w5p_integration_7ae059ef1b4c/log/outputs/final_report.docx",
+    "bytes": 7023105,
+    "sha256": "54c133281e11606ba699700b41424e5929fc834d5c7ae0b3bfed6392fdd7e866"
+  },
+  {
+    "scenario": "log",
+    "path": "tmp/w5p_integrations/w5p_integration_7ae059ef1b4c/log/report_render_final/final_report.pdf",
+    "bytes": 6527264,
+    "sha256": "1ce20ed74de76b1fcfa92e4033eb1b86940422eab7bb4f3130e770baca9dac51"
+  }
+]

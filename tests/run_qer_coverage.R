@@ -12,7 +12,7 @@ option <- function(name, default) {
 lib <- option("library", "")
 if (nzchar(lib)) .libPaths(c(lib, .libPaths()))
 mode <- option("mode", "equivalence")
-out <- option("output", "docs/QER/evidence")
+out <- option("output", "docs/validation/QER/evidence")
 outer <- as.integer(option("outer", if (mode == "balanced") "500" else "100"))
 B <- as.integer(option("bootstrap", if (mode == "balanced") "1000" else "500"))
 stopifnot(mode %in% c("equivalence", "balanced", "heterogeneous"), outer >= 2, B >= 30)

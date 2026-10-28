@@ -10,7 +10,7 @@ cfg_path <- file.path(work, "integration_config.yml")
 cfg <- yaml::read_yaml(cfg_path)
 if (!identical(cfg$country_name, "Spain integration fixture")) stop("Not a QER integration fixture.")
 files <- c("scripts/03_comparison.R", "R/change_comparison.R", "R/comparison_report_ai.R",
-            "R/report_export.R", "R/report_word.lua", "report.Rmd", "docs/report_reference.docx")
+            "R/report_export.R", "R/report_word.lua", "report.Rmd", "docs/templates/report_reference.docx")
 for (p in files) stopifnot(file.copy(file.path(root, p), file.path(work, p), overwrite = TRUE))
 outputs <- file.path(work, "outputs")
 protected <- file.path(outputs, "data", c("pov_fh.xlsx", "pov_mfh.xlsx", "mfh_artifacts.rds", "fh_model_y1.rds", "fh_model_y2.rds"))

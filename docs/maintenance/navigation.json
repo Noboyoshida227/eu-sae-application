@@ -1,0 +1,515 @@
+{
+  "title": "EU SAE Workbench",
+  "subtitle": "Start an analysis and find your documents and results",
+  "introduction": "Open this guide from the extracted package. It works offline and does not start R. Use the guided application for a new analysis.",
+  "groups": [
+    {
+      "id": "instructions",
+      "title": "Using the Workbench",
+      "description": "Start with Guides 1, 2 and 3 in your preferred language. Additional reference documents are currently in English."
+    },
+    {
+      "id": "guidance",
+      "title": "Methods and interpretation",
+      "description": "Guidelines first, then the deviations note and optional technical details."
+    },
+    {
+      "id": "validation",
+      "title": "Validation and limitations",
+      "description": "Current checks and statistical limitations, followed by clearly identified historical evidence."
+    },
+    {
+      "id": "maintenance",
+      "title": "For maintainers",
+      "description": "Release and project records. These are not required for a normal analysis."
+    }
+  ],
+  "steps": [
+    {
+      "title": "Extract and prepare",
+      "text": "Extract the whole application ZIP. Install R 4.2 or later using a version approved by your organization. Keep the package folders together. The launcher installs missing R packages on first use, so allow an internet connection and time for setup. It reuses Pandoc or downloads a verified copy for HTML/Word reporting."
+    },
+    {
+      "title": "Open the guided application",
+      "text": "Open Start_Here and use the launcher for your computer. Keep its terminal window open while working. Choose New model run, or Load saved configuration to continue with saved settings."
+    },
+    {
+      "title": "Run the seven steps",
+      "text": "Choose your input files, check variable mappings and model settings, then run Check data readiness in Step 6. In Step 7, select Run model. AI report writing is optional and requires separate consent."
+    },
+    {
+      "title": "Review and retain the run",
+      "text": "Use Open the report and Open the run folder when the run finishes. Review diagnostics, uncertainty and any AI advice before using the findings. Save a separate copy of the Word report before editing it."
+    }
+  ],
+  "launchers": [
+    {
+      "os": "Windows",
+      "command": "Start_Here/Start_Wizard.bat",
+      "action": "Double-click"
+    },
+    {
+      "os": "macOS",
+      "command": "Start_Here/Start_Wizard.command",
+      "action": "Double-click; see launcher help for security prompts"
+    },
+    {
+      "os": "Linux",
+      "command": "bash Start_Here/Start_Wizard.command",
+      "action": "Run in a terminal from the package folder"
+    }
+  ],
+  "results": [
+    {
+      "title": "Current report",
+      "path": "outputs/final_report.html",
+      "description": "Open in a browser after a completed run. Keep outputs/data beside it for linked workbooks."
+    },
+    {
+      "title": "Editable report",
+      "path": "outputs/final_report.docx",
+      "description": "Open in Word. Save a separate working copy before editing."
+    },
+    {
+      "title": "Consolidated results",
+      "path": "outputs/data/EU_SAE_results.xlsx",
+      "description": "Excel estimates, changes and diagnostics when the relevant steps complete."
+    },
+    {
+      "title": "Figures and diagnostic tables",
+      "path": "outputs/figures/ and outputs/tables/",
+      "description": "Maps, plots and detailed diagnostics from the current run."
+    },
+    {
+      "title": "A previous run",
+      "path": "app_runs/<run folder>/outputs/",
+      "description": "Archived results; the parent run folder contains saved configuration and logs. Retain original inputs separately."
+    }
+  ],
+  "result_notice": "outputs/ is reused by later runs. app_runs/ holds dated run folders. app_runs/_last_setup_files contains saved-setup support files and is not a run archive. A newly extracted package has no generated reports yet.",
+  "folders": [
+    {
+      "path": "Start_Here/",
+      "purpose": "Launchers and detailed startup help."
+    },
+    {
+      "path": "Data/",
+      "purpose": "Supplied Spain and synthetic examples. Your own approved inputs can be elsewhere."
+    },
+    {
+      "path": "docs/instructions/English, Polish, Greek/",
+      "purpose": "Language folders containing Guides 1-3; PDF for reading, PPTX for editing."
+    },
+    {
+      "path": "docs/guidance/",
+      "purpose": "Guidelines, methodology alignment, deviations and technical notes."
+    },
+    {
+      "path": "docs/validation/",
+      "purpose": "Current validation, limitations and historical QER evidence."
+    },
+    {
+      "path": "docs/maintenance/",
+      "purpose": "Release history and procedures; navigation source files."
+    },
+    {
+      "path": "docs/templates/",
+      "purpose": "Internal Word-report template; keep it with the application."
+    },
+    {
+      "path": "outputs/ and app_runs/",
+      "purpose": "Current results and archived runs, respectively."
+    },
+    {
+      "path": "R/, scripts/, tests/, tools/, www/",
+      "purpose": "Application code, checks, builders and interface resources. No routine editing is needed."
+    }
+  ],
+  "troubleshooting": "For startup problems, read Start_Here/README.md and startup_setup.log. If analysis completes without a report, inspect the run log for Pandoc or Word-conversion messages. The Guides and notes menu links to the same documentation catalogue.",
+  "items": [
+    {
+      "id": "guide1_English",
+      "group": "instructions",
+      "title": "Guide 1: Install and start",
+      "path": "docs/instructions/English/EU_SAE_Workbench_Guide_1_Install_and_Start.pdf",
+      "purpose": "Install and launch the application.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": "docs/instructions/English/EU_SAE_Workbench_Guide_1_Install_and_Start.pptx",
+      "menu": true
+    },
+    {
+      "id": "guide2_English",
+      "group": "instructions",
+      "title": "Guide 2: Running the Workbench",
+      "path": "docs/instructions/English/EU_SAE_Workbench_Guide_2_Running_the_Workbench.pdf",
+      "purpose": "Follow the seven guided steps and save a run.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": "docs/instructions/English/EU_SAE_Workbench_Guide_2_Running_the_Workbench.pptx",
+      "menu": true
+    },
+    {
+      "id": "guide3_English",
+      "group": "instructions",
+      "title": "Guide 3: Estimating poverty and welfare",
+      "path": "docs/instructions/English/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare.pdf",
+      "purpose": "Choose poverty or mean welfare and interpret the results.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": "docs/instructions/English/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare.pptx",
+      "menu": true
+    },
+    {
+      "id": "guide1_Polish",
+      "group": "instructions",
+      "title": "Przewodnik 1: Instalacja i uruchomienie",
+      "path": "docs/instructions/Polish/EU_SAE_Workbench_Guide_1_Install_and_Start_PL.pdf",
+      "purpose": "Install and launch the application.",
+      "audience": "Analysts",
+      "language": "Polish",
+      "status": "Current",
+      "editable": "docs/instructions/Polish/EU_SAE_Workbench_Guide_1_Install_and_Start_PL.pptx",
+      "menu": true
+    },
+    {
+      "id": "guide2_Polish",
+      "group": "instructions",
+      "title": "Przewodnik 2: Praca z aplikacją Workbench",
+      "path": "docs/instructions/Polish/EU_SAE_Workbench_Guide_2_Running_the_Workbench_PL.pdf",
+      "purpose": "Follow the seven guided steps and save a run.",
+      "audience": "Analysts",
+      "language": "Polish",
+      "status": "Current",
+      "editable": "docs/instructions/Polish/EU_SAE_Workbench_Guide_2_Running_the_Workbench_PL.pptx",
+      "menu": true
+    },
+    {
+      "id": "guide3_Polish",
+      "group": "instructions",
+      "title": "Przewodnik 3: Szacowanie ubóstwa i dobrobytu",
+      "path": "docs/instructions/Polish/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare_PL.pdf",
+      "purpose": "Choose poverty or mean welfare and interpret the results.",
+      "audience": "Analysts",
+      "language": "Polish",
+      "status": "Current",
+      "editable": "docs/instructions/Polish/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare_PL.pptx",
+      "menu": true
+    },
+    {
+      "id": "guide1_Greek",
+      "group": "instructions",
+      "title": "Εγχειρίδιο 1: Εγκατάσταση και εκκίνηση",
+      "path": "docs/instructions/Greek/EU_SAE_Workbench_Guide_1_Install_and_Start_GR.pdf",
+      "purpose": "Install and launch the application.",
+      "audience": "Analysts",
+      "language": "Greek",
+      "status": "Current",
+      "editable": "docs/instructions/Greek/EU_SAE_Workbench_Guide_1_Install_and_Start_GR.pptx",
+      "menu": true
+    },
+    {
+      "id": "guide2_Greek",
+      "group": "instructions",
+      "title": "Εγχειρίδιο 2: Χρήση του Workbench",
+      "path": "docs/instructions/Greek/EU_SAE_Workbench_Guide_2_Running_the_Workbench_GR.pdf",
+      "purpose": "Follow the seven guided steps and save a run.",
+      "audience": "Analysts",
+      "language": "Greek",
+      "status": "Current",
+      "editable": "docs/instructions/Greek/EU_SAE_Workbench_Guide_2_Running_the_Workbench_GR.pptx",
+      "menu": true
+    },
+    {
+      "id": "guide3_Greek",
+      "group": "instructions",
+      "title": "Εγχειρίδιο 3: Εκτίμηση φτώχειας και ευημερίας",
+      "path": "docs/instructions/Greek/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare_GR.pdf",
+      "purpose": "Choose poverty or mean welfare and interpret the results.",
+      "audience": "Analysts",
+      "language": "Greek",
+      "status": "Current",
+      "editable": "docs/instructions/Greek/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare_GR.pptx",
+      "menu": true
+    },
+    {
+      "id": "quick",
+      "group": "instructions",
+      "title": "Quick start and folder map",
+      "path": "docs/instructions/English/QUICK_START.pdf",
+      "purpose": "Printable companion to START_HERE.html. Two pages.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": true
+    },
+    {
+      "id": "download",
+      "group": "instructions",
+      "title": "Download and installation details",
+      "path": "docs/instructions/English/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_16.pdf",
+      "purpose": "Package verification, dependencies and installation details.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": true
+    },
+    {
+      "id": "reference",
+      "group": "instructions",
+      "title": "Detailed user reference",
+      "path": "docs/instructions/English/README_WIZARD.md",
+      "purpose": "Settings, input preparation, prices, AI and saved configurations.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "platforms",
+      "group": "instructions",
+      "title": "Supported platforms",
+      "path": "docs/instructions/English/SUPPORTED_PLATFORMS.md",
+      "purpose": "Operating systems, dependencies and supported startup paths.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "ai",
+      "group": "instructions",
+      "title": "AI and data handling",
+      "path": "docs/instructions/English/SECURITY_AND_AI.md",
+      "purpose": "Consent, external providers, keys and interpretation responsibilities.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "guidelines",
+      "group": "guidance",
+      "title": "Methodological guidelines",
+      "path": "docs/guidance/guidelines_v5_2_0_rc6_wizard.pdf",
+      "purpose": "Main methodological reference. Read the relevant sections before interpreting estimates.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx",
+      "menu": true
+    },
+    {
+      "id": "deviations",
+      "group": "guidance",
+      "title": "Departures and extensions from Molina and Romero",
+      "path": "docs/guidance/MOLINA_ROMERO_DEVIATIONS_w5p.md",
+      "purpose": "What follows the manuscript, project extensions, reasons and remaining conditions.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": true
+    },
+    {
+      "id": "alignment",
+      "group": "guidance",
+      "title": "Methodology alignment",
+      "path": "docs/guidance/METHODOLOGY_ALIGNMENT.md",
+      "purpose": "Reference-to-code mapping and implementation assumptions.",
+      "audience": "Analysts",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": true
+    },
+    {
+      "id": "technical_17",
+      "group": "guidance",
+      "title": "FH_prediction_covariance_paper_with_annex_REVISED_section11_annexA",
+      "path": "docs/guidance/Technical notes/FH_prediction_covariance_paper_with_annex_REVISED_section11_annexA.docx",
+      "purpose": "Advanced derivations and implementation details.",
+      "audience": "Methodologists",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "technical_18",
+      "group": "guidance",
+      "title": "Note on eblupMFH2_robust.R",
+      "path": "docs/guidance/Technical notes/Note on eblupMFH2_robust.R.docx",
+      "purpose": "Advanced derivations and implementation details.",
+      "audience": "Methodologists",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "technical_19",
+      "group": "guidance",
+      "title": "Note on Estimating the Sampling-Error Covariance Matrix (revised)",
+      "path": "docs/guidance/Technical notes/Note on Estimating the Sampling-Error Covariance Matrix (revised).pdf",
+      "purpose": "Advanced derivations and implementation details.",
+      "audience": "Methodologists",
+      "language": "English",
+      "status": "Current",
+      "editable": "docs/guidance/Technical notes/Note on Estimating the Sampling-Error Covariance Matrix (revised).docx",
+      "menu": false
+    },
+    {
+      "id": "technical_20",
+      "group": "guidance",
+      "title": "Note on MSE Estimation - Levels and Changes",
+      "path": "docs/guidance/Technical notes/Note on MSE Estimation - Levels and Changes.pdf",
+      "purpose": "Advanced derivations and implementation details.",
+      "audience": "Methodologists",
+      "language": "English",
+      "status": "Current",
+      "editable": "docs/guidance/Technical notes/Note on MSE Estimation - Levels and Changes.docx",
+      "menu": false
+    },
+    {
+      "id": "receipt",
+      "group": "validation",
+      "title": "Current validation receipt",
+      "path": "docs/validation/W5P_VALIDATION_RECEIPT.md",
+      "purpose": "Executed checks, their source identity and limits.",
+      "audience": "Analysts and reviewers",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": true
+    },
+    {
+      "id": "coverage",
+      "group": "validation",
+      "title": "Statistical validation and limitations",
+      "path": "docs/validation/MCPE_VALIDATION_STATUS.md",
+      "purpose": "Coverage evidence and unresolved inferential questions.",
+      "audience": "Analysts and reviewers",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": true
+    },
+    {
+      "id": "revision",
+      "group": "validation",
+      "title": "Revision status",
+      "path": "docs/validation/REVISION_STATUS.md",
+      "purpose": "Review decisions and outstanding work.",
+      "audience": "Analysts and reviewers",
+      "language": "English",
+      "status": "Current",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "qer",
+      "group": "validation",
+      "title": "Historical QER evidence",
+      "path": "docs/validation/QER/QER_README.md",
+      "purpose": "Earlier simulation designs, results and receipts; keep their original version/date.",
+      "audience": "Methodologists",
+      "language": "English",
+      "status": "Historical evidence",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "changelog",
+      "group": "maintenance",
+      "title": "Changes by version",
+      "path": "docs/maintenance/CHANGELOG.md",
+      "purpose": "Version history; earlier entries describe earlier packages.",
+      "audience": "Maintainers",
+      "language": "English",
+      "status": "Version history",
+      "editable": null,
+      "menu": true
+    },
+    {
+      "id": "releasing",
+      "group": "maintenance",
+      "title": "Release procedure",
+      "path": "docs/maintenance/RELEASING.md",
+      "purpose": "Build and publish from an approved committed tree.",
+      "audience": "Maintainers",
+      "language": "English",
+      "status": "Maintainer reference",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "release_checklist",
+      "group": "maintenance",
+      "title": "Release checklist",
+      "path": "docs/maintenance/RELEASE_CHECKLIST.md",
+      "purpose": "Release authority, rights, privacy and verification checks.",
+      "audience": "Maintainers",
+      "language": "English",
+      "status": "Maintainer reference",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "governance",
+      "group": "maintenance",
+      "title": "Project governance",
+      "path": "docs/maintenance/GOVERNANCE.md",
+      "purpose": "Roles and project decisions.",
+      "audience": "Maintainers",
+      "language": "English",
+      "status": "Maintainer reference",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "history_remediation",
+      "group": "maintenance",
+      "title": "History remediation",
+      "path": "docs/maintenance/HISTORY_REMEDIATION.md",
+      "purpose": "Historical repository cleanup and evidence.",
+      "audience": "Maintainers",
+      "language": "English",
+      "status": "Maintainer reference",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "package_reference",
+      "group": "maintenance",
+      "title": "Technical package reference",
+      "path": "docs/maintenance/PACKAGE_REFERENCE.md",
+      "purpose": "Advanced inputs, reproducibility, licensing and source provenance.",
+      "audience": "Maintainers",
+      "language": "English",
+      "status": "Maintainer reference",
+      "editable": null,
+      "menu": false
+    },
+    {
+      "id": "navigation",
+      "group": "maintenance",
+      "title": "Maintaining navigation",
+      "path": "docs/maintenance/NAVIGATION.md",
+      "purpose": "Shared catalogue source, builders and link verification.",
+      "audience": "Maintainers",
+      "language": "English",
+      "status": "Maintainer reference",
+      "editable": null,
+      "menu": false
+    }
+  ]
+}

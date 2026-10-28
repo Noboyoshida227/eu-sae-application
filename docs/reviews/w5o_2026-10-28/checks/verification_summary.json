@@ -1,0 +1,15 @@
+{
+  "archive_sha256": "52d684f84b76fd87fa65e93deb838ca17ea6ea3b15a8e7b732a0cac1c734b4ef",
+  "manifest_files": 185,
+  "archive_files": 186,
+  "all_manifest_hashes_and_sizes_match": true,
+  "local_source_differences": [
+    "docs/CLEAN_RELEASE_NOTICE.txt"
+  ],
+  "pass_lines": 275,
+  "fail_lines": 0,
+  "skips": [
+    "SKIP: Word integration fixture needs Pandoc, xml2 and zip."
+  ],
+  "suite_completed": true
+}

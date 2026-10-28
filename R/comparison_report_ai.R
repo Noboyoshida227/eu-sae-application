@@ -6,6 +6,8 @@ format_num <- function(x, digits = 4) {
   out
 }
 
+source(file.path("R", "comparison_ai_recommendation.R"), local = TRUE)
+
 comparison_ai_sections <- function() {
   c(
     overview = "Overview",
@@ -14,7 +16,8 @@ comparison_ai_sections <- function() {
     precision = "MSE, RMSE, and CV Comparisons",
     change_significance = "Statistical Significance of Poverty Changes",
     poverty_maps = "Poverty Maps",
-    change_maps = "Poverty Change Maps"
+    change_maps = "Poverty Change Maps",
+    recommendation = "AI Recommendation: UFH or MFH"
   )
 }
 
@@ -122,6 +125,12 @@ load_comparison_ai_data <- function() {
     FH_Bench_MSE = FH_Bench_MSE,
     FH_Bench_CV = FH_Bench_CV
   )
+  for (x in list(fh_comp, mfh_comp)) {
+    if (anyNA(x$domain) || any(!nzchar(x$domain)) || anyNA(x$year) ||
+        anyDuplicated(x[c("domain", "year")])) {
+      stop("AI comparison outputs require unique nonmissing domain/year keys.", call. = FALSE)
+    }
+  }
   missing_fh <- dplyr::anti_join(mfh_comp, fh_comp, by = c("domain", "year"))
   missing_mfh <- dplyr::anti_join(fh_comp, mfh_comp, by = c("domain", "year"))
   if (nrow(missing_fh) > 0 || nrow(missing_mfh) > 0) {
@@ -145,8 +154,20 @@ load_comparison_ai_data <- function() {
 
   .as_sig_flag <- function(x) {
     value <- trimws(tolower(as.character(x)))
-    value %in% c("true", "significant", "1", "yes")
+    out <- rep(NA, length(value))
+    out[value %in% c("true", "significant", "1", "yes")] <- TRUE
+    out[value %in% c("false", "not significant", "0", "no")] <- FALSE
+    out
   }
+
+  .read_ai_rds <- function(name) {
+    path <- file.path("outputs", "data", name)
+    x <- if (file.exists(path)) tryCatch(readRDS(path), error = function(e) list()) else list()
+    if (is.list(x)) x else list()
+  }
+  .ai_fit <- comparison_ai_inference_summary(.read_ai_rds("mfh_artifacts.rds"), .read_ai_rds("run_metadata.rds"),
+    if (file.exists("outputs/tables/mfh_convergence_check.csv"))
+      tryCatch(utils::read.csv("outputs/tables/mfh_convergence_check.csv"), error = function(e) NULL) else NULL)
 
   prepare_sig_tbl_local <- function(df, method_label = NULL) {
     if (is.null(df)) return(data.frame(
@@ -155,7 +176,8 @@ load_comparison_ai_data <- function() {
       significant_unadjusted = logical(), p_value_bh = numeric(),
       significant_bh = logical(), p_value_bonferroni = numeric(),
       significant_bonferroni = logical(), significant = logical(),
-      method = character()
+      method = character(), inference_status = character(), inference_warning = character(),
+      joint_moment_status = character()
     ))
     n <- nrow(df)
     method_value <- if (!is.null(method_label)) {
@@ -199,6 +221,20 @@ load_comparison_ai_data <- function() {
     } else {
       p_bonf < 0.05
     }
+    inference <- if ("inference_status" %in% names(df)) as.character(df$inference_status) else
+      ifelse(grepl("^MFH", method_value), .ai_fit$mfh_inference, "period_independence")
+    inference[is.na(inference) | !nzchar(inference)] <- "not_recorded"
+    mfh_rows <- grepl("^MFH", method_value)
+    if (.ai_fit$mfh_inference == "unavailable") inference[mfh_rows] <- "unavailable"
+    if (.ai_fit$mfh_inference == "boundary_sensitive") inference[mfh_rows & inference != "unavailable"] <- "boundary_sensitive"
+    joint_status <- if ("joint_moment_status" %in% names(df)) as.character(df$joint_moment_status) else rep("not_recorded", n)
+    invalid <- inference == "unavailable" | grepl("invalid|unavailable", joint_status) |
+      !is.finite(diff_value) | !is.finite(mse_value) | mse_value < 0 |
+      !is.finite(suppressWarnings(as.numeric(df$lb))) | !is.finite(suppressWarnings(as.numeric(df$ub))) |
+      suppressWarnings(as.numeric(df$ub)) < suppressWarnings(as.numeric(df$lb))
+    inference[invalid] <- "unavailable"
+    sig_raw[invalid] <- sig_bh[invalid] <- sig_bonf[invalid] <- NA
+    p_raw[invalid] <- p_bh[invalid] <- p_bonf[invalid] <- NA_real_
     data.frame(
       domain = trimws(as.character(df$domain)),
       diff = diff_value,
@@ -213,6 +249,9 @@ load_comparison_ai_data <- function() {
       significant_bonferroni = sig_bonf,
       significant = sig_raw,
       method = method_value,
+      inference_status = inference,
+      inference_warning = if ("inference_warning" %in% names(df)) as.character(df$inference_warning) else rep("", n),
+      joint_moment_status = joint_status,
       stringsAsFactors = FALSE
     )
   }
@@ -315,7 +354,19 @@ build_comparison_ai_prompts <- function(language = "en",
     indicator_unit_phrase <- "as a fraction between 0 and 1"
   }
 
-  dat <- load_comparison_ai_data()
+  recommendation_evidence <- load_comparison_ai_recommendation_evidence(indicator_type = indicator_type)
+  recommendation_prompt <- build_comparison_ai_recommendation_prompt(
+    recommendation_evidence, language, indicator_type)
+  # Missing comparison inputs must not manufacture a preferred estimator.
+  # The advisory section can still explain insufficient evidence; unavailable
+  # descriptive sections retain their own explicit failure statuses.
+  dat <- tryCatch(load_comparison_ai_data(), error = function(e) NULL)
+  if (is.null(dat)) return(list(
+    system = paste("You are a statistician providing advisory interpretation only.",
+      "Use only the supplied aggregate evidence. Do not invent unavailable results.",
+      "Return plain text paragraphs. Human review is required before dissemination.",
+      paste0("Write entirely in ", comparison_ai_language_label(language), ".")),
+    recommendation = recommendation_prompt))
   comparison_dt <- dat$comparison
   sig_plot_dt <- dat$significance
 
@@ -519,8 +570,9 @@ build_comparison_ai_prompts <- function(language = "en",
 
   prompt_system <- paste(
     "You are a statistician writing short commentary blocks for a Small Area Estimation comparison report.",
-    if ("inference_status" %in% names(sig_plot_dt) &&
-        any(sig_plot_dt$inference_status == "boundary_sensitive", na.rm = TRUE))
+    if (identical(recommendation_evidence$fit$mfh_inference, "boundary_sensitive") ||
+        ("inference_status" %in% names(sig_plot_dt) &&
+         any(sig_plot_dt$inference_status == "boundary_sensitive", na.rm = TRUE)))
       paste("This MFH fit has covariance-boundary-sensitive inference.",
             "Explicitly state that its change intervals and p-values are provisional and can substantially understate uncertainty.",
             "Do not claim a narrower interval establishes greater reliable precision or a significant change is confirmed.",
@@ -555,13 +607,13 @@ build_comparison_ai_prompts <- function(language = "en",
       "Write exactly 3 paragraphs for the report overview.",
       "",
       "Paragraph 1: State that this report compares Fay-Herriot (FH) and Multivariate Fay-Herriot (MFH) small area estimation models.",
-      "Explain that FH models each domain independently while MFH borrows strength across correlated variables.",
+      "Explain that UFH fits each year separately while pooling information across areas; MFH additionally models temporal dependence under its assumptions.",
       "Report the mean direct, FH, and MFH poverty rates for each year from the table below.",
       "",
       "Paragraph 2: Compare how closely FH and MFH track the direct estimator using the mean absolute deviation values.",
       "State which method tracks the direct estimator more closely in each year.",
       "",
-      "Paragraph 3: Describe the role of benchmarking. Report how many domains show significant changes by method.",
+      "Paragraph 3: Describe the role of benchmarking. Report exploratory counts of pointwise-significant domains by method; do not give these counts a familywide interpretation.",
       "Note whether FH and MFH agree on which domains show significant changes.",
       "",
       "Mean levels and direct-tracking summary by year:",
@@ -624,20 +676,20 @@ build_comparison_ai_prompts <- function(language = "en",
       "Do NOT use sub-headers or titles within your response. Just write 3 continuous paragraphs.",
       "",
       "Paragraph 1 (MSE): Report the mean MSE for each method by year.",
-      "Quantify how much benchmarking inflates MSE (percentage increase) for FH and MFH.",
-      "Compare whether benchmarking inflates MSE more for FH or MFH, and whether this gap changes across years.",
+      "Quantify the observed percentage change in MSE after benchmarking for FH and MFH, which may be positive or negative.",
+      "Compare these changes between methods and across years.",
       "Describe the observed direction of each benchmarking effect without presuming that variance must increase.",
       "",
       "Paragraph 2 (RMSE): Explain that RMSE expresses estimation error on the same scale as the poverty rate.",
       "Report the mean RMSE for Direct, FH, and MFH by year.",
       "Quantify the percentage reduction in RMSE from the direct estimator for each model-based method.",
-      "Report the benchmarking inflation of RMSE (percentage increase from unbenchmarked to benchmarked) for FH and MFH.",
+      "Report the observed percentage change in RMSE from unbenchmarked to benchmarked for FH and MFH without assuming inflation.",
       "Compare FH vs MFH RMSE and note whether the gap narrows or widens across years.",
       "Note whether FH Benchmarked and MFH Benchmarked converge to similar RMSE levels after benchmarking.",
       "Use the fh_rmse_ratio, mfh_rmse_ratio, fh_rmse_reduction_from_direct, and mfh_rmse_reduction_from_direct",
       "columns from the benchmarking impact table for these calculations.",
       "",
-      "Paragraph 3 (CV): Explain that CV (coefficient of variation) measures relative precision as a percentage of the estimate itself,",
+      "Paragraph 3 (CV): Explain that CV (coefficient of variation) measures relative precision. Input CV values are dimensionless ratios; multiply by 100 only when explicitly reporting percentages,",
       "making it comparable across domains with different poverty levels.",
       "Report the mean CV for Direct, FH, FH Benchmarked, MFH, and MFH Benchmarked by year from the mean_cv column.",
       "Quantify the CV reduction achieved by model-based methods relative to the direct estimator.",
@@ -657,7 +709,7 @@ build_comparison_ai_prompts <- function(language = "en",
       "",
       "Paragraph 1: Report the pointwise, BH, and Bonferroni significant-domain counts for each available method out of the total.",
       "Explain briefly that BH controls the false discovery rate and Bonferroni controls the family-wise error rate.",
-      "Keep pointwise significance as the primary result and compare the sensitivity counts neutrally.",
+      "Keep pointwise significance as the primary result, label counts across domains exploratory, and compare BH and Bonferroni counts neutrally. Do not interpret pointwise counts as familywide error control.",
       "",
       "Paragraph 2: Compare the UFH and MFH 95% confidence-interval width distributions.",
       "Report the medians and interquartile ranges, the number of matched domains in which MFH is narrower or wider,",
@@ -691,6 +743,7 @@ build_comparison_ai_prompts <- function(language = "en",
       "Top three anonymized ranked values by method and year:",
       paste(capture.output(print(as.data.frame(top_rates), row.names = FALSE)), collapse = "\n")
     ), lang_reminder),
+    recommendation = recommendation_prompt,
     change_maps = paste0(paste(
       "Write exactly 2 paragraphs for the poverty-change maps section.",
       "",
@@ -778,7 +831,7 @@ new_comparison_ai_interpretation_state <- function(
   }), keys)
   list(
     schema_version = 1L,
-    prompt_version = "comparison-interpretation-rc6-v1",
+    prompt_version = "comparison-interpretation-rc6-v2-recommendation",
     requested = isTRUE(requested),
     enabled = isTRUE(enabled),
     include_in_report = isTRUE(include_in_report),
@@ -806,7 +859,7 @@ generate_comparison_ai_interpretations <- function(
   model <- if (is.list(llm)) llm$model %||% NA_character_ else NA_character_
   state <- new_comparison_ai_interpretation_state(
     requested = TRUE,
-    enabled = !is.null(llm) && isTRUE(llm$enabled),
+    enabled = !is.null(llm) && isTRUE(llm$enabled) && isTRUE(consent_recorded),
     provider = provider,
     model = model,
     language = language,
@@ -815,9 +868,12 @@ generate_comparison_ai_interpretations <- function(
     default_status = "failed",
     default_reason = "Interpretation was not generated."
   )
-  if (is.null(llm) || !isTRUE(llm$enabled)) {
-    reason <- "The AI provider was unavailable or not enabled."
+  if (!isTRUE(consent_recorded) || is.null(llm) || !isTRUE(llm$enabled)) {
+    reason <- if (!isTRUE(consent_recorded))
+      "AI interpretation was disabled because external-transfer consent was not recorded." else
+      "The AI provider was unavailable or not enabled."
     state$sections <- lapply(state$sections, function(section) {
+      section$status <- "disabled"
       section$failure_reason <- reason
       section
     })
@@ -830,19 +886,15 @@ generate_comparison_ai_interpretations <- function(
     currency_symbol = currency_symbol,
     log_transform   = log_transform
   )
-  section_keys <- c(
-    "overview",
-    "normality",
-    "rates",
-    "precision",
-    "change_significance",
-    "poverty_maps",
-    "change_maps"
-  )
+  section_keys <- names(comparison_ai_sections())
 
   generated_at <- format(Sys.time(), tz = "UTC", usetz = TRUE)
   last_warning_msg <- NULL
   for (key in section_keys) {
+    if (is.null(prompts[[key]]) || !nzchar(prompts[[key]])) {
+      state$sections[[key]]$failure_reason <- "Usable comparative inputs were unavailable for this section."
+      next
+    }
     logger(sprintf("Generating AI commentary for %s section...", key))
     section_warning <- NULL
     section_error <- NULL
@@ -852,13 +904,13 @@ generate_comparison_ai_interpretations <- function(
         warning = function(w) {
           section_warning <<- conditionMessage(w)
           last_warning_msg <<- section_warning
-          logger(sprintf("  Warning (%s): %s", key, conditionMessage(w)))
+          logger(sprintf("  Warning (%s): %s", key, sanitize_ai_failure_message(conditionMessage(w))))
           invokeRestart("muffleWarning")
         }
       ),
       error = function(e) {
         section_error <<- conditionMessage(e)
-        logger(sprintf("  Error (%s): %s", key, conditionMessage(e)))
+        logger(sprintf("  Error (%s): %s", key, sanitize_ai_failure_message(conditionMessage(e))))
         NULL
       }
     )
@@ -889,7 +941,7 @@ generate_comparison_ai_interpretations <- function(
   ))
   if (generated_count == 0L) {
     if (!is.null(last_warning_msg)) {
-      logger(sprintf("All AI commentary sections failed. Last warning: %s", last_warning_msg))
+      logger(sprintf("All AI commentary sections failed. Last warning: %s", sanitize_ai_failure_message(last_warning_msg)))
       logger("Possible causes: invalid API key, network/firewall blocking the API, or rate limiting.")
     }
   } else {
@@ -1053,9 +1105,9 @@ comparison_ai_section_html <- function(state, key, include_ai = TRUE) {
   }
   numeric_qa <- html_escape_text(section$numeric_qa$status %||% "not_applicable")
   paste0(
-    '<section class="ai-interpretation-block ', status_class, '">',
+    '<section id="ai-', html_escape_text(key), '" class="ai-interpretation-block ', status_class, '">',
     '<div class="ai-block-title">', html_escape_text(labels[[key]]),
-    '<span class="ai-section-status">', status_label, '</span></div>',
+    ' | <span class="ai-section-status">', status_label, '</span></div>',
     body,
     '<div class="ai-block-footer">Provider: ', provider,
     ' | Model: ', model,

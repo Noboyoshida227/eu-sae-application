@@ -174,7 +174,7 @@ sae_render_word_report <- function(html_path = "outputs/final_report.html",
                                     output_path = "outputs/final_report.docx",
                                     root = getwd()) {
   if (!file.exists(html_path)) stop("HTML report not found: ", html_path)
-  reference <- file.path(root, "docs", "report_reference.docx")
+  reference <- file.path(root, "docs", "templates", "report_reference.docx")
   filter <- file.path(root, "R", "report_word.lua")
   if (!file.exists(reference) || !file.exists(filter)) stop("Word report template/filter is missing from the package.")
   if (!rmarkdown::pandoc_available()) stop("Pandoc is required for the Word report.")

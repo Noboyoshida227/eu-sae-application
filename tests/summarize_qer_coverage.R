@@ -1,6 +1,6 @@
 # Additional descriptive evidence. Bins below describe observed boundary mass;
 # they are not calibrated decision thresholds or changes to the estimator.
-out <- "docs/QER/evidence"
+out <- "docs/validation/QER/evidence"
 tab <- read.csv(file.path(out, "boundary_outer.csv"))
 tab <- tab[tab$bootstrap == max(tab$bootstrap), ]
 stopifnot(nrow(tab) == read.csv(file.path(out, "boundary_design.csv"))$outer_replicates)

@@ -115,13 +115,16 @@ if (stopped) {
 # ---- Step 2b: AI interpretations (optional) ----
 ai <- job$ai %||% list()
 ai_requested <- isTRUE(ai$requested)
-ai_eligible  <- ok && isTRUE(ai$eligible) && nzchar(api_key)
+ai_eligible  <- ok && ai_requested && "Comparison" %in% (job$steps %||% character()) &&
+  isTRUE(ai$consent) && isTRUE(ai$eligible) && nzchar(api_key)
 provider_hint <- ai$provider %||% NA_character_
 model_hint    <- ai$model %||% NA_character_
 disabled_reason <- if (!ai_requested) {
   "AI interpretation was not requested for this run."
 } else if (!isTRUE(ai$consent)) {
   "AI interpretation was disabled because external-transfer consent was not recorded."
+} else if (!"Comparison" %in% (job$steps %||% character())) {
+  "AI comparison interpretation requires the Comparison step."
 } else if (!nzchar(api_key)) {
   "AI interpretation was disabled because no provider API key was supplied."
 } else if (!ok) {

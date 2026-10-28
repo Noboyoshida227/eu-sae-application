@@ -12,5 +12,5 @@ This inventory records known rights issues; it does not grant permission.
 | `www/cover_map_spain.png` | Landing-page and slide-guide illustration produced by this package with `tools/make_cover_map.R`: benchmarked MFH poverty rates for 2013 from a run of the bundled Spain example, drawn on the IGN/CNIG CartoBase ANE boundaries (Canary Islands shown in an inset). It replaces a former EU map illustration whose source and licence were not recorded. | Package output. Reuse requires keeping the IGN credit printed on the image (Obra derivada de CartoBase ANE 2006-2024 CC-BY 4.0 ign.es; boundaries under CC BY 4.0). The estimates come from the synthetic Spain example described above, whose data carry GPL-2 terms. |
 
 See `docs/guidance/literature/README.md`, `Data/Spain/README.md`, `NOTICE`, and
-`docs/HISTORY_REMEDIATION.md`. This file should be replaced by an approved rights
+`docs/maintenance/HISTORY_REMEDIATION.md`. This file should be replaced by an approved rights
 inventory before a production release.

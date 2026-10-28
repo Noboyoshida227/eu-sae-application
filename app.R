@@ -186,6 +186,7 @@ dashboard_setup_file_dir <- function() {
 dashboard_setup_defaults <- function() {
   list(
     version = 1L,
+    variance_policy_ui_version = 2L,
     saved_at = NULL,
     data_files = list(
       survey_file = "",
@@ -238,7 +239,7 @@ dashboard_setup_defaults <- function() {
       shp_domain = "prov",
       ufh_transformation = "arcsin",
       ufh_backtrans = "bc",
-      ufh_var_choice = "sm_out",
+      ufh_var_choice = "sm_all",
       ufh_ic_criterion = "BIC",
       ufh_lasso_enabled = FALSE,
       ufh_lasso_lambda = "lambda.1se",
@@ -249,8 +250,8 @@ dashboard_setup_defaults <- function() {
       mfh_ic_criterion = "AIC",
       mfh_lasso_enabled = FALSE,
       mfh_lasso_lambda = "lambda.1se",
-      mfh_var_choice = "sm_out",
-      mfh_cov_choice = "rho_sm_out",
+      mfh_var_choice = "sm_all",
+      mfh_cov_choice = "rho_sm_all",
       mfh_diag_model = "MFH2",
       fit_mfh3 = FALSE,
       mfh_refvar_adjustment = "bonferroni",
@@ -263,6 +264,19 @@ dashboard_setup_defaults <- function() {
       language = "en"
     )
   )
+}
+
+sae_setup_variance_notice <- function(setup) {
+  # Older log dashboards stored a hidden choice but always ran sm_out.
+  # Preserve that stored choice and explain its newly active meaning.
+  marker <- setup$variance_policy_ui_version
+  current <- is.numeric(marker) && length(marker) == 1L && !is.na(marker) && marker >= 2L
+  if (current || !identical(setup$inputs$ufh_transformation, "log") ||
+      identical(sae_variance_choice(setup$inputs$ufh_var_choice), "sm_out")) return("")
+  paste0("Review the UFH log variance option: older dashboard versions always applied sm_out for log models, ",
+         "even when the saved hidden setting differed. This version uses the visible selected policy (",
+         sae_variance_choice(setup$inputs$ufh_var_choice),
+         "). Select sm_out to match the variance policy of an earlier dashboard log run.")
 }
 
 read_dashboard_setup <- function(path = dashboard_setup_path()) {
@@ -283,6 +297,9 @@ sae_sanitize_setup <- function(setup) {
   is_scalar <- function(v) !is.null(v) && is.atomic(v) && length(v) == 1L
   out <- list(
     saved_at = if (is_scalar(setup$saved_at)) as.character(setup$saved_at) else NULL,
+    variance_policy_ui_version = if (is_scalar(setup$variance_policy_ui_version) &&
+      is.numeric(setup$variance_policy_ui_version) && !is.na(setup$variance_policy_ui_version))
+        setup$variance_policy_ui_version else NULL,
     data_files = list(),
     inputs = list()
   )
@@ -1094,7 +1111,7 @@ ui <- fluidPage(
         ),
         fileInput("regional_benchmark_file",
           tip_label("Benchmark Target Database (optional)",
-                    "Optional RDS/CSV/XLSX file with benchmark targets by year. Leave blank to estimate targets from the survey with the population weights (weight * household size when each row is a household, weight when each row is a person).")),
+                    "Optional RDS/CSV/XLSX file with one target per group/year (or one per year nationally). Duplicate keys are rejected, even when values agree. Named matrix columns match years; completely unnamed columns must follow the selected year order. Leave blank to estimate targets from the survey with the population weights (weight * household size when each row is a household, weight when each row is a person).")),
         tags$div(
           class = "benchmark-format-note",
           tags$div(class = "note-title", "External benchmark file format"),
@@ -1126,7 +1143,7 @@ ui <- fluidPage(
       ),
       fileInput("population_file",
         tip_label("Domain population sizes (optional)",
-                  "Optional RDS/CSV/XLSX file with domain population sizes. Supports long domain-year-population format or wide domain-by-year format; leave blank to estimate domain populations from the survey as the sum of the population weights (weight * household size when each row is a household, weight when each row is a person).")),
+                  "Optional RDS/CSV/XLSX file with domain population sizes. Requires one row per domain/year in long format or one row per domain in wide format. Duplicate keys (including sex/age rows) are rejected; supply aggregate population totals. Named matrix columns match years; completely unnamed columns must follow the selected year order. Leave blank to estimate domain populations from the survey as the sum of the population weights (weight * household size when each row is a household, weight when each row is a person).")),
       uiOutput("population_active_file"),
       fileInput("cpi_file",
         tip_label("Consumer price index (optional)",
@@ -1289,13 +1306,13 @@ ui <- fluidPage(
                       "For log: 'bc_sm' uses the Slud-Maiti correction implemented by emdi, with maximum-likelihood variance estimation. 'none' uses exp(eta_hat) without bias correction. Both target the area's arithmetic mean welfare; the naive prediction can be biased downwards. Corrected predictions are unavailable for areas without a direct estimate.")),
           choices = c("bc", "none"), selected = "bc")
       ),
-      # Variance smoothing menu is only meaningful when no transformation
-      # is used (arcsin/log already stabilize variances).
+      # Identity and log models honor the selected variance policy.
+      # Arcsin instead uses effective-sample-size working variances.
       conditionalPanel(
-        condition = "input.ufh_transformation == 'no'",
+        condition = "input.ufh_transformation == 'no' || input.ufh_transformation == 'log'",
         selectInput("ufh_var_choice",
-          tip_label("Variance option (UFH)", "Sampling variance input for UFH when no transformation is used. 'sm_out' replaces a direct variance with its smoothed (GVF-based) variance only when the direct variance is missing/non-finite or below 0.001; 'sm_all' replaces all variances; 'direct' retains raw survey variances except safety backfills. This choice is shown only when no transformation is used: under arcsin the app fills only missing or zero variances, and under log it applies 'sm_out' to the log-scale variances."),
-          choices = c("sm_out", "sm_all", "direct"), selected = "sm_out")
+          tip_label("Variance option (UFH)", "Sampling variance input for identity or log UFH. The default 'sm_all' replaces all working variances with GVF predictions. 'sm_out' replaces only missing/non-finite or below-0.001 variances; 'direct' retains survey variances except missing/zero safety backfills. Under log, the selected policy applies to log-scale variances. Arcsin uses effective-sample-size working variance 1/(4*n_eff) independently of this choice. Raw Direct uncertainty is reported separately."),
+          choices = c("sm_all", "sm_out", "direct"), selected = "sm_all")
       ),
       ic_criterion_input("ufh", selected = "BIC",
         tip_text = "Information criterion used for stepwise covariate selection. BIC penalizes complexity more heavily and tends to select simpler models. AIC favours predictive accuracy. Not used when covariates are entered for both years with LASSO off."),
@@ -1364,11 +1381,11 @@ ui <- fluidPage(
           choices = c("lambda.1se", "lambda.min"), selected = "lambda.1se")
       ),
       selectInput("mfh_var_choice",
-        tip_label("Variance option (MFH)", "Sampling variance input: 'sm_out' replaces a direct variance with its smoothed (GVF-based) variance only when the direct variance is missing/non-finite or below 0.001; 'sm_all' replaces all variances; 'direct' retains raw survey variances except safety backfills. The covariance options below update automatically to match."),
-        choices = c("sm_out", "sm_all", "direct"), selected = "sm_out"),
+        tip_label("Variance option (MFH)", "Sampling variance input: the default 'sm_all' replaces all variances with GVF predictions; 'sm_out' replaces only missing/non-finite or below-0.001 variances; 'direct' retains survey variances except missing/zero safety backfills. For log means, the policy applies on the log-mean variance scale. The covariance options below update automatically to match."),
+        choices = c("sm_all", "sm_out", "direct"), selected = "sm_all"),
       selectInput("mfh_cov_choice",
         tip_label("Covariance option", "How the covariance of sampling errors over time is estimated. Available options depend on the variance choice above. 'rho_sm_out' multiplies the national average autocorrelation with outlier-smoothed variances (available with sm_out). 'rho_sm_all' multiplies it with fully smoothed variances (available with sm_all). 'rho_dir' multiplies it with direct variances. 'direct' uses the direct variance-covariance matrix. 'zero' assumes no cross-year sampling correlation."),
-        choices = c("rho_sm_out", "rho_dir", "direct", "zero"), selected = "rho_sm_out"),
+        choices = c("rho_sm_all", "direct", "zero"), selected = "rho_sm_all"),
       selectInput("mfh_diag_model",
         tip_label("Selected MFH model", "MFH2 is the package default. If MFH3 is selected, the package follows Molina and Romero: fit MFH3, use MFH2 if MFH3 does not converge or errors, and otherwise use the MFH3 reference-variance tests to choose MFH3 or MFH2. MFH1 remains an additional sensitivity model. UFH is produced separately by scripts/01_ufh.R."),
         choices = c(
@@ -1502,20 +1519,14 @@ server <- function(input, output, session) {
   # When the variance option changes, update the available covariance choices
   # so that the smoothing level is consistent.
   observeEvent(input$mfh_var_choice, {
-    vc <- input$mfh_var_choice
-    if (vc == "sm_out") {
-      cov_choices <- c("rho_sm_out", "direct", "zero")
-      default_sel <- "rho_sm_out"
-    } else if (vc == "sm_all") {
-      cov_choices <- c("rho_sm_all", "direct", "zero")
-      default_sel <- "rho_sm_all"
-    } else {
-      # direct variance: rho_dir uses direct variances, which is consistent
-      cov_choices <- c("rho_dir", "direct", "zero")
-      default_sel <- "rho_dir"
-    }
+    vc <- sae_variance_choice(input$mfh_var_choice)
+    default_sel <- sae_covariance_choice(var_choice = vc)
+    cov_choices <- c(default_sel, "direct", "zero")
+    current_sel <- isolate(input$mfh_cov_choice)
+    selected <- if (length(current_sel) == 1L && current_sel %in% cov_choices)
+      current_sel else default_sel
     updateSelectInput(session, "mfh_cov_choice",
-                      choices = cov_choices, selected = default_sel)
+                      choices = cov_choices, selected = selected)
   })
 
   status    <- reactiveVal("Idle")
@@ -2504,6 +2515,9 @@ server <- function(input, output, session) {
         inputs[[id]] <- val
       }
     }
+    inputs <- sae_setup_variance_inputs(inputs)
+    inputs$mfh_cov_choice <- sae_covariance_choice(input$mfh_cov_choice,
+                                                   inputs$mfh_var_choice)
     inputs$povline_numeric_by_year <- get_povline_numeric_by_year(parse_years(inputs$years))
     if (length(inputs$povline_numeric_by_year) > 0L) {
       inputs$povline_numeric <- as.numeric(inputs$povline_numeric_by_year[[1]])
@@ -2529,6 +2543,7 @@ server <- function(input, output, session) {
 
     list(
       version = 1L,
+      variance_policy_ui_version = 2L,
       saved_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
       data_files = list(
         survey_file = selected_setup_file_ref(input$survey_file, "survey_file"),
@@ -2549,11 +2564,15 @@ server <- function(input, output, session) {
   apply_dashboard_setup <- function(setup, label = "saved setup") {
     defaults <- dashboard_setup_defaults()
     setup <- setup %||% defaults
+    variance_notice <- sae_setup_variance_notice(setup)
     # Read the prices choice before the defaults are filled in: setups saved
     # before w5k have only deflate_welfare, and the default welfare_prices
     # ("current") would otherwise switch their inflation adjustment off.
     .welfare_prices_saved <- sae_setup_welfare_prices(setup$inputs)
-    setup$inputs <- modifyList(defaults$inputs, setup$inputs %||% list())
+    # Resolve missing covariance before merging defaults, so an explicit
+    # saved sm_out/direct variance retains its matching rho option.
+    setup$inputs <- modifyList(defaults$inputs,
+                               sae_setup_variance_inputs(setup$inputs))
     setup$data_files <- modifyList(defaults$data_files, setup$data_files %||% list())
 
     restoring_setup(TRUE)
@@ -2564,14 +2583,16 @@ server <- function(input, output, session) {
     active_setup_files(setup$data_files)
     benchmark_upload_cleared(FALSE)
     setup_status_text(sprintf(
-      "Loaded %s%s.",
+      "Loaded %s%s.%s",
       label,
       if (!is.null(setup$saved_at) && nzchar(setup$saved_at %||% "")) {
         paste0(" saved at ", setup$saved_at)
       } else {
         ""
-      }
+      },
+      if (nzchar(variance_notice)) paste0(" ", variance_notice) else ""
     ))
+    if (nzchar(variance_notice)) showNotification(variance_notice, type = "warning", duration = 20)
 
     x <- setup$inputs
     f <- setup$data_files
@@ -2696,7 +2717,7 @@ server <- function(input, output, session) {
     updateSelectInput(session, "mfh_lasso_lambda",
                       selected = x$mfh_lasso_lambda %||% "lambda.1se")
     updateSelectInput(session, "mfh_var_choice",
-                      selected = x$mfh_var_choice %||% "sm_out")
+                      selected = sae_variance_choice(x$mfh_var_choice))
     updateSelectInput(session, "mfh_diag_model",
                       selected = x$mfh_diag_model %||% "MFH2")
     updateCheckboxInput(session, "fit_mfh3",
@@ -3883,13 +3904,24 @@ server <- function(input, output, session) {
     )
     readiness_survey <- filter_to_analysis_years(harmonized$survey, requested_years)
     readiness_rhs <- filter_to_analysis_years(harmonized$rhs, requested_years)
+    upload_error <- tryCatch({
+      sae_validate_relevant_analysis_inputs(readiness_survey, readiness_rhs, requested_years,
+        steps = input$steps, do_benchmark = isTRUE(input$do_benchmark),
+        population_path = population_path, target_path = regional_benchmark_path,
+        benchmark_level = get_benchmark_level(), level_col = benchmark_level_var,
+        indicator_type = input$indicator_type %||% "poverty", fgt_alpha = as.integer(input$fgt_alpha %||% 0))
+      NULL
+    }, error = function(e) conditionMessage(e))
+    if (!is.null(upload_error)) year_msgs <- c(year_msgs, paste("Test 0h: ERROR --", upload_error))
     rr <- tryCatch(
       assess_data_readiness(
         survey_data    = readiness_survey,
         aux_data       = readiness_rhs,
+        mfh_requested  = "MFH" %in% input$steps,
+        years_keep     = requested_years,
         geo_data       = geo_read$data,
         domain_var     = input$shp_domain,
-        save_to        = "outputs/tables",
+        save_to        = if (any(grepl("ERROR", year_msgs, fixed = TRUE))) NULL else "outputs/tables",
         fgt_alpha      = as.integer(input$fgt_alpha %||% 0),
         indicator_type = input$indicator_type %||% "poverty",
         # Readiness assesses log-specific issues (non-positive welfare,
@@ -4121,9 +4153,10 @@ server <- function(input, output, session) {
       }
     )
 
-    # Map legacy covariance name if browser cached an old session
-    mfh_cov_val <- input$mfh_cov_choice
-    if (identical(mfh_cov_val, "rho_sm")) mfh_cov_val <- "rho_sm_out"
+    # Only missing values use the new defaults. Explicit saved alternatives
+    # and the legacy selective-smoothing alias retain their meaning.
+    mfh_var_val <- sae_variance_choice(input$mfh_var_choice)
+    mfh_cov_val <- sae_covariance_choice(input$mfh_cov_choice, mfh_var_val)
 
     if (!is.null(harmonized)) {
       validation_survey <- filter_to_analysis_years(harmonized$survey, years)
@@ -4242,13 +4275,24 @@ server <- function(input, output, session) {
       )
       readiness_survey <- filter_to_analysis_years(harmonized$survey, requested_years)
       readiness_rhs <- filter_to_analysis_years(harmonized$rhs, requested_years)
+      upload_error <- tryCatch({
+        sae_validate_relevant_analysis_inputs(readiness_survey, readiness_rhs, requested_years,
+          steps = input$steps, do_benchmark = isTRUE(input$do_benchmark),
+          population_path = population_path, target_path = regional_benchmark_path,
+          benchmark_level = get_benchmark_level(), level_col = benchmark_level_var,
+          indicator_type = input$indicator_type %||% "poverty", fgt_alpha = as.integer(input$fgt_alpha %||% 0))
+        NULL
+      }, error = function(e) conditionMessage(e))
+      if (!is.null(upload_error)) year_msgs <- c(year_msgs, paste("Test 0h: ERROR --", upload_error))
       rr <- tryCatch(
         assess_data_readiness(
           survey_data    = readiness_survey,
           aux_data       = readiness_rhs,
+          mfh_requested  = "MFH" %in% input$steps,
+          years_keep     = requested_years,
           geo_data       = geo_read$data,
           domain_var     = input$shp_domain,
-          save_to        = "outputs/tables",
+          save_to        = if (any(grepl("ERROR", year_msgs, fixed = TRUE))) NULL else "outputs/tables",
           fgt_alpha      = as.integer(input$fgt_alpha %||% 0),
           indicator_type = input$indicator_type %||% "poverty",
           # OR over UFH and MFH transformation choices -- see longer
@@ -4291,10 +4335,10 @@ server <- function(input, output, session) {
           # back-transform.
           backtransformation = if (input$ufh_transformation %in% c("arcsin", "log"))
                                  input$ufh_backtrans else NA,
-          # Variance-smoothing choice is only meaningful on the identity
-          # scale; arcsin and log both already stabilize variances.
-          var_choice         = if (input$ufh_transformation %in% c("arcsin", "log"))
-                                 NA else (input$ufh_var_choice %||% "sm_out"),
+          # Arcsin has its own effective-sample-size working variance;
+          # identity and log models honor the selected smoothing policy.
+          var_choice         = if (identical(input$ufh_transformation, "arcsin"))
+                                 NA else sae_variance_choice(input$ufh_var_choice),
           lasso_enabled      = isTRUE(input$ufh_lasso_enabled),
           lasso_lambda       = input$ufh_lasso_lambda %||% "lambda.1se",
           candidate_vars_y1  = ufh_candidates_y1,
@@ -4318,7 +4362,7 @@ server <- function(input, output, session) {
           backtransformation = if (identical(input$indicator_type, "mean_welfare") &&
                                     identical(input$mfh_transformation, "log"))
                                  input$mfh_backtrans else NA,
-          var_choice     = input$mfh_var_choice,
+          var_choice     = mfh_var_val,
           cov_choice     = mfh_cov_val,
           diag_model     = input$mfh_diag_model,
           fit_mfh3       = isTRUE(input$fit_mfh3) ||
@@ -4391,15 +4435,9 @@ server <- function(input, output, session) {
     }
 
     # ---- Step 2: Build pipeline config and run ----
-    # Variance smoothing option for UFH is only active when no transformation
-    # is used. arcsin and log both stabilize variances on their own scale, so
-    # the R script pins var_choice to "sm_out" (a no-op for non-NA, non-outlier
-    # rows) under those branches.
-    ufh_var_val <- if (input$ufh_transformation %in% c("arcsin", "log")) {
-      "sm_out"
-    } else {
-      input$ufh_var_choice %||% "sm_out"
-    }
+    # Preserve the selected policy for identity and log models. Arcsin
+    # records the setting for round trips but uses its distinct n_eff rule.
+    ufh_var_val <- sae_variance_choice(input$ufh_var_choice)
 
     # Bias correction has two complementary representations in the config:
     #   ufh$bias_correction        -- LOGICAL (TRUE = correct, FALSE = naive).
@@ -4523,7 +4561,7 @@ server <- function(input, output, session) {
       rhs_domain              = input$rhs_domain,
       shp_domain              = input$shp_domain,
       years_keep              = years,
-      var_choice              = input$mfh_var_choice,
+      var_choice              = mfh_var_val,
       cov_choice              = mfh_cov_val,
       diag_model              = input$mfh_diag_model,
       fit_mfh3                = isTRUE(input$fit_mfh3) ||

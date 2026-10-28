@@ -37,16 +37,17 @@ writeLines(c(
   paste("EU SAE candidate", wizard_version, "- reorganized layout"),
   "Prepared locally for review and testing; this build does not publish or upload the package. Whether to publish estimates as official statistics is for each national statistical office to decide.",
   "Includes only the explicit scripts/release_inventory.csv file list.",
+  "Start with START_HERE.html for launch steps, language-specific guides, results locations and the folder map; docs/INDEX.html contains the complete document catalogue.",
   "Windows: open Start_Here and run Start_Wizard.bat or Start_Dashboard.bat. Keep Start_Here inside the package.",
   "macOS/Linux: open Start_Here and run Start_Wizard.command or Start_Dashboard.command (double-click on macOS). Keep Start_Here inside the package.",
   "Prerequisites: R 4.2+ (use the newest version approved by your organization). Pandoc is reused if installed (RStudio Desktop, Quarto, Positron, standalone) or downloaded once by the launcher; see Start_Here/README.md.",
   "Reports: final_report.html and editable final_report.docx; comparison outputs include signed estimated-change figures alongside CI-width figures.",
   "Excluded: internal notes, non-inventory literature, user Data folders, local libraries, credentials, run histories, generated outputs and local diagnostics.",
   "Spain boundaries now use documented IGN/CNIG CartoBase ANE (CC BY 4.0); the survey derivation script remains missing.",
-  "See docs/QER/QER_README.md for completed validation, result changes and remaining QER decisions. Passing code tests does not establish nominal interval coverage in all settings.",
-  "Review docs/RELEASE_CHECKLIST.md, docs/MCPE_VALIDATION_STATUS.md, docs/HISTORY_REMEDIATION.md and THIRD_PARTY_NOTICES.md.",
+  "See docs/validation/QER/QER_README.md for completed validation, result changes and remaining QER decisions. Passing code tests does not establish nominal interval coverage in all settings.",
+  "Review docs/maintenance/RELEASE_CHECKLIST.md, docs/validation/MCPE_VALIDATION_STATUS.md, docs/maintenance/HISTORY_REMEDIATION.md and THIRD_PARTY_NOTICES.md.",
   "No Git history is included."
-), file.path(stage, "docs", "CLEAN_RELEASE_NOTICE.txt"), useBytes = TRUE)
+), file.path(stage, "docs", "maintenance", "CLEAN_RELEASE_NOTICE.txt"), useBytes = TRUE)
 sae_write_release_manifest(stage)
 sae_verify_release(stage)
 archive <- file.path(target, paste0(package_name, ".zip"))
