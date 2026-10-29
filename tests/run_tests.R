@@ -1518,6 +1518,12 @@ shiny::testServer(app, {
        identical(input$years, "2012,2013") &&
        state("mapping") == "done" && state("analysis") == "done",
      "two-year Spain example: matching mappings and years are kept and the steps are done")
+  # Step 6 lists the configuration's data files. A browsed survey.rds is the
+  # session's file, not an example file found (or several found) by name.
+  panel <- gsub("\\s+", " ", gsub("<[^>]+>", " ", as.character(output$saved_setup_status$html)))
+  ok(grepl("Survey : survey.rds (selected for this session)", panel, fixed = TRUE) &&
+       !grepl("Ambiguous|not found", panel),
+     "the data-files panel names the browsed file instead of looking it up by name")
 
   session$setInputs(var_weight = "wgt_missing")
   ok(state("mapping") == "todo" &&
@@ -1642,7 +1648,7 @@ local({
   out <- suppressWarnings(system2(rscript, shQuote(script), stdout = TRUE, stderr = TRUE))
   cat(out[!grepl("^here\\(\\) starts at", out)], sep = "\n")
   status <- attr(out, "status")
-  check(is.null(status) && any(grepl("^13 wizard data-change checks passed", out)),
+  check(is.null(status) && any(grepl("^14 wizard data-change checks passed", out)),
         "wizard server: example data switches update mappings, years and step status")
 })
 

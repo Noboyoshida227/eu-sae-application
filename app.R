@@ -2868,12 +2868,30 @@ server <- function(input, output, session) {
       if (!nzchar(ref)) {
         return(tags$div(tags$strong(label), ": not set"))
       }
-      ok <- setup_file_exists(ref)
+      # A file browsed in this session is the one a run uses. Until the
+      # configuration is saved its reference is only the bare name, which can
+      # match an example file (or several), so it is not looked up by name.
+      upload <- input[[key]]
+      upload_path <- as.character(upload$datapath %||% "")[1]
+      if (!is.na(upload_path) && nzchar(upload_path) &&
+          !(identical(key, "regional_benchmark_file") && isTRUE(benchmark_upload_cleared()))) {
+        return(tags$div(
+          tags$strong(label), ": ", basename(as.character(upload$name)[1]),
+          tags$span(style = "color:#2e7d32;", " (selected for this session)")
+        ))
+      }
+      ok <- tryCatch(setup_file_exists(ref), error = function(e) NA)
       tags$div(
         tags$strong(label), ": ", basename(ref),
         tags$span(
-          style = sprintf("color:%s;", if (ok) "#2e7d32" else "#b26a00"),
-          if (ok) " (found)" else " (not found; browse again)"
+          style = sprintf("color:%s;", if (isTRUE(ok)) "#2e7d32" else "#b26a00"),
+          if (isTRUE(ok)) {
+            " (found)"
+          } else if (is.na(ok)) {
+            " (more than one example folder has this file name; browse again)"
+          } else {
+            " (not found; browse again)"
+          }
         )
       )
     }
