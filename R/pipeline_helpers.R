@@ -1252,6 +1252,63 @@ sae_cpi_guess_columns <- function(df) {
   list(year = year, value = if (is.na(value)) "" else value)
 }
 
+# Usual column names for each variable mapping, in order of preference. Used to
+# re-guess a mapping when a newly selected data file lacks the mapped column.
+sae_mapping_name_guesses <- local({
+  domain <- c("domain", "prov", "province", "area", "domain_id", "area_id")
+  list(
+    var_year    = c("year", "yr", "survey_year"),
+    var_domain  = domain,
+    var_psu     = c("psu", "ea_id", "ea", "cluster", "psu_id"),
+    var_weight  = c("weight", "wgt", "hhweight", "hh_weight", "pweight", "wt"),
+    var_strata  = c("strata", "stratum"),
+    var_hh_size = c("hhsize", "hh_size", "household_size"),
+    var_hh_id   = c("hh_id", "hhid", "household_id"),
+    var_welfare = c("income", "welfare", "consumption", "expenditure"),
+    var_povline = c("povline", "poverty_line", "pline"),
+    rhs_domain  = domain,
+    shp_domain  = domain
+  )
+})
+
+# Column a mapping points to after a new data file is selected: the current
+# column when the file has it (also with other capitals), otherwise the first
+# of `prefer` and the usual names for that variable that the file has,
+# otherwise "" (cleared). An empty optional mapping stays empty. With no
+# columns (the file could not be read) the current value is kept.
+sae_remap_column <- function(id, current, cols, required = TRUE, prefer = character()) {
+  current <- trimws(as.character(current %||% "")[1])
+  if (is.na(current)) current <- ""
+  cols <- as.character(cols %||% character())
+  if (!length(cols)) return(current)
+  find_col <- function(name) {
+    if (is.na(name) || !nzchar(name)) return(NA_character_)
+    if (name %in% cols) return(name)
+    cols[tolower(cols) == tolower(name)][1]
+  }
+  if (nzchar(current)) {
+    hit <- find_col(current)
+    if (!is.na(hit)) return(hit)
+  } else if (!isTRUE(required)) {
+    return("")
+  }
+  for (cand in c(prefer, sae_mapping_name_guesses[[id]])) {
+    hit <- find_col(trimws(as.character(cand)))
+    if (!is.na(hit)) return(hit)
+  }
+  ""
+}
+
+# A comma-separated list of column names restricted to the columns of a newly
+# selected file: list(value = kept names joined by ", ", dropped = the others).
+# With no columns (the file could not be read) nothing is dropped.
+sae_keep_known_columns <- function(csv, cols) {
+  vals <- trimws(unlist(strsplit(as.character(csv %||% ""), ",", fixed = TRUE)))
+  vals <- vals[nzchar(vals)]
+  keep <- if (length(cols)) vals %in% cols else rep(TRUE, length(vals))
+  list(value = paste(vals[keep], collapse = ", "), dropped = vals[!keep])
+}
+
 # Values by year from a CPI table: list(values = named numeric sorted by year,
 # problems = character(), notes = character()).
 sae_cpi_series <- function(df, year_col, value_col) {

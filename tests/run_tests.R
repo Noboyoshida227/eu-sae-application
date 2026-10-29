@@ -35,6 +35,11 @@ comparison_text <- read_all("scripts/03_comparison.R")
 wizard_manifest_text <- read_all("tools/build_wizard_manifest.R")
 ai_text <- read_all("R/comparison_report_ai.R")
 report_text <- read_all("report.Rmd")
+# httpuv reports a busy port as "Failed to create server"; both launchers must
+# treat that as "try the next port" rather than stopping.
+check(grepl("Failed to create server", wizard_text, fixed = TRUE) &&
+        grepl("Failed to create server", app_text, fixed = TRUE),
+      "both launchers fall back to the next port when the preferred port is busy")
 wizard_required_ids <- c("country_name", "analysis_seed", "benchmark_level",
                          "mfh_diag_model", "fit_mfh3", "mfh_refvar_adjustment",
                          "mcpe_bootstrap_replicates", "llm_external_consent")
@@ -1359,6 +1364,233 @@ check(sum(gregexpr("pointwise_significant = sae_count_flags(significant_unadjust
         grepl('"Unavailable"', read_all("report.Rmd"), fixed = TRUE) &&
         grepl("tested_domains = sum(!is.na(significant_unadjusted))", read_all("R/comparison_report_ai.R"), fixed = TRUE),
       "significance summary reports untested methods as Unavailable with the tested-domain count")
+
+# Front page (reviewer comment): nothing that looks clickable but is not. No
+# badge in the header, About is the header's only link, and the footer is just
+# its title and the release note, with no step list that reads as a breadcrumb.
+local({
+  lp <- new.env()
+  sys.source("R/landing_page.R", envir = lp)
+  for (wizard in c(TRUE, FALSE)) {
+    html <- as.character(lp$sae_landing_page(wizard = wizard))
+    header <- regmatches(html, regexpr("(?s)<header.*?</header>", html, perl = TRUE))
+    footer <- regmatches(html, regexpr("(?s)<footer.*?</footer>", html, perl = TRUE))
+    check(!grepl("Research application|sae-badge|sae-steps", html) &&
+            length(header) == 1L && grepl('id="about_btn_cover"', header, fixed = TRUE) &&
+            length(footer) == 1L && grepl("From data to insight", footer, fixed = TRUE) &&
+            !grepl("<a |<ol|<li|<button|about_btn_cover", footer),
+          sprintf("%s front page: About sits in the header; no badge or step list in the footer",
+                  if (wizard) "wizard" else "dashboard"))
+  }
+  check(grepl("observeEvent(input$about_btn_cover", app_text, fixed = TRUE),
+        "the front-page About link still opens the About dialog")
+})
+
+# Wizard state after the input data change (reviewer comment). A mapping keeps
+# a column the new file has and is otherwise re-guessed or cleared, the years
+# follow the file, and a step whose fields name columns or years the data lack
+# needs attention (amber) until it is valid again.
+#
+# The script below drives the real wizard server; it is run in its own R
+# process further down.
+wizard_data_change_test <- r"---(
+Sys.unsetenv(c("ANTHROPIC_API_KEY", "OPENAI_API_KEY"))
+Sys.setenv(EU_SAE_WIZARD_LAUNCHED = "1")
+app <- suppressMessages(suppressWarnings(source("app_wizard.R")$value))
+
+# Stand-in for the browser: the values the server sends to inputs are kept and
+# reported back by browser_round() below.
+sent <- new.env()
+sent$values <- list()
+record <- function(id, value) {
+  if (is.null(value)) return(invisible())
+  value <- as.character(value)
+  sent$values[[id]] <- if (length(value)) value[1] else ""
+  invisible()
+}
+updateSelectizeInput <- function(session, inputId, label = NULL, choices = NULL,
+                                 selected = NULL, options = list(), server = FALSE) {
+  record(inputId, selected)
+}
+updateTextInput <- function(session, inputId, label = NULL, value = NULL, placeholder = NULL) {
+  record(inputId, value)
+}
+
+# A file input value for a temporary copy of `path`, as Shiny stores an upload.
+upload <- function(path) {
+  tmp <- file.path(tempfile("upload_"), basename(path))
+  dir.create(dirname(tmp))
+  stopifnot(file.copy(path, tmp))
+  data.frame(name = basename(path), size = file.size(tmp), type = "",
+             datapath = tmp, stringsAsFactors = FALSE)
+}
+
+checks <- 0L
+ok <- function(value, label) {
+  if (!isTRUE(value)) stop("FAILED: ", label, call. = FALSE)
+  checks <<- checks + 1L
+  cat("PASS -", label, "\n")
+}
+
+shiny::testServer(app, {
+  # Like the browser, report only values that changed, until nothing is sent.
+  browser_round <- function() {
+    for (i in 1:10) {
+      session$flushReact()
+      vals <- sent$values
+      sent$values <- list()
+      same <- vapply(names(vals), function(id) identical(isolate(input[[id]]), vals[[id]]), logical(1))
+      vals <- vals[!same]
+      if (!length(vals)) return(invisible(TRUE))
+      do.call(session$setInputs, vals)
+    }
+    stop("the inputs did not settle")
+  }
+  select_data <- function(survey, aux, geometry) {
+    session$setInputs(survey_file = upload(survey), rhs_file = upload(aux),
+                      shp_file = upload(geometry))
+    browser_round()
+  }
+  state <- function(step) wiz_step_states(wiz_issue_map(), "data", WIZ_IDS)[[step]]
+  mapped <- function(...) vapply(c(...), function(id) input[[id]] %||% "", character(1))
+
+  session$setInputs(
+    wizard = "data", survey_unit = "household", indicator_type = "poverty",
+    povline_type = "column", steps = c("UFH", "MFH", "Comparison"),
+    analysis_seed = 123, mcpe_bootstrap_replicates = 500, llm_enabled = FALSE,
+    do_benchmark = FALSE, benchmark_level = "national",
+    var_year = "year", var_domain = "prov", var_psu = "ea_id", var_weight = "weight",
+    var_strata = "", var_hh_size = "hhsize", var_hh_id = "", var_welfare = "income",
+    var_povline = "povline", var_benchmark_level = "", rhs_domain = "prov", shp_domain = "prov",
+    years = "2012,2013", year_1 = "2012", year_2 = "2013",
+    ufh_candidates_y1 = "", ufh_candidates_y2 = "", mfh_candidates_y1 = "", mfh_candidates_y2 = ""
+  )
+
+  select_data("Data/Spain_2y/survey.rds", "Data/Spain_2y/auxiliary.rds", "Data/Spain_2y/shapefile.rds")
+  ok(identical(mapped("var_domain", "var_psu", "rhs_domain"),
+               c(var_domain = "prov", var_psu = "ea_id", rhs_domain = "prov")) &&
+       identical(input$years, "2012,2013") &&
+       state("mapping") == "done" && state("analysis") == "done",
+     "two-year Spain example: matching mappings and years are kept and the steps are done")
+
+  session$setInputs(var_weight = "wgt_missing")
+  ok(state("mapping") == "todo" &&
+       any(grepl("'wgt_missing' (weight) is not in the survey file", issues_mapping(), fixed = TRUE)),
+     "a mapped column missing from the survey file makes Map variables need attention")
+  session$setInputs(var_weight = "weight")
+  ok(state("mapping") == "done", "Map variables is done again once the column exists")
+
+  session$setInputs(ufh_candidates_y1 = "abs, ntl", mfh_candidates_y2 = "educ1, not_a_column",
+                    var_strata = "region")
+  ok(state("models") == "todo" &&
+       any(grepl("MFH covariates for year 2 not in the auxiliary file: not_a_column",
+                 issues_models(), fixed = TRUE)),
+     "a covariate missing from the auxiliary file makes Configure model need attention")
+
+  # Switch to the simulated example: other column names and years.
+  select_data("Data/simulated/survey_example.csv", "Data/simulated/auxiliary_example.csv",
+              "Data/simulated/geometry_example.geojson")
+  ok(identical(mapped("var_year", "var_domain", "var_psu", "var_weight", "var_hh_size", "var_welfare",
+                      "var_povline", "rhs_domain", "shp_domain", "var_strata"),
+               c(var_year = "year", var_domain = "domain", var_psu = "psu", var_weight = "weight",
+                 var_hh_size = "hhsize", var_welfare = "income", var_povline = "povline",
+                 rhs_domain = "domain", shp_domain = "domain", var_strata = "region")),
+     "simulated example: existing columns kept, prov/ea_id re-guessed as domain/psu in all three files")
+  ok(grepl(paste("New survey file: settings that named columns the file does not have were updated:",
+                 "domain set to 'domain' (was 'prov'); psu set to 'psu' (was 'ea_id')."),
+           output$logs, fixed = TRUE),
+     "the changed mappings are reported to the user")
+  ok(identical(input$years, "2022,2023") && identical(c(input$year_1, input$year_2), c("2022", "2023")),
+     "simulated example: the two analysis years follow the file's only two years")
+  ok(identical(mapped("ufh_candidates_y1", "mfh_candidates_y2"),
+               c(ufh_candidates_y1 = "", mfh_candidates_y2 = "")),
+     "covariates the new auxiliary file lacks are removed")
+  ok(all(vapply(c("mapping", "analysis", "models"), state, character(1)) == "done"),
+     "after the switch every re-derived step is valid, so its chip is green")
+
+  # Back to the three-year Spain example: the pair of years is the user's choice.
+  session$setInputs(var_hh_id = "hh_gone")
+  select_data("Data/Spain/survey.rds", "Data/Spain/auxiliary.rds", "Data/Spain/shapefile.rds")
+  ok(identical(mapped("var_domain", "var_psu", "rhs_domain", "shp_domain", "var_hh_id"),
+               c(var_domain = "prov", var_psu = "ea_id", rhs_domain = "prov", shp_domain = "prov",
+                 var_hh_id = "")),
+     "three-year Spain example: re-guessed join keys and a cleared optional household ID")
+  ok(identical(input$years, "") && identical(c(input$year_1, input$year_2), c("", "")) &&
+       state("analysis") == "todo" &&
+       any(grepl("Choose two different analysis years", issues_analysis(), fixed = TRUE)),
+     "three-year Spain example: years not in the file are cleared and Configure analysis needs attention")
+  session$setInputs(year_1 = "2013", year_2 = "2014")
+  browser_round()
+  ok(identical(input$years, "2013,2014") && state("analysis") == "done",
+     "Configure analysis is done again once two years of the file are chosen")
+
+  # Loading a configuration is not a data change: its mappings are restored
+  # as saved, and a column the selected file lacks is flagged, not replaced.
+  cfg <- tempfile(fileext = ".yml")
+  yaml::write_yaml(list(inputs = list(var_domain = "domain", years = "2013,2014")), cfg)
+  session$setInputs(config_file = data.frame(name = "cfg.yml", size = file.size(cfg), type = "",
+                                             datapath = cfg, stringsAsFactors = FALSE))
+  browser_round()
+  ok(identical(input$var_domain, "domain") && state("mapping") == "todo" &&
+       any(grepl("'domain' (domain) is not in the survey file", issues_mapping(), fixed = TRUE)),
+     "a loaded configuration keeps its mapping; a column the data lack is flagged, not re-guessed")
+})
+cat(sprintf("%d wizard data-change checks passed.\n", checks))
+)---"
+local({
+  helpers <- new.env()
+  sys.source("R/pipeline_helpers.R", envir = helpers)
+  wanted <- c("wiz_missing_columns", "wiz_rederive_years", "wiz_step_states")
+  defs <- Filter(function(x) is.call(x) && identical(x[[1]], as.name("<-")) &&
+                   as.character(x[[2]]) %in% wanted, parse("app_wizard.R", keep.source = FALSE))
+  for (d in defs) eval(d, helpers)
+  h <- helpers
+  check(length(defs) == 3L &&
+          identical(h$sae_remap_column("var_domain", "prov", c("year", "prov", "ea_id")), "prov") &&
+          identical(h$sae_remap_column("var_domain", "PROV", c("year", "prov")), "prov") &&
+          identical(h$sae_remap_column("var_domain", "prov", c("year", "domain", "psu")), "domain") &&
+          identical(h$sae_remap_column("var_psu", "ea_id", c("year", "domain", "psu")), "psu") &&
+          identical(h$sae_remap_column("rhs_domain", "prov", c("nuts3", "domain"), prefer = "nuts3"), "nuts3") &&
+          identical(h$sae_remap_column("var_hh_id", "hh_id", c("year", "hid"), required = FALSE), "") &&
+          identical(h$sae_remap_column("var_strata", "", "strata", required = FALSE), "") &&
+          identical(h$sae_remap_column("var_year", "", c("id", "Year")), "Year") &&
+          identical(h$sae_remap_column("var_domain", "prov", character()), "prov"),
+        "a mapping keeps a column the new file has, else is re-guessed or cleared; an unread file changes nothing")
+  kept <- h$sae_keep_known_columns("abs, ntl ,x", c("abs", "x"))
+  check(identical(kept, list(value = "abs, x", dropped = "ntl")) &&
+          identical(h$sae_keep_known_columns("abs", character())$dropped, character()),
+        "covariates the new auxiliary file lacks are dropped")
+  check(identical(h$wiz_rederive_years(c(2012L, 2013L), c(2023, 2022, 2022)), c(2022L, 2023L)) &&
+          identical(h$wiz_rederive_years(c(2012L, 2013L), 2012:2014), c(2012L, 2013L)) &&
+          identical(h$wiz_rederive_years(c(2013L, 2022L), 2012:2014), 2013L) &&
+          identical(h$wiz_rederive_years(c(2022L, 2023L), 2012:2014), integer()) &&
+          identical(h$wiz_rederive_years(c(2022L, 2023L), integer()), c(2022L, 2023L)),
+        "analysis years keep those in the new file, take a two-year file's years, and never guess a pair")
+  check(identical(h$wiz_missing_columns(list(var_domain = "prov", var_strata = ""),
+                                        c(var_domain = "domain", var_strata = "strata"),
+                                        c("year", "domain"), "survey file"),
+                  "Column 'prov' (domain) is not in the survey file.") &&
+          identical(h$wiz_missing_columns(list(var_domain = "prov"), c(var_domain = "domain"),
+                                          character(), "survey file"), character()),
+        "mapped columns missing from the selected file are reported")
+  check(identical(h$wiz_step_states(list(data = character(), mapping = "stale", analysis = character()), "data"),
+                  c(data = "current", mapping = "todo", analysis = "done")),
+        "a step with an outstanding item is amber (todo), not green")
+
+  # The real wizard server (app_wizard.R with app.R's server) under
+  # shiny::testServer, switching between the example data sets. It runs in its
+  # own R process: loading app.R defines the app's globals.
+  script <- tempfile("wizard_data_change_", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(sprintf(".libPaths(%s)", paste(deparse(.libPaths()), collapse = "")),
+               wizard_data_change_test), script)
+  rscript <- file.path(R.home("bin"), if (.Platform$OS.type == "windows") "Rscript.exe" else "Rscript")
+  out <- suppressWarnings(system2(rscript, shQuote(script), stdout = TRUE, stderr = TRUE))
+  cat(out[!grepl("^here\\(\\) starts at", out)], sep = "\n")
+  status <- attr(out, "status")
+  check(is.null(status) && any(grepl("^13 wizard data-change checks passed", out)),
+        "wizard server: example data switches update mappings, years and step status")
+})
 
 # Statistical regression checks require and exercise the installed emdi/msae estimators.
 for (.method_test in c("test_ufh_methodology.R", "test_mfh_bootstrap_methodology.R",

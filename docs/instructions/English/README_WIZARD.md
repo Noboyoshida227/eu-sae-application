@@ -217,6 +217,19 @@ criterion is always used.
 The step buttons are clickable. Green indicates a complete step, amber indicates
 an outstanding item, and blue indicates the current step.
 
+Selecting another survey, auxiliary or geometry file in step 1 (for example
+switching from `Data/Spain/` to `Data/simulated/`) updates the settings that
+depend on it. A column mapping keeps its column when the new file has it;
+otherwise the usual column name for that variable is chosen if the file has one
+(for example `domain` or `prov`, `psu` or `ea_id`), and the field is cleared if
+it does not. Covariates that the new auxiliary file lacks are removed from the
+covariate lists. The analysis years keep the chosen years that the new survey
+file has; a file with exactly two years supplies both, and with more years you
+choose the pair. A notification lists every change. A step stays amber while a
+required field is empty or a field names a column or year that the selected
+files do not have. Loading a configuration is not treated as a data change: its
+saved mapping is restored as it is, and a column the files lack is marked.
+
 ### MFH3/MFH2 model-selection rule
 
 **MFH2 is the default MFH model.** If the user selects MFH3, the app follows the
@@ -425,7 +438,8 @@ Estimating poverty and welfare), in English and, under their own headings,
 in Polish (`_PL` files) and Greek (`_GR` files), then the download
 instructions, the guidelines note, the methodology mapping, the validation
 status and the changelog.
-**About** shows the version.
+**About**, at the top right of the front page and of the configuration pages,
+shows the version.
 
 ## Architecture and maintenance rule
 

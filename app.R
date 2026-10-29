@@ -3025,16 +3025,50 @@ server <- function(input, output, session) {
     }, ignoreInit = TRUE)
   })
 
-  update_mapping_choices <- function(id, cols = NULL, selected = NULL) {
+  # Field names in messages about the mapping, and the mappings that are
+  # re-guessed when empty after a new file is selected (the required ones).
+  mapping_field_labels <- c(
+    var_year = "year", var_domain = "domain", var_psu = "psu",
+    var_weight = "weight", var_strata = "strata", var_hh_size = "household size",
+    var_hh_id = "household ID", var_welfare = "welfare", var_povline = "poverty line",
+    var_benchmark_level = "grouped benchmark variable",
+    rhs_domain = "auxiliary domain field", shp_domain = "shapefile domain field"
+  )
+  mapping_required_ids <- c("var_year", "var_domain", "var_psu", "var_weight",
+                            "var_hh_size", "var_welfare", "var_povline",
+                            "rhs_domain", "shp_domain")
+
+  # With remap = TRUE (a newly selected data file) a mapping keeps its
+  # column when the file has it and is otherwise re-guessed or cleared
+  # (sae_remap_column()); a value being restored from a configuration is left
+  # alone. Returns a description of the change, or character(0).
+  update_mapping_choices <- function(id, cols = NULL, selected = NULL, remap = FALSE) {
     if (is.null(cols)) cols <- columns_for_mapping_id(id)
+    restoring <- exists(id, envir = mapping_restore, inherits = FALSE)
     current <- if (!is.null(selected)) {
       selected
-    } else if (exists(id, envir = mapping_restore, inherits = FALSE)) {
+    } else if (restoring) {
       get(id, envir = mapping_restore, inherits = FALSE)
     } else {
       isolate(input[[id]] %||% "")
     }
     current <- trimws(as.character(current %||% ""))
+    change <- character()
+    if (isTRUE(remap) && is.null(selected) && !restoring) {
+      prefer <- if (id %in% c("rhs_domain", "shp_domain")) isolate(input$var_domain) else character()
+      remapped <- sae_remap_column(id, current, cols,
+                                   required = id %in% mapping_required_ids,
+                                   prefer = prefer)
+      if (!identical(remapped, current)) {
+        was <- if (nzchar(current)) sprintf("'%s'", current) else "blank"
+        change <- if (nzchar(remapped)) {
+          sprintf("%s set to '%s' (was %s)", mapping_field_labels[[id]], remapped, was)
+        } else {
+          sprintf("%s cleared (was %s)", mapping_field_labels[[id]], was)
+        }
+        current <- remapped
+      }
+    }
     updateSelectizeInput(
       session,
       id,
@@ -3048,6 +3082,7 @@ server <- function(input, output, session) {
       ),
       server = TRUE
     )
+    invisible(change)
   }
 
   refresh_all_mapping_choices <- function() {
@@ -3059,21 +3094,65 @@ server <- function(input, output, session) {
     invisible(TRUE)
   }
 
+  # Data path of the last survey, auxiliary and geometry upload seen below; a
+  # different path means the user has selected a new file. Loading a
+  # configuration does not change the uploads, so it never counts as one.
+  seen_uploads <- new.env(parent = emptyenv())
+  is_new_upload <- function(key, file_input) {
+    path <- as.character(file_input$datapath %||% "")[1]
+    if (is.na(path)) path <- ""
+    prev <- get0(key, envir = seen_uploads, inherits = FALSE, ifnotfound = "")
+    assign(key, path, envir = seen_uploads)
+    nzchar(path) && !identical(path, prev)
+  }
+
+  report_remapped_fields <- function(changes, file_label) {
+    if (!length(changes)) return(invisible(NULL))
+    msg <- sprintf("New %s: settings that named columns the file does not have were updated: %s.",
+                   file_label, paste(changes, collapse = "; "))
+    isolate(append_log(msg))
+    showNotification(paste(msg, "Check the variable mapping before running the model."),
+                     type = "warning", duration = 15)
+  }
+
+  covariate_field_labels <- c(
+    ufh_candidates_y1 = "UFH covariates for year 1", ufh_candidates_y2 = "UFH covariates for year 2",
+    mfh_candidates_y1 = "MFH covariates for year 1", mfh_candidates_y2 = "MFH covariates for year 2"
+  )
+
   observe({
     cols <- survey_columns()
+    remap <- is_new_upload("survey", input$survey_file)
+    changes <- character()
     for (id in survey_mapping_ids) {
-      update_mapping_choices(id, cols)
+      changes <- c(changes, update_mapping_choices(id, cols, remap = remap))
     }
+    report_remapped_fields(changes, "survey file")
   })
 
   observe({
     cols <- rhs_columns()
-    update_mapping_choices("rhs_domain", cols)
+    remap <- is_new_upload("rhs", input$rhs_file)
+    changes <- update_mapping_choices("rhs_domain", cols, remap = remap)
+    # The covariate lists name auxiliary columns too: drop those the new file lacks.
+    if (remap && length(cols)) {
+      for (id in names(covariate_field_labels)) {
+        kept <- sae_keep_known_columns(isolate(input[[id]]), cols)
+        if (length(kept$dropped)) {
+          updateTextInput(session, id, value = kept$value)
+          changes <- c(changes, sprintf("%s: removed %s", covariate_field_labels[[id]],
+                                        paste(kept$dropped, collapse = ", ")))
+        }
+      }
+    }
+    report_remapped_fields(changes, "auxiliary file")
   })
 
   observe({
     cols <- shp_columns()
-    update_mapping_choices("shp_domain", cols)
+    remap <- is_new_upload("shp", input$shp_file)
+    report_remapped_fields(update_mapping_choices("shp_domain", cols, remap = remap),
+                           "geometry file")
   })
 
   mapping_invalid_entries <- reactive({
@@ -3274,11 +3353,16 @@ server <- function(input, output, session) {
   # start-up. The wizard reuses this server and reads these session values.
   session$userData$active_setup_files <- active_setup_files
   session$userData$readiness_checked <- readiness_checked
+  session$userData$restoring_setup <- restoring_setup
   session$userData$run_panel <- run_panel
   session$userData$config_loaded <- reactiveVal(0L)
   session$userData$survey_input_path <- reactive({
     resolve_upload(input$survey_file, fallback = saved_setup_path_for("survey_file"))
   })
+  # Column names of the selected files, for the wizard's step status
+  # (character(0) while a file is not selected or cannot be read).
+  session$userData$data_columns <- list(survey = survey_columns, rhs = rhs_columns,
+                                        shp = shp_columns)
   load_modal_enter <- reactiveVal(FALSE)
 
   # Applies a (sanitised) configuration; a failure is reported, not fatal.

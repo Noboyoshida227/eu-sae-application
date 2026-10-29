@@ -36,7 +36,10 @@
 #  GATING
 #  ------
 #  Gating is deliberately "soft": Next and the breadcrumb are always
-#  clickable. Incomplete steps show an amber notice and an amber chip.
+#  clickable. Incomplete steps show an amber notice and an amber chip, as
+#  do steps with a field naming a column or year the selected files lack
+#  (a new data file re-guesses or clears such fields first; see app.R's
+#  update_mapping_choices() and the analysis-years code below).
 #  Only "Run model" on step 7 is genuinely blocked (missing data files);
 #  app.R's own run handler also asks for a data readiness check first.
 #
@@ -1148,6 +1151,41 @@ wiz_is_blank <- function(x) {
   !length(x) || is.null(x) || !nzchar(trimws(as.character(x)[1]))
 }
 
+# Mapped columns that the selected file does not have, as messages. `values`
+# and `labels` are named by input ID. With no columns (no file selected, or it
+# cannot be read) nothing is reported.
+wiz_missing_columns <- function(values, labels, cols, file_label) {
+  if (!length(cols)) return(character())
+  msgs <- character()
+  for (id in names(labels)) {
+    v <- trimws(as.character(values[[id]] %||% "")[1])
+    if (!is.na(v) && nzchar(v) && !v %in% cols) {
+      msgs <- c(msgs, sprintf("Column '%s' (%s) is not in the %s.", v, labels[[id]], file_label))
+    }
+  }
+  msgs
+}
+
+# Analysis years after a new survey file is selected: the chosen years the file
+# has, or both of its years when it has exactly two. Years it lacks are dropped,
+# not replaced by a guess, so with more years the user picks the pair.
+wiz_rederive_years <- function(chosen, available) {
+  available <- sort(unique(as.integer(available)))
+  if (!length(available)) return(chosen)
+  if (length(available) == 2L) return(available)
+  sort(intersect(as.integer(chosen), available))
+}
+
+# Breadcrumb state of each step: "current", else "done" when nothing is
+# outstanding, else "todo" (amber, needs attention).
+wiz_step_states <- function(issues, current, ids = names(issues)) {
+  vapply(ids, function(id) {
+    if (identical(id, current)) "current"
+    else if (length(issues[[id]]) == 0L) "done"
+    else "todo"
+  }, character(1))
+}
+
 wizard_server <- function(input, output, session) {
 
   # ---- Everything from the classic dashboard, unchanged --------------
@@ -1160,6 +1198,13 @@ wizard_server <- function(input, output, session) {
   active_files  <- session$userData$active_setup_files
   readiness_ok  <- session$userData$readiness_checked
   config_loaded <- session$userData$config_loaded
+  restoring     <- session$userData$restoring_setup
+
+  # Column names of the selected survey, auxiliary and geometry files
+  # (character(0) while a file is not selected or cannot be read).
+  wiz_columns <- function(key) {
+    tryCatch(session$userData$data_columns[[key]](), error = function(e) character())
+  }
 
   wiz_config_file_ok <- function(key) {
     ref <- tryCatch(active_files()[[key]], error = function(e) NULL)
@@ -1241,6 +1286,32 @@ wizard_server <- function(input, output, session) {
                          selected = if (length(sel) >= 2L) sel[2] else character(0))
   })
 
+  # A newly selected survey file: once its years are known, keep the chosen
+  # years that it has (wiz_rederive_years()), so the selectors never hold
+  # years the data lack. Loading a configuration restores its own years.
+  wiz_years_upload  <- ""
+  wiz_years_pending <- FALSE
+  observe({
+    up <- as.character(input$survey_file$datapath %||% "")[1]
+    if (!is.na(up) && nzchar(up) && !identical(up, wiz_years_upload)) {
+      wiz_years_upload  <<- up
+      wiz_years_pending <<- TRUE
+    }
+    avail <- wiz_survey_years()
+    if (isTRUE(isolate(restoring()))) {
+      wiz_years_pending <<- FALSE
+      return()
+    }
+    if (!wiz_years_pending || !length(avail)) return()
+    wiz_years_pending <<- FALSE
+    chosen <- parse_years(isolate(input$years))
+    years  <- wiz_rederive_years(chosen, avail)
+    if (!identical(years, chosen)) {
+      updateTextInput(session, "years", value = paste(years, collapse = ","))
+    }
+  })
+  observeEvent(config_loaded(), { wiz_years_pending <<- FALSE }, ignoreInit = TRUE)
+
   output$wiz_years_hint <- renderUI({
     avail  <- wiz_survey_years()
     chosen <- parse_years(input$years)
@@ -1304,8 +1375,19 @@ wizard_server <- function(input, output, session) {
         msgs <- c(msgs, sprintf("No column mapped for %s.", required[[id]]))
       }
     }
-    # strata and household ID are optional and deliberately not checked here.
-    msgs
+    # strata and household ID are optional, but a column they name must exist,
+    # like every mapped column: after a new data file a mapping it lacks keeps
+    # this step amber until it is changed.
+    survey_labels <- c(required[intersect(names(required),
+                                          c("var_year", "var_domain", "var_psu", "var_weight",
+                                            "var_hh_size", "var_welfare"))],
+                       var_strata = "strata", var_hh_id = "household ID")
+    ids <- c(names(survey_labels), "rhs_domain", "shp_domain")
+    values <- setNames(lapply(ids, function(id) input[[id]]), ids)
+    c(msgs,
+      wiz_missing_columns(values, survey_labels, wiz_columns("survey"), "survey file"),
+      wiz_missing_columns(values, required["rhs_domain"], wiz_columns("rhs"), "auxiliary file"),
+      wiz_missing_columns(values, required["shp_domain"], wiz_columns("shp"), "geometry file"))
   })
 
   issues_years <- reactive({
@@ -1314,6 +1396,12 @@ wizard_server <- function(input, output, session) {
 
   issues_analysis <- reactive({
     msgs <- issues_years()
+    avail <- wiz_survey_years()
+    absent <- setdiff(parse_years(input$years), avail)
+    if (length(avail) && length(absent)) {
+      msgs <- c(msgs, sprintf("Not in the survey file: %s. Choose from %s.",
+                              paste(absent, collapse = ", "), paste(avail, collapse = ", ")))
+    }
     seed <- suppressWarnings(as.numeric(input$analysis_seed))
     if (length(seed) != 1L || !is.finite(seed) || seed < 0 || seed != floor(seed)) {
       msgs <- c(msgs, "Analysis seed must be a non-negative whole number.")
@@ -1324,6 +1412,9 @@ wizard_server <- function(input, output, session) {
         if (wiz_is_blank(input$var_povline)) {
           msgs <- c(msgs, "No column mapped for the poverty line.")
         }
+        msgs <- c(msgs, wiz_missing_columns(list(var_povline = input$var_povline),
+                                            c(var_povline = "poverty line"),
+                                            wiz_columns("survey"), "survey file"))
       } else {
         for (yr in parse_years(input$years)) {
           val <- input[[paste0("povline_numeric_", yr)]]
@@ -1347,9 +1438,27 @@ wizard_server <- function(input, output, session) {
       msgs <- c(msgs, "Select at least one pipeline step (UFH, MFH or Comparison).")
     }
     if (isTRUE(input$do_benchmark) &&
-        identical(input$benchmark_level %||% "national", "custom") &&
-        wiz_is_blank(input$var_benchmark_level)) {
-      msgs <- c(msgs, "Grouped benchmarking requires a benchmark-level survey variable.")
+        identical(input$benchmark_level %||% "national", "custom")) {
+      if (wiz_is_blank(input$var_benchmark_level)) {
+        msgs <- c(msgs, "Grouped benchmarking requires a benchmark-level survey variable.")
+      }
+      msgs <- c(msgs, wiz_missing_columns(list(var_benchmark_level = input$var_benchmark_level),
+                                          c(var_benchmark_level = "grouped benchmark variable"),
+                                          wiz_columns("survey"), "survey file"))
+    }
+    # Covariates are auxiliary columns; a name the file lacks would be ignored.
+    rhs_cols <- wiz_columns("rhs")
+    if (length(rhs_cols)) {
+      for (cov in list(c("ufh_candidates_y1", "UFH covariates for year 1"),
+                       c("ufh_candidates_y2", "UFH covariates for year 2"),
+                       c("mfh_candidates_y1", "MFH covariates for year 1"),
+                       c("mfh_candidates_y2", "MFH covariates for year 2"))) {
+        unknown <- setdiff(split_csv(input[[cov[1]]]), rhs_cols)
+        if (length(unknown)) {
+          msgs <- c(msgs, sprintf("%s not in the auxiliary file: %s.", cov[2],
+                                  paste(unknown, collapse = ", ")))
+        }
+      }
     }
     n_boot <- suppressWarnings(as.numeric(input$mcpe_bootstrap_replicates))
     if (length(n_boot) != 1L || !is.finite(n_boot) || n_boot < 50 || n_boot != floor(n_boot)) {
@@ -1437,13 +1546,7 @@ wizard_server <- function(input, output, session) {
   # Breadcrumb colours. Pushed as CSS classes rather than re-rendering
   # the links, so the action-button bindings survive untouched.
   observe({
-    issues <- wiz_issue_map()
-    current <- input$wizard %||% "data"
-    states <- vapply(WIZ_IDS, function(id) {
-      if (identical(id, current)) "current"
-      else if (length(issues[[id]]) == 0L) "done"
-      else "todo"
-    }, character(1))
+    states <- wiz_step_states(wiz_issue_map(), input$wizard %||% "data", WIZ_IDS)
     session$sendCustomMessage("wizCrumbState", list(
       ids    = as.list(paste0("wiz_crumb_", WIZ_IDS)),
       states = as.list(unname(states))
@@ -1708,7 +1811,10 @@ wizard_server <- function(input, output, session) {
                     launch.browser = TRUE)
       TRUE
     }, error = function(e) {
-      if (grepl("port|address|in use", conditionMessage(e), ignore.case = TRUE)) {
+      # httpuv reports a busy port as "Failed to create server" (the
+      # "address already in use" text goes to stderr), as app.R handles.
+      if (grepl("port|address|in use|Failed to create server|createTcpServer",
+                conditionMessage(e), ignore.case = TRUE)) {
         message(sprintf("Port %d unavailable, trying the next one...", port))
         FALSE
       } else {
