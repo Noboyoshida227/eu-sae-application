@@ -1425,6 +1425,33 @@ upload <- function(path) {
              datapath = tmp, stringsAsFactors = FALSE)
 }
 
+# Spain_2y's survey and auxiliary files are not in Git (they ship with the
+# release), so CI would not have them. A Spain-like set is built from the
+# tracked simulated example instead: prov/ea_id rather than domain/psu, years
+# 2012-2013, and covariates the simulated auxiliary file lacks.
+spain <- local({
+  dir <- tempfile("spain_like_")
+  dir.create(dir)
+  as_spain <- function(df) {
+    names(df)[names(df) == "domain"] <- "prov"
+    names(df)[names(df) == "psu"] <- "ea_id"
+    df$year <- as.integer(df$year) - 10L
+    df
+  }
+  aux <- as_spain(read.csv("Data/simulated/auxiliary_example.csv"))
+  aux$abs <- aux$urban_share
+  aux$ntl <- aux$nightlights
+  aux$educ1 <- aux$educ_secondary
+  paths <- list(survey = file.path(dir, "survey.rds"), aux = file.path(dir, "auxiliary.rds"),
+                geometry = file.path(dir, "shapefile.geojson"))
+  saveRDS(as_spain(read.csv("Data/simulated/survey_example.csv")), paths$survey)
+  saveRDS(aux, paths$aux)
+  writeLines(gsub('"domain":', '"prov":', fixed = TRUE,
+                  readLines("Data/simulated/geometry_example.geojson", warn = FALSE)),
+             paths$geometry)
+  paths
+})
+
 checks <- 0L
 ok <- function(value, label) {
   if (!isTRUE(value)) stop("FAILED: ", label, call. = FALSE)
@@ -1466,7 +1493,7 @@ shiny::testServer(app, {
     ufh_candidates_y1 = "", ufh_candidates_y2 = "", mfh_candidates_y1 = "", mfh_candidates_y2 = ""
   )
 
-  select_data("Data/Spain_2y/survey.rds", "Data/Spain_2y/auxiliary.rds", "Data/Spain_2y/shapefile.rds")
+  select_data(spain$survey, spain$aux, spain$geometry)
   ok(identical(mapped("var_domain", "var_psu", "rhs_domain"),
                c(var_domain = "prov", var_psu = "ea_id", rhs_domain = "prov")) &&
        identical(input$years, "2012,2013") &&
@@ -1508,9 +1535,17 @@ shiny::testServer(app, {
   ok(all(vapply(c("mapping", "analysis", "models"), state, character(1)) == "done"),
      "after the switch every re-derived step is valid, so its chip is green")
 
-  # Back to the three-year Spain example: the pair of years is the user's choice.
+  # A temporary three-year copy of the Spain-like set tests year selection.
+  three_year_fixture <- function(path) {
+    x <- readRDS(path)
+    extra <- x[x$year == 2013, , drop = FALSE]
+    extra$year <- 2014L
+    out <- tempfile(fileext = ".rds")
+    saveRDS(rbind(x, extra), out)
+    out
+  }
   session$setInputs(var_hh_id = "hh_gone")
-  select_data("Data/Spain/survey.rds", "Data/Spain/auxiliary.rds", "Data/Spain/shapefile.rds")
+  select_data(three_year_fixture(spain$survey), three_year_fixture(spain$aux), spain$geometry)
   ok(identical(mapped("var_domain", "var_psu", "rhs_domain", "shp_domain", "var_hh_id"),
                c(var_domain = "prov", var_psu = "ea_id", rhs_domain = "prov", shp_domain = "prov",
                  var_hh_id = "")),
