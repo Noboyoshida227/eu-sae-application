@@ -1,0 +1,178 @@
+{
+  "status": "installed_verified",
+  "installed_utc": "2026-10-29T18:17:32.996953+00:00",
+  "authorization": "User explicitly requested replacement of Data/Spain_2y with the verified moderate-correlation dataset, backup of the existing version, updated documentation, preservation of original Spain, and no commit/push/publication.",
+  "candidate": {
+    "id": "candidate_01",
+    "tau": 0.25,
+    "r_gen": 0.3
+  },
+  "source_audit_package": "Claude outputs/spain_regeneration/moderate_correlation_20261029",
+  "source_acceptance_receipt_sha256": "c2c895b2ac331687cf9b3c7f23ee9bf3662bab6bfb00a444f28ab8e855e2c658",
+  "source_audit_package_unchanged": true,
+  "source_audit_files_checked": 844,
+  "backup_folder": "Claude outputs/data_preservation/Spain_2y_before_moderate_20261029T180949Z",
+  "backup_zip": "Claude outputs/data_preservation/Spain_2y_before_moderate_20261029T180949Z/Spain_2y.zip",
+  "backup_zip_sha256": "df72fe381c5a9c2dcfe4ceddf22a52fea67335b5a50bcc17b2eac7be16c2ba66",
+  "previous_spain2y_sha256": {
+    "auxiliary.rds": "78f770d87e99c3b36b2e2293cb67a3490c5b4960072fa823d50596daaf5dbb2b",
+    "boundary_provenance.json": "7de427c43fabfce4f2ecde493af19149c5c11a169fc28a9b63aab5b212acf174",
+    "CPI_Spain_teaching.csv": "359e8ae815e8a23144a841ef9feb90b45d77fea9b5f02aff0b227ab1fb262d9e",
+    "generation/capped_province_years.csv": "3dc13a8210ec0f20abc97bcdb6d6130acb23239eeb309ea39c0aa82792fd1b88",
+    "generation/multipliers.csv": "d57832951c2f646ae46622f9719508e15528710796a51f4c800c68284ce85f83",
+    "generation/province_composition_before_after.csv": "f3fad109351effa344ef2568c26ae8ee8899c6e3aa6316037807ef53ef77825d",
+    "generation/transfer_list.csv": "8a44716b8f63df6dd59d0c6f09802a8c07fda27cad2f2221106484ea1d7fa08a",
+    "generation/weight_factors.csv": "b5653ecc66c2e89660a0860bdc0d780bf1ecefacf23fc298575bd6341b351134",
+    "README.md": "6fd2b609eaa435ecfcd3c7444ff6462874f1045e19ed80383c9b5f0994ce2171",
+    "shapefile.rds": "cc00941daf511d2ec5dac279e0560094ffec02b77778dd56357697ec6b9585f7",
+    "survey.rds": "8998ae36270625a13c7051c4174ad92d26227d7cef55667f49b4d1dec9f79394"
+  },
+  "original_spain_unchanged": true,
+  "original_spain_sha256": {
+    "auxiliary.rds": "3c62e6e682a6d30ec201ca6892da2f8433d0a92270b7a0c219131c7ebfb97998",
+    "boundary_provenance.json": "7de427c43fabfce4f2ecde493af19149c5c11a169fc28a9b63aab5b212acf174",
+    "CPI_sample.xlsx": "b5d0e834350d9a65f0f11322cc6193c87a34599fa68d71f79da7dc78fb126939",
+    "generate_spain_boundary.R": "3d6ae08ae703d01a6c01fb5261699aa1c802f9d76dfb3fc17ac60594c461f335",
+    "IGN_source/IGN_licence.pdf": "48b745c62276e4d5ae8870922b9db89d276e9b339f66e3d1f9eea6379f2957d9",
+    "IGN_source/se89_3_admin_prov_a_x.gpkg": "a9dd54dcb4778d99caacc85891dba54a359c636fe5548b4f7a8490ac57cd2117",
+    "IGN_source/se89_3_admin_prov_a_y.gpkg": "796c8e24ee06361d267cb9641a741f12773dce2d28f1c1e3065bc63b7d18d8aa",
+    "province_crosswalk.csv": "869475d6dc886f6d6f916128f0810f0987eb54f00086aa67b9c51ef244537bbe",
+    "README.md": "f4c57770194c662aaebd6d4105580aacac701739a3a1d0b843cc1737816ae465",
+    "shapefile.rds": "cc00941daf511d2ec5dac279e0560094ffec02b77778dd56357697ec6b9585f7",
+    "survey.rds": "b86ac348be3898075aa7df07c0d37798255daf22d79f89e8d1c1d2755544ad32"
+  },
+  "installed_data_sha256": {
+    "survey.rds": "f5f8087a4fd997ba9740863af38b9fa6746198e32fb21c24cbe1dd22e595ed9c",
+    "auxiliary.rds": "b4b7815793c6c734efddcdc6f9218ffb09bfb5f1621194e418ec0696b587b841",
+    "shapefile.rds": "cc00941daf511d2ec5dac279e0560094ffec02b77778dd56357697ec6b9585f7"
+  },
+  "installed_files_sha256_excluding_this_receipt": {
+    "auxiliary.rds": "b4b7815793c6c734efddcdc6f9218ffb09bfb5f1621194e418ec0696b587b841",
+    "boundary_provenance.json": "7de427c43fabfce4f2ecde493af19149c5c11a169fc28a9b63aab5b212acf174",
+    "CPI_Spain_teaching.csv": "359e8ae815e8a23144a841ef9feb90b45d77fea9b5f02aff0b227ab1fb262d9e",
+    "generation/draws.csv": "6ec9d8861e8e40254dea1b3e2fe2dce81918e0b40d93fbcf3f5822bbf03b1b23",
+    "generation/draws.rds": "f38e2a08abeaa8b87da67df1b031fc1462de7dc02fce5cfbc2f4fedb8829dabf",
+    "generation/generation_evidence.rds": "c638ecb168411467a2598f585a72c7464aaeb1d32d903565f18a70e94bcb62a9",
+    "generation/generation_summary.json": "9528804244ea5124e8a2a36ebb0b89af62b04319cb06b88a93231225a51dbcdd",
+    "generation/multipliers.csv": "b7ba95bb294c2b218e4a50f649a5ee95463d59b9650679f0a94053084130a402",
+    "generation/protocol_frozen.md": "fb6308dc6498b86694f5cfec5c9889261d414445ee074fbfffea72e15cd90108",
+    "generation/province_labels.csv": "4170336ad0ade608a880973b263be6540523021583d89edb8bc57ff29009cfa8",
+    "generation/README.md": "3fd89b758cbb83b155c12eaeeb1561815bb301cc7f30bc930aa65c4b49b719bc",
+    "generation/redistribution_audit.csv": "c6d254631063fb5ba54c610291e7da10769c66047b06dcb570de92fe24e700e1",
+    "generation/transfer_list.csv": "0d54382df38f2c741e14f1ee300d11c1a7927a1d91ee4bed2ebb3e9085fba4fb",
+    "GENERATION.md": "725fc019520877de0e94ff2ec36dca15d704ab73cfe470a45f8454754ccc0d8d",
+    "LICENSES/GPL-2.0.txt": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+    "LICENSES/IGN_licence.pdf": "48b745c62276e4d5ae8870922b9db89d276e9b339f66e3d1f9eea6379f2957d9",
+    "provenance/original_README.md": "f4c57770194c662aaebd6d4105580aacac701739a3a1d0b843cc1737816ae465",
+    "province_crosswalk.csv": "869475d6dc886f6d6f916128f0810f0987eb54f00086aa67b9c51ef244537bbe",
+    "README.md": "ebc97f82440c1e57d2f7064680c4df9ed36edc06c84350847204d4aba5a45040",
+    "run_config_sm_all.yml": "e5ed936b72ee182368b4a4c10ac69905d9517c0e6c06ca71a567dc8b184cc8c9",
+    "run_config_sm_out.yml": "dee5520823299cf70c3019b1d0b8a9bc47c2adda30b4ce3d2b36425a0f0bc00e",
+    "shapefile.rds": "cc00941daf511d2ec5dac279e0560094ffec02b77778dd56357697ec6b9585f7",
+    "START_HERE.md": "c96c6a4c21538f4a2d1d3c4c9540848e68121a697e8419523a9b729d665eafe9",
+    "survey.rds": "f5f8087a4fd997ba9740863af38b9fa6746198e32fb21c24cbe1dd22e595ed9c",
+    "verification/acceptance_receipt.json": "c2c895b2ac331687cf9b3c7f23ee9bf3662bab6bfb00a444f28ab8e855e2c658",
+    "verification/fit_comparison.json": "38a703546d44d3a97cdb17b48e95d511f7b6e515f5a3d74e3e92216e7aab2072",
+    "verification/package_versions.csv": "8f45f45a94b017fbe50fce4c500b1c9c6c52a3c2d239bd6ad0196c9dc7338526",
+    "verification/README.md": "04e72f9a4b0c8ec36922e357789f91668b468d7a8112a3e62cf1fbee1790e268",
+    "verification/regeneration.json": "5850966b5492b1c1243cb51d5dad51f91b28e71c01420d11a2dba633be16e606",
+    "verification/source_snapshot.json": "c2ba8687b08bbba77263d792e77f66678e981e8fc6f7d7f10ccc7fcf8e9a4e7f",
+    "verification/variance_receipt_sm_all.csv": "4f47ce81a5524c1f8e4d4ca345d4c7f03dea3ea67993c2e30a07741d96eeca3e",
+    "verification/variance_receipt_sm_out.csv": "5411a164100be434c3a5e51ba26936460e221a8ea254e7e6fe5e8d8903bd495a"
+  },
+  "related_updated_files_sha256": {
+    "Data/README.md": "5d99efb5aa22ad578154e7b591ab0a0ff76f4694834c83fd23386d46ba802624",
+    "THIRD_PARTY_NOTICES.md": "db5f358d7ae556c6ce53926e752a95959dec9ae9abffce19aee4477b9c1675c7",
+    "scripts/release_inventory.csv": "3dfd02b62b6c66678ffdb5b4e6f2881a124e40e45871084cb2d3128c12737bbe"
+  },
+  "tested_application_sources_unchanged": true,
+  "application_source_files_checked": 57,
+  "source_snapshot_metadata_changes": {
+    "THIRD_PARTY_NOTICES.md": {
+      "before_sha256": "4cd1cc1d412f2432d10ed6dc029a5c00289e1bc1cc5feece5fe05589a683cc74",
+      "after_sha256": "db5f358d7ae556c6ce53926e752a95959dec9ae9abffce19aee4477b9c1675c7",
+      "reason": "Authorized data installation updates inventory or attribution; no statistical code change."
+    },
+    "scripts/release_inventory.csv": {
+      "before_sha256": "d2e4be6aeddcaf77ddd27772689d6def7e5ad6749439027d43d557416b2ca532",
+      "after_sha256": "3dfd02b62b6c66678ffdb5b4e6f2881a124e40e45871084cb2d3128c12737bbe",
+      "reason": "Authorized data installation updates inventory or attribution; no statistical code change."
+    }
+  },
+  "r_installation_checks": {
+    "pass": true,
+    "R_version": "R version 4.5.2 (2025-10-31 ucrt)",
+    "schema": [
+      "provlab",
+      "prov",
+      "weight",
+      "ea_id",
+      "year",
+      "income",
+      "povline",
+      "hh_id_panel",
+      "hh_uid_nolink",
+      "hh_uid_link",
+      "region",
+      "hhsize"
+    ],
+    "household_rows": 3432,
+    "auxiliary_rows": 104,
+    "geometries": 52,
+    "year_summaries": [
+      {
+        "year": 2012,
+        "households": 1716,
+        "psus": 442,
+        "provinces": 52,
+        "headcount": 0.205666640844481
+      },
+      {
+        "year": 2013,
+        "households": 1716,
+        "psus": 442,
+        "provinces": 52,
+        "headcount": 0.213815212411222
+      }
+    ],
+    "original_province_year_weighted_totals_preserved": true,
+    "removed_columns_from_previous_active": "povline_anchored",
+    "shared_columns_identical_to_previous_active": {
+      "provlab": true,
+      "prov": true,
+      "weight": true,
+      "ea_id": true,
+      "year": true,
+      "income": false,
+      "povline": true,
+      "hh_id_panel": true,
+      "hh_uid_nolink": true,
+      "hh_uid_link": true,
+      "region": true,
+      "hhsize": true
+    },
+    "configurations": {
+      "sm_out": {
+        "application_validation": true,
+        "statistical_settings_equal_executed_run": true,
+        "all_input_paths_resolve": true,
+        "all_input_objects_identical": true
+      },
+      "sm_all": {
+        "application_validation": true,
+        "statistical_settings_equal_executed_run": true,
+        "all_input_paths_resolve": true,
+        "all_input_objects_identical": true
+      }
+    },
+    "release_inventory_valid": true,
+    "pipeline_rerun": false,
+    "reason": "Byte-identical verified inputs; installation changes locations and documentation only."
+  },
+  "original_full_run_evidence_reused": true,
+  "statistical_pipeline_rerun_during_installation": false,
+  "release_inventory_matches_active_folder": true,
+  "cpi_resource_retained_byte_identical": true,
+  "documentation_relative_links_checked": true,
+  "no_commit_push_publication_or_release_build_performed": true
+}

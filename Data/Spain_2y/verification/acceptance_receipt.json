@@ -1,0 +1,479 @@
+{
+  "status": "accepted_verified",
+  "candidate": {
+    "id": "candidate_01",
+    "tau": 0.25,
+    "r_gen": 0.3
+  },
+  "fitted_correlation_target": [
+    0.3,
+    0.7
+  ],
+  "data_sha256": {
+    "survey.rds": "f5f8087a4fd997ba9740863af38b9fa6746198e32fb21c24cbe1dd22e595ed9c",
+    "auxiliary.rds": "b4b7815793c6c734efddcdc6f9218ffb09bfb5f1621194e418ec0696b587b841",
+    "shapefile.rds": "cc00941daf511d2ec5dac279e0560094ffec02b77778dd56357697ec6b9585f7"
+  },
+  "source_git_head": "f5740d25795c118af4404a7745e0f3258b6243e1",
+  "source_git_status": "",
+  "source_manifest_sha256": "c2ba8687b08bbba77263d792e77f66678e981e8fc6f7d7f10ccc7fcf8e9a4e7f",
+  "protocol_sha256": "fb6308dc6498b86694f5cfec5c9889261d414445ee074fbfffea72e15cd90108",
+  "frozen_pre_candidate_manifest_sha256": "04cdc62e4b47e57a15eb460f1a178ef3978b1b93d5ccc82ee54d9ce7a6d8a748",
+  "verification": {
+    "sens2": {
+      "pass": true,
+      "checks": {
+        "required_files": true,
+        "ufh_2012_interior": true,
+        "ufh_2012_domains": true,
+        "ufh_2012_predictions": true,
+        "ufh_2012_mse": true,
+        "ufh_2012_bootstrap": true,
+        "ufh_2012_residuals": true,
+        "ufh_2012_sampling": true,
+        "ufh_2012_df": true,
+        "ufh_2013_interior": true,
+        "ufh_2013_domains": true,
+        "ufh_2013_predictions": true,
+        "ufh_2013_mse": true,
+        "ufh_2013_bootstrap": true,
+        "ufh_2013_residuals": true,
+        "ufh_2013_sampling": true,
+        "ufh_2013_df": true,
+        "moderate_correlation": true,
+        "mfh_interior": true,
+        "mfh_predictions": true,
+        "mfh_screen_reproduced": true,
+        "mfh_residuals": true,
+        "ufh_ols_sigma": true,
+        "mfh_ols_sigma": true,
+        "mfh_bootstrap": true,
+        "mfh_F2": true,
+        "change_variance_positive": true,
+        "ufh_change": true,
+        "mfh_change_inference": true,
+        "required_figures": true,
+        "figures": true
+      },
+      "failed": [],
+      "details": {
+        "UFH_2012": {
+          "reml": {
+            "pass": true,
+            "s_hat": 0.0139670942136714,
+            "reference": 0.0139751878352968,
+            "interval": [
+              0,
+              0.0326590091617894
+            ],
+            "loglik_fit": 14.7038495577084,
+            "loglik_reference": 14.703851071838,
+            "gain_over_zero": 22.205399714275,
+            "gain_over_upper": 3.37236330218268,
+            "likelihood_tolerance": 1.5703851071838e-07,
+            "variance_agreement_tolerance": 0.000138400028593322,
+            "grid_step": 1.63295045808947e-05,
+            "reference_tol": 3.26590091617894e-12,
+            "grid_max": 0.0139780559212459,
+            "n_local_maxima": 1
+          },
+          "bootstrap": {
+            "requested": 500,
+            "successful": 500,
+            "required": 450,
+            "seed": 2135,
+            "target_source": "not_benchmarked",
+            "failures": []
+          },
+          "formula": "direct_povrate ~ gen + age5 + educ1 + educ2 + mkt + age4_X_educ3 +      labor2_X_educ3",
+          "residual_df": 44,
+          "mse_mcse": {
+            "Min.": 1.23127484690543e-05,
+            "1st Qu.": 0.000139219208136495,
+            "Median": 0.000226536558461999,
+            "Mean": 0.000243399375832243,
+            "3rd Qu.": 0.000337600600456317,
+            "Max.": 0.000523808736527382
+          }
+        },
+        "UFH_2013": {
+          "reml": {
+            "pass": true,
+            "s_hat": 0.0206208993142661,
+            "reference": 0.020616781545057,
+            "interval": [
+              0,
+              0.0273078692082908
+            ],
+            "loglik_fit": 15.3591946876117,
+            "loglik_reference": 15.3591949637326,
+            "gain_over_zero": 55.6931498713765,
+            "gain_over_upper": 0.542468333613751,
+            "likelihood_tolerance": 1.63591949637326e-07,
+            "variance_agreement_tolerance": 0.000135724557048917,
+            "grid_step": 1.36539346041454e-05,
+            "reference_tol": 2.73078692082908e-12,
+            "grid_max": 0.0206174412522596,
+            "n_local_maxima": 1
+          },
+          "bootstrap": {
+            "requested": 500,
+            "successful": 500,
+            "required": 450,
+            "seed": 2136,
+            "target_source": "not_benchmarked",
+            "failures": []
+          },
+          "formula": "direct_povrate ~ 1",
+          "residual_df": 51,
+          "mse_mcse": {
+            "Min.": 6.32074645678636e-05,
+            "1st Qu.": 0.000190662029751978,
+            "Median": 0.00026299635579305,
+            "Mean": 0.000260569423596413,
+            "3rd Qu.": 0.000317583294678761,
+            "Max.": 0.000487811180741082
+          }
+        },
+        "MFH": {
+          "a": 0.004071,
+          "q": 0.00607251479536271,
+          "rho": 0.57411,
+          "boundary": {
+            "boundary": false,
+            "variance_zero": false,
+            "correlation_limit": false,
+            "rho": 0.57411,
+            "rho_limit": 0.999999,
+            "reason": "interior_covariance_parameters",
+            "inference_status": "regular"
+          },
+          "bootstrap": {
+            "successful": 500,
+            "attempts": 500,
+            "failed": 0,
+            "boundary": 0,
+            "boundary_fraction": 0
+          },
+          "F2": {
+            "n_domains": 52,
+            "mse_ok": true,
+            "mse_mcse_ok": true,
+            "mcpe_finite": true,
+            "mcpe_mcse_ok": true,
+            "min_scaled_eigen": 0.158884095413569,
+            "eigen_ok": true,
+            "second_moment_array_matches": true,
+            "change_var_min": 0.00107016909158603,
+            "n_negative_change_var": 0,
+            "change_ok": true,
+            "export_rows_matched": true,
+            "change_max_abs_diff_vs_pipeline": 4.77048955893622e-18,
+            "change_agree": true,
+            "annual_mse_agree": true,
+            "annual_mcpe_agree": true,
+            "change_order_ok": true,
+            "eblup_columns": "poor_2012,poor_2013",
+            "year_columns_ok": true,
+            "proportion_units": true,
+            "F2": true,
+            "mc_precision": {
+              "mse_mcse_max": 0.000519745419382309,
+              "mse_mcse_median": 0.000209924650857716,
+              "mse_relative_mcse_median": 0.0637963569741329,
+              "mse_relative_mcse_max": 0.0737754372490818,
+              "mcpe_mcse_max": 0.000379965132949168,
+              "mcpe_mcse_median": 0.000161816578785027,
+              "mcpe_relative_mcse_median": 0.0948391025909558,
+              "change_mcse": "unavailable: the helper does not retain per-draw change errors; not recomputed"
+            }
+          }
+        }
+      },
+      "required_files": [
+        "data/fh_model_y1.rds",
+        "data/fh_model_y2.rds",
+        "data/mfh_artifacts.rds",
+        "data/pov_fh.xlsx",
+        "data/pov_mfh.xlsx",
+        "data/pov_comparison_detailed.xlsx",
+        "data/EU_SAE_results.xlsx",
+        "tables/ufh_model_diagnostics.csv",
+        "tables/mfh_model_diagnostics.csv",
+        "tables/mfh_standardized_residuals.csv",
+        "tables/comparison_final.csv",
+        "final_report.html",
+        "final_report.docx"
+      ],
+      "figure_count": 101
+    },
+    "principal": {
+      "pass": true,
+      "checks": {
+        "required_files": true,
+        "ufh_2012_interior": true,
+        "ufh_2012_domains": true,
+        "ufh_2012_predictions": true,
+        "ufh_2012_mse": true,
+        "ufh_2012_bootstrap": true,
+        "ufh_2012_residuals": true,
+        "ufh_2012_sampling": true,
+        "ufh_2012_df": true,
+        "ufh_2013_interior": true,
+        "ufh_2013_domains": true,
+        "ufh_2013_predictions": true,
+        "ufh_2013_mse": true,
+        "ufh_2013_bootstrap": true,
+        "ufh_2013_residuals": true,
+        "ufh_2013_sampling": true,
+        "ufh_2013_df": true,
+        "moderate_correlation": true,
+        "mfh_interior": true,
+        "mfh_predictions": true,
+        "mfh_screen_reproduced": true,
+        "mfh_residuals": true,
+        "ufh_ols_sigma": true,
+        "mfh_ols_sigma": true,
+        "mfh_bootstrap": true,
+        "mfh_F2": true,
+        "change_variance_positive": true,
+        "ufh_change": true,
+        "mfh_change_inference": true,
+        "required_figures": true,
+        "figures": true
+      },
+      "failed": [],
+      "details": {
+        "UFH_2012": {
+          "reml": {
+            "pass": true,
+            "s_hat": 0.0139670942136714,
+            "reference": 0.0139751878352968,
+            "interval": [
+              0,
+              0.0326590091617894
+            ],
+            "loglik_fit": 14.7038495577084,
+            "loglik_reference": 14.703851071838,
+            "gain_over_zero": 22.205399714275,
+            "gain_over_upper": 3.37236330218268,
+            "likelihood_tolerance": 1.5703851071838e-07,
+            "variance_agreement_tolerance": 0.000138400028593322,
+            "grid_step": 1.63295045808947e-05,
+            "reference_tol": 3.26590091617894e-12,
+            "grid_max": 0.0139780559212459,
+            "n_local_maxima": 1
+          },
+          "bootstrap": {
+            "requested": 500,
+            "successful": 500,
+            "required": 450,
+            "seed": 2135,
+            "target_source": "not_benchmarked",
+            "failures": []
+          },
+          "formula": "direct_povrate ~ gen + age5 + educ1 + educ2 + mkt + age4_X_educ3 +      labor2_X_educ3",
+          "residual_df": 44,
+          "mse_mcse": {
+            "Min.": 1.23127484690543e-05,
+            "1st Qu.": 0.000139219208136495,
+            "Median": 0.000226536558461999,
+            "Mean": 0.000243399375832243,
+            "3rd Qu.": 0.000337600600456317,
+            "Max.": 0.000523808736527382
+          }
+        },
+        "UFH_2013": {
+          "reml": {
+            "pass": true,
+            "s_hat": 0.0206208993142661,
+            "reference": 0.020616781545057,
+            "interval": [
+              0,
+              0.0273078692082908
+            ],
+            "loglik_fit": 15.3591946876117,
+            "loglik_reference": 15.3591949637326,
+            "gain_over_zero": 55.6931498713765,
+            "gain_over_upper": 0.542468333613751,
+            "likelihood_tolerance": 1.63591949637326e-07,
+            "variance_agreement_tolerance": 0.000135724557048917,
+            "grid_step": 1.36539346041454e-05,
+            "reference_tol": 2.73078692082908e-12,
+            "grid_max": 0.0206174412522596,
+            "n_local_maxima": 1
+          },
+          "bootstrap": {
+            "requested": 500,
+            "successful": 500,
+            "required": 450,
+            "seed": 2136,
+            "target_source": "not_benchmarked",
+            "failures": []
+          },
+          "formula": "direct_povrate ~ 1",
+          "residual_df": 51,
+          "mse_mcse": {
+            "Min.": 6.32074645678636e-05,
+            "1st Qu.": 0.000190662029751978,
+            "Median": 0.00026299635579305,
+            "Mean": 0.000260569423596413,
+            "3rd Qu.": 0.000317583294678761,
+            "Max.": 0.000487811180741082
+          }
+        },
+        "MFH": {
+          "a": 0.0032341,
+          "q": 0.00563615681443571,
+          "rho": 0.65283,
+          "boundary": {
+            "boundary": false,
+            "variance_zero": false,
+            "correlation_limit": false,
+            "rho": 0.65283,
+            "rho_limit": 0.999999,
+            "reason": "interior_covariance_parameters",
+            "inference_status": "regular"
+          },
+          "bootstrap": {
+            "successful": 500,
+            "attempts": 500,
+            "failed": 0,
+            "boundary": 24,
+            "boundary_fraction": 0.048
+          },
+          "F2": {
+            "n_domains": 52,
+            "mse_ok": true,
+            "mse_mcse_ok": true,
+            "mcpe_finite": true,
+            "mcpe_mcse_ok": true,
+            "min_scaled_eigen": 0.322119276132848,
+            "eigen_ok": true,
+            "second_moment_array_matches": true,
+            "change_var_min": 0.00218045248788667,
+            "n_negative_change_var": 0,
+            "change_ok": true,
+            "export_rows_matched": true,
+            "change_max_abs_diff_vs_pipeline": 5.20417042793042e-18,
+            "change_agree": true,
+            "annual_mse_agree": true,
+            "annual_mcpe_agree": true,
+            "change_order_ok": true,
+            "eblup_columns": "poor_2012,poor_2013",
+            "year_columns_ok": true,
+            "proportion_units": true,
+            "F2": true,
+            "mc_precision": {
+              "mse_mcse_max": 0.000418662570992658,
+              "mse_mcse_median": 0.000251667514244954,
+              "mse_relative_mcse_median": 0.0631300685662928,
+              "mse_relative_mcse_max": 0.0729292245316218,
+              "mcpe_mcse_max": 0.000280331551871154,
+              "mcpe_mcse_median": 0.000202671711820674,
+              "mcpe_relative_mcse_median": 0.0948531843496467,
+              "change_mcse": "unavailable: the helper does not retain per-draw change errors; not recomputed"
+            }
+          }
+        }
+      },
+      "required_files": [
+        "data/fh_model_y1.rds",
+        "data/fh_model_y2.rds",
+        "data/mfh_artifacts.rds",
+        "data/pov_fh.xlsx",
+        "data/pov_mfh.xlsx",
+        "data/pov_comparison_detailed.xlsx",
+        "data/EU_SAE_results.xlsx",
+        "tables/ufh_model_diagnostics.csv",
+        "tables/mfh_model_diagnostics.csv",
+        "tables/mfh_standardized_residuals.csv",
+        "tables/comparison_final.csv",
+        "final_report.html",
+        "final_report.docx"
+      ],
+      "figure_count": 101
+    }
+  },
+  "data_changes": {
+    "pass": true,
+    "comparison": "Previous accepted workbench_goal/candidate_02 versus new candidate",
+    "years": [
+      {
+        "year": 2012,
+        "n": 1716,
+        "changed_incomes": 0,
+        "all_other_columns_identical": true,
+        "old_headcount": 0.205666640844481,
+        "new_headcount": 0.205666640844481,
+        "old_mean_welfare": 12884.7715533925,
+        "new_mean_welfare": 12884.7715533925
+      },
+      {
+        "year": 2013,
+        "n": 1716,
+        "changed_incomes": 1691,
+        "all_other_columns_identical": true,
+        "old_headcount": 0.214280710850239,
+        "new_headcount": 0.213815212411222,
+        "old_mean_welfare": 13041.5922664182,
+        "new_mean_welfare": 12908.3666934197
+      }
+    ]
+  },
+  "exact_regeneration": {
+    "pass": true,
+    "id": "candidate_01",
+    "source": "preserved three-year baseline",
+    "exact_survey": true,
+    "exact_auxiliary": true,
+    "exact_transfer_list": true,
+    "exact_generation_evidence": true,
+    "saved_draws_equal_v8": true
+  },
+  "exact_fit_reproduction": {
+    "pass": true,
+    "checks": {
+      "principal": {
+        "formulas": true,
+        "predictions": true,
+        "refvar": true,
+        "rho": true,
+        "design": true,
+        "sampling": true
+      },
+      "sens2": {
+        "formulas": true,
+        "predictions": true,
+        "refvar": true,
+        "rho": true,
+        "design": true,
+        "sampling": true
+      }
+    }
+  },
+  "protected_file_audit": {
+    "protected_files_checked": 179,
+    "changed_outside_staging": [],
+    "original_preserved": true,
+    "previous_accepted_preserved": true,
+    "source_snapshot_unchanged": true,
+    "current_git_head": "f5740d25795c118af4404a7745e0f3258b6243e1",
+    "current_git_status": ""
+  },
+  "configuration": {
+    "sm_out": {
+      "executed": "C:\\Users\\noboy\\Repos\\eu-sae-personal\\Claude outputs\\spain_regeneration\\moderate_correlation_20261029\\runs\\candidate_01\\sens2\\app_config.yml",
+      "executed_sha256": "ceca07ff703739ae12163992f9595f240f0d1ff9d172f68305a1f0af529657b9",
+      "delivered_sha256": "8d2aa9d0e1b75ad2ee94194250af7e4126e9821e130bf79889ad8a4c6e72d811",
+      "successful_outputs": "C:\\Users\\noboy\\Repos\\eu-sae-personal\\Claude outputs\\spain_regeneration\\moderate_correlation_20261029\\runs\\candidate_01\\sens2\\outputs"
+    },
+    "sm_all": {
+      "executed": "C:\\Users\\noboy\\Repos\\eu-sae-personal\\Claude outputs\\spain_regeneration\\moderate_correlation_20261029\\runs\\candidate_01\\principal\\app_config.yml",
+      "executed_sha256": "4ba88a651a1a8857dd5aeeb14a217186667693e082f212ff242c6013828de316",
+      "delivered_sha256": "482df099a705e0a5e6f5f57332b173565f09df19b2fdcd495d0f3c5e748b52a9",
+      "successful_outputs": "C:\\Users\\noboy\\Repos\\eu-sae-personal\\Claude outputs\\spain_regeneration\\moderate_correlation_20261029\\runs\\candidate_01\\principal\\outputs"
+    }
+  },
+  "created_utc": "2026-10-29T17:51:15.852779+00:00"
+}

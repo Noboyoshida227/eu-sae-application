@@ -1,0 +1,122 @@
+years_keep:
+- 2012
+- 2013
+country: Spain (synthetic teaching example)
+analysis_seed: 123
+indicator_type: poverty
+log_transform: no
+currency_symbol: EUR
+fgt_alpha: 0
+povline_type: column
+povline_value: povline
+price_index:
+  enabled: no
+run_id: Spain_2y_moderate__sm_out
+run_label: Spain_2y_moderate__sm_out
+benchmarking:
+  enabled: no
+  level: national
+  level_variable: ''
+  level_label: national
+  source: survey direct
+  target_path: ~
+data_inputs:
+  data_folder: Data/Spain_2y
+  survey_file: survey.rds
+  rhs_file: auxiliary.rds
+  shp_file: shapefile.rds
+  benchmark_target_file: ''
+  population_file: ''
+  cpi_file: ''
+  survey_path: Data/Spain_2y/survey.rds
+  rhs_path: Data/Spain_2y/auxiliary.rds
+  shp_path: Data/Spain_2y/shapefile.rds
+run:
+  steps:
+  - UFH
+  - MFH
+  - Comparison
+ai:
+  enabled: no
+  provider: anthropic
+  external_transfer_consent: no
+mfh:
+  survey_path: Data/Spain_2y/survey.rds
+  rhs_path: Data/Spain_2y/auxiliary.rds
+  shp_path: Data/Spain_2y/shapefile.rds
+  do_benchmark: no
+  benchmark_level: national
+  benchmark_level_variable: ''
+  benchmark_source: survey direct
+  var_map:
+    year: year
+    domain: prov
+    psu: ea_id
+    weight: weight
+    strata: ''
+    hh_size: hhsize
+    hh_id: ''
+    survey_unit: household
+    benchmark_level: ''
+    region: ''
+    welfare: income
+    poor: poor
+    povline: povline
+  ic_criterion: AIC
+  rhs_domain: prov
+  shp_domain: prov
+  years_keep:
+  - 2012
+  - 2013
+  var_choice: sm_out
+  cov_choice: rho_sm_out
+  diag_model: MFH2
+  fit_mfh3: no
+  refvar_adjustment: bonferroni
+  refvar_alpha: 0.05
+  mcpe_nB: 500
+  log_transform: no
+  transformation: 'no'
+  bias_correction: .na
+  bias_correction_method: .na.character
+  backtransformation: ~
+  lasso_enabled: no
+  lasso_lambda: lambda.1se
+  bench_nB: 500
+ufh:
+  survey_path: Data/Spain_2y/survey.rds
+  rhs_path: Data/Spain_2y/auxiliary.rds
+  shp_path: Data/Spain_2y/shapefile.rds
+  do_benchmark: no
+  benchmark_level: national
+  benchmark_level_variable: ''
+  benchmark_source: survey direct
+  var_map:
+    year: year
+    domain: prov
+    psu: ea_id
+    weight: weight
+    strata: ''
+    hh_size: hhsize
+    hh_id: ''
+    survey_unit: household
+    benchmark_level: ''
+    region: ''
+    welfare: income
+    poor: poor
+    povline: povline
+  rhs_domain: prov
+  shp_domain: prov
+  years_keep:
+  - 2012
+  - 2013
+  transformation: arcsin
+  bias_correction: yes
+  bias_correction_method: bc
+  backtransformation: bc
+  ic_criterion: BIC
+  var_choice: sm_all
+  lasso_enabled: no
+  lasso_lambda: lambda.1se
+  bootstrap_nB: 500
+  log_transform: no

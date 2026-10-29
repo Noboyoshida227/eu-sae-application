@@ -151,9 +151,9 @@ if (identical(indicator_type, "poverty")) {
 }
 
 # ---- Data paths (from config or defaults) ----
-.default_survey_path <- here::here("Data", "Spain", "survey.rds")
-.default_rhs_path <- here::here("Data", "Spain", "auxiliary.rds")
-.default_shp_path <- here::here("Data", "Spain", "shapefile.rds")
+.default_survey_path <- here::here("Data", "Spain_2y", "survey.rds")
+.default_rhs_path <- here::here("Data", "Spain_2y", "auxiliary.rds")
+.default_shp_path <- here::here("Data", "Spain_2y", "shapefile.rds")
 survey_path <- resolve_config_path(ufh_cfg$survey_path, .default_survey_path, "Survey")
 rhs_path <- resolve_config_path(ufh_cfg$rhs_path, .default_rhs_path, "Auxiliary covariates")
 shp_path <- resolve_config_path(ufh_cfg$shp_path, .default_shp_path, "Geometry")
@@ -558,13 +558,15 @@ fh_results_list <- list()
     )
   ggplot2::ggplot(shp_join) +
     ggplot2::geom_sf(ggplot2::aes(fill = .value), color = "white", linewidth = 0.1) +
-    sae_fill_level(name = "EUR", limits = limits, oob = scales::squish) +
+    sae_fill_welfare(name = pov_lab$axis_label, horizontal = FALSE,
+                     limits = limits, oob = scales::squish) +
     ggplot2::labs(caption = sae_map_caption(.map_attribution), 
       title = paste0(value_col, " -- Year ", year_label),
       subtitle = "Back-transformed to EUR (mean welfare, log-fit)",
       fill = "EUR"
     ) +
-    ggplot2::theme_void(base_size = 12)
+    ggplot2::theme_void(base_size = 12) +
+    ggplot2::theme(plot.background = ggplot2::element_rect(fill = "white", colour = NA))
 }
 
 # UFH level and RMSE maps drawn with the shared scheme (R/map_style.R):
@@ -2403,6 +2405,10 @@ if (.growth_limit_min >= 0.5) .growth_limit_min <- 0.5 - 1e-6
   sae_fill_change(
     name   = "Growth Rate (capped at 1)",
     limits = c(.growth_limit_min, 0.5),
+    guide = guide_colourbar(
+      direction = "horizontal", title.position = "top",
+      barwidth = grid::unit(12, "cm"), barheight = grid::unit(0.45, "cm")
+    ),
     oob    = squish
   ) +
   labs(

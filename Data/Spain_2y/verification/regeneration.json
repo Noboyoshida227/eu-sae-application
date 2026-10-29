@@ -1,0 +1,10 @@
+{
+  "pass": true,
+  "id": "candidate_01",
+  "source": "preserved three-year baseline",
+  "exact_survey": true,
+  "exact_auxiliary": true,
+  "exact_transfer_list": true,
+  "exact_generation_evidence": true,
+  "saved_draws_equal_v8": true
+}

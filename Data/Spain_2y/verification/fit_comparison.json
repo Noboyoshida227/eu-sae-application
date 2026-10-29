@@ -1,0 +1,21 @@
+{
+  "pass": true,
+  "checks": {
+    "principal": {
+      "formulas": true,
+      "predictions": true,
+      "refvar": true,
+      "rho": true,
+      "design": true,
+      "sampling": true
+    },
+    "sens2": {
+      "formulas": true,
+      "predictions": true,
+      "refvar": true,
+      "rho": true,
+      "design": true,
+      "sampling": true
+    }
+  }
+}

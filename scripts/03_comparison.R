@@ -266,7 +266,7 @@ if (nzchar(.configured_shp_path)) {
          "\nUpload the geometry again or provide its current stable path.")
   }
 } else {
-  .shp_path <- here::here("Data", "Spain", "shapefile.rds")
+  .shp_path <- here::here("Data", "Spain_2y", "shapefile.rds")
   if (!file.exists(.shp_path)) stop("No geometry configured. Browse to the intended geometry file.")
 }
 
@@ -1351,6 +1351,15 @@ for (.yr in years_keep) {
   label_number(accuracy = if (kind == "rmse") 0.001 else 0.01)
 }
 
+.map_legend_title <- function(kind = c("rate", "rmse")) {
+  kind <- match.arg(kind)
+  if (identical(indicator_type, "mean_welfare")) {
+    if (kind == "rate") return(pov_lab$axis_label)
+    return(paste0("RMSE", if (nzchar(currency_symbol)) paste0(" (", currency_symbol, ")") else ""))
+  }
+  if (kind == "rmse") "RMSE" else pov_lab$short
+}
+
 plot_poverty_map <- function(col_name, method_label, year_val) {
   map_sf <- shp_dt %>%
     left_join(
@@ -1361,9 +1370,13 @@ plot_poverty_map <- function(col_name, method_label, year_val) {
     geom_sf(aes(fill = value), color = NA) +
     # Shared level scale (R/map_style.R): light = low rate, dark = high rate,
     # same value range on every poverty map (.map_level_limits).
-    sae_fill_level(labels = .map_label("rate"),
+    (if (identical(indicator_type, "mean_welfare")) {
+      sae_fill_welfare(name = .map_legend_title("rate"), horizontal = FALSE,
+                       limits = if (exists(".map_level_limits")) .map_level_limits else NULL,
+                       oob = scales::squish)
+    } else sae_fill_level(labels = .map_label("rate"),
                    limits = if (exists(".map_level_limits")) .map_level_limits else NULL,
-                   oob = scales::squish) +
+                   oob = scales::squish)) +
     labs(caption = sae_map_caption(.map_attribution), 
       title = paste0(method_label, " -- ", year_val),
       fill = "Rate"
@@ -1390,9 +1403,13 @@ plot_rmse_map <- function(col_name, method_label, year_val) {
     )
   ggplot(map_sf) +
     geom_sf(aes(fill = value), color = NA) +
-    sae_fill_level(labels = .map_label("rmse"),
+    (if (identical(indicator_type, "mean_welfare")) {
+      sae_fill_welfare(name = .map_legend_title("rmse"), horizontal = FALSE,
+                       limits = if (exists(".map_rmse_limits")) .map_rmse_limits else NULL,
+                       oob = scales::squish)
+    } else sae_fill_level(labels = .map_label("rmse"),
                    limits = if (exists(".map_rmse_limits")) .map_rmse_limits else NULL,
-                   oob = scales::squish) +
+                   oob = scales::squish)) +
     labs(caption = sae_map_caption(.map_attribution), 
       title = paste0("RMSE: ", method_label, " -- ", year_val),
       fill  = "RMSE"
@@ -1464,7 +1481,10 @@ plot_map_grid <- function(specs, kind = c("rate", "rmse"), title = NULL) {
   }
   ggplot(map_sf) +
     geom_sf(aes(fill = value), color = NA) +
-    sae_fill_level(
+    (if (identical(indicator_type, "mean_welfare")) {
+      sae_fill_welfare(name = .map_legend_title(kind), limits = limits,
+                       oob = scales::squish)
+    } else sae_fill_level(
       name   = if (kind == "rmse") "RMSE" else pov_lab$short,
       labels = .map_label(kind),
       limits = limits,
@@ -1472,7 +1492,7 @@ plot_map_grid <- function(specs, kind = c("rate", "rmse"), title = NULL) {
       guide  = guide_colourbar(barwidth = grid::unit(16, "lines"),
                                barheight = grid::unit(0.9, "lines"),
                                title.vjust = 0.85)
-    ) +
+    )) +
     facet_grid(method ~ year, switch = "y") +
     labs(
       title    = title,
@@ -2293,7 +2313,7 @@ message("Exporting map grids ...")
     lp <- ggplot(bar, aes(x = x, y = 0, fill = x)) +
       geom_raster() +
       sae_fill_level(limits = limits, guide = "none") +
-      scale_x_continuous(name = if (kind == "rmse") "RMSE" else pov_lab$short,
+      scale_x_continuous(name = .map_legend_title(kind),
                          labels = .map_label(kind),
                          expand = c(0, 0)) +
       scale_y_continuous(expand = c(0, 0)) +

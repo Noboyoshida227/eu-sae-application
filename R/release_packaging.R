@@ -18,12 +18,18 @@ sae_release_inventory <- function(root = ".") {
   }
   forbidden <- "(^|/)(\\.git|\\.env[^/]*|\\.Renviron|\\.Rhistory|\\.RData|Rplots\\.pdf|app_runs|r_local_library|node_modules|renv|tmp|dist|secrets\\.yml|api_keys\\.yml|package_versions\\.local\\.csv)(/|$)|^docs/internal/|^outputs/(?!.*\\.gitkeep$)|^docs/guidance/literature/(?!README\\.md$)"
   if (any(grepl(forbidden, paths, perl = TRUE, ignore.case = TRUE))) stop("Forbidden file in release inventory.")
+  if (any(grepl("^Data/Spain(/|$)", paths, ignore.case = TRUE))) {
+    stop("Data/Spain is retained locally for provenance and must not enter the release. Ship Data/Spain_2y instead.")
+  }
   required <- c("VERSION", "WIZARD_VERSION", "RELEASE_NAME", "app.R", "app_wizard.R", "report.Rmd",
                 "README.md", "START_HERE.html", "docs/INDEX.html",
                 "docs/maintenance/navigation.json", "docs/instructions/English/QUICK_START.pdf",
                 "docs/templates/report_reference.docx", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md",
                 "docs/validation/MCPE_VALIDATION_STATUS.md", "docs/instructions/English/SUPPORTED_PLATFORMS.md",
-                "Data/README.md", "scripts/release_inventory.csv")
+                "Data/README.md", "Data/Spain_2y/START_HERE.md",
+                "Data/Spain_2y/survey.rds", "Data/Spain_2y/auxiliary.rds",
+                "Data/Spain_2y/shapefile.rds", "Data/Spain_2y/CPI_Spain_teaching.csv",
+                "scripts/release_inventory.csv")
   if (length(setdiff(required, paths))) stop("Release inventory lacks required package files.")
   sort(paths, method = "radix")
 }

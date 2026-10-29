@@ -27,9 +27,10 @@ end to end, plus the script that generated them.
    question. Then press **Check data readiness** in Step 6 (Review
    configuration); all tests should pass.
 
-A second example -- real Spanish province geography and the dataset used in
-the guidance notes -- ships in `Data/Spain/`. It carries third-party licence terms
-(GPL-2); see `Data/Spain/README.md`. Use the synthetic files here for anything you
+A second example -- real Spanish province geography and synthetic 2012–2013
+teaching data -- ships in `Data/Spain_2y/`. It carries third-party licence terms
+(GPL-2); see `Data/Spain_2y/README.md`. It differs from the historical guidance example.
+Use the synthetic files here for anything you
 intend to pass on.
 
 ## Suggested variable mapping

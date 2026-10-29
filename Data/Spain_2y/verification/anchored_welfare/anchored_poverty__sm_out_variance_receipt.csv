@@ -1,0 +1,13 @@
+"method","year","quantity","scale","value"
+"UFH",2012,"random_effect_variance","arcsin poverty",0.0139670942136714
+"UFH",2012,"residual_sample_variance","arcsin poverty",0.00379809274845064
+"UFH",2013,"random_effect_variance","arcsin poverty",0.0223778460516002
+"UFH",2013,"residual_sample_variance","arcsin poverty",0.00232181107268612
+"MFH2",2012,"innovation_variance","poverty proportion",0.0039251
+"MFH2",2012,"marginal_random_effect_variance","poverty proportion",0.00647969149465563
+"MFH2",2012,"residual_sample_variance","poverty proportion",0.00394672414750611
+"MFH2",2012,"minimum_model_residual_variance","poverty proportion",0.000111036336666423
+"MFH2",2013,"innovation_variance","poverty proportion",0.0039251
+"MFH2",2013,"marginal_random_effect_variance","poverty proportion",0.00647969149465563
+"MFH2",2013,"residual_sample_variance","poverty proportion",0.00344133319813841
+"MFH2",2013,"minimum_model_residual_variance","poverty proportion",0.000118540519728249

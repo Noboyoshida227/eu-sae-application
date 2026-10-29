@@ -64,7 +64,7 @@ SHA-256.
 - `dist\<RELEASE_NAME>\` already exists;
 - `docs/maintenance/CHANGELOG.md` has no entry for the version;
 - any file in `scripts/release_inventory.csv` is missing — in particular
-  `Data/Spain/survey.rds` and `auxiliary.rds`, which are kept out of the
+  `Data/Spain_2y/survey.rds`, `auxiliary.rds` and generation records, which are kept out of the
   repository on purpose (GPL-2) and must be present locally;
 - the built archive lacks a package folder, a zip, or the executable bit on the
   macOS/Linux launchers.
@@ -84,9 +84,12 @@ authoritative one; keep the others short and pointing to it.
 **The download-instructions PDF.** Do not edit the PDF. Edit the text in
 `tools/build_instruction_pdf.py` and run it (`bump_version.py` runs it for you).
 
-**Building from a fresh clone.** A clone lacks `Data/Spain/survey.rds` and
-`auxiliary.rds` by design. Copy them in from a previous release archive before
+**Building from a fresh clone.** A clone lacks `Data/Spain_2y/survey.rds`,
+`auxiliary.rds` and generation records by design. Restore the current verified
+Spain_2y files from the maintained local copy or its matching release archive before
 building; `Release.ps1` will tell you if they are missing.
+
+**Local w5p rebuilds without committing.** Use `Rscript scripts/build_clean_release.R dist/<unique-review-build-name>` to retain existing builds. This creates a local review package with hashes and a re-extraction check; it does not commit, tag, upload or publish. Record the uncommitted source state alongside the ZIP. The original `Data/Spain/` stays in the repository working copy and is explicitly forbidden in the release inventory; `Data/Spain_2y/` is the bundled Spain example.
 
 **Country data.** Real survey or auxiliary data (for example `Data/Greece/`)
 never go into the repository or a release: `.gitignore` excludes them and the

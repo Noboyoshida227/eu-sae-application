@@ -21,7 +21,7 @@ sae_resolve_input_path <- function(path, root = ".", allow_basename = FALSE) {
     return(normalizePath(destination, winslash = "/", mustWork = TRUE))
   }
   if (isTRUE(allow_basename) && !grepl("/", relative, fixed = TRUE)) {
-    candidates <- file.path(root, c("Data", "Data/Spain", "Data/simulated"), relative)
+    candidates <- file.path(root, c("Data", "Data/Spain", "Data/Spain_2y", "Data/simulated"), relative)
     candidates <- candidates[file.exists(candidates)]
     if (length(candidates) > 1L) stop("Ambiguous saved input filename: ", relative,
                                      ". Browse to the intended file again.", call. = FALSE)

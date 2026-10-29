@@ -1,0 +1,13 @@
+"method","year","quantity","scale","value"
+"UFH",2012,"random_effect_variance","log welfare",0.0349760841786216
+"UFH",2012,"residual_sample_variance","log welfare",0.00390259444574479
+"UFH",2013,"random_effect_variance","log welfare",0.0332121552975281
+"UFH",2013,"residual_sample_variance","log welfare",0.0037428413853914
+"MFH2",2012,"innovation_variance","log welfare",0.026361
+"MFH2",2012,"marginal_random_effect_variance","log welfare",0.0311425890791319
+"MFH2",2012,"residual_sample_variance","log welfare",0.00379124492216249
+"MFH2",2012,"minimum_model_residual_variance","log welfare",0.00141757840560679
+"MFH2",2013,"innovation_variance","log welfare",0.026361
+"MFH2",2013,"marginal_random_effect_variance","log welfare",0.0311425890791319
+"MFH2",2013,"residual_sample_variance","log welfare",0.0039430103013627
+"MFH2",2013,"minimum_model_residual_variance","log welfare",0.000892599461979354

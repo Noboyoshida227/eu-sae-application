@@ -45,6 +45,24 @@ sae_fill_level <- function(name = ggplot2::waiver(), ...) {
   )
 }
 
+# Currency legends need room for thousands separators. Put the title above
+# the bar so a long indicator name cannot squeeze the ticks together. Only
+# presentation changes: values, limits and the shared level palette are kept.
+sae_fill_welfare <- function(name = "Mean welfare (EUR)", horizontal = TRUE, ...) {
+  sae_fill_level(
+    name = name,
+    labels = scales::label_number(accuracy = 1, big.mark = ","),
+    breaks = scales::breaks_pretty(n = 4),
+    guide = ggplot2::guide_colourbar(
+      direction = if (horizontal) "horizontal" else "vertical",
+      title.position = "top",
+      barwidth = grid::unit(if (horizontal) 12 else 0.5, "cm"),
+      barheight = grid::unit(if (horizontal) 0.45 else 4, "cm")
+    ),
+    ...
+  )
+}
+
 sae_fill_change <- function(name = "Change", ...) {
   ggplot2::scale_fill_gradient2(
     low      = "#2c7bb6",

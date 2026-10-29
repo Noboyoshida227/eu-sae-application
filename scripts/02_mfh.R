@@ -231,9 +231,9 @@ if (identical(indicator_type, "poverty")) {
   }
 }
 
-.default_survey_path <- here::here("Data", "Spain", "survey.rds")
-.default_rhs_path <- here::here("Data", "Spain", "auxiliary.rds")
-.default_shp_path <- here::here("Data", "Spain", "shapefile.rds")
+.default_survey_path <- here::here("Data", "Spain_2y", "survey.rds")
+.default_rhs_path <- here::here("Data", "Spain_2y", "auxiliary.rds")
+.default_shp_path <- here::here("Data", "Spain_2y", "shapefile.rds")
 survey_path <- resolve_config_path(mfh_cfg$survey_path, .default_survey_path, "Survey")
 rhs_path <- resolve_config_path(mfh_cfg$rhs_path, .default_rhs_path, "Auxiliary covariates")
 shp_path <- resolve_config_path(mfh_cfg$shp_path, .default_shp_path, "Geometry")
@@ -2530,20 +2530,33 @@ write.csv(data.frame(domain = rep(domain_vec, length(years_keep)),
 cat("Residual diagnostics use covariance-standardized residuals. Shapiro-Wilk and residual-fitted regressions are descriptive because residuals remain correlated.\n")
 
 # Two-panel diagnostic plots -- save to file
+# Keep poor_* as internal model keys; display the indicator and working scale.
+.diag_fitted_label <- if (isTRUE(log_transform)) {
+  "Fitted log mean welfare"
+} else if (identical(indicator_type, "mean_welfare")) {
+  sub("^Mean", "Fitted mean", pov_lab$axis_label)
+} else {
+  # UFH's fgt_label() supplies short but not noun_singular. It may already
+  # be loaded when the Workbench starts MFH, so support both label schemas.
+  paste0("Fitted ", pov_lab$noun_singular %||% tolower(pov_lab$short), " (proportion)")
+}
+.diag_year_labels <- setNames(as.character(years_keep), poor_cols)
 png(here::here("outputs", "figures", "mfh_residual_vs_eblup.png"),
     width = 12, height = 6, units = "in", res = 150)
 par(mfrow = c(1, 2))
 plot(
   eb[[poor_cols[1]]], resids_2[, 1],
   pch = 19,
-  xlab = paste0("EBLUPs (", poor_cols[1], ")"),
-  ylab = paste0("Standardized residuals (", poor_cols[1], ")")
+  xlab = .diag_fitted_label,
+  ylab = "Standardized residuals",
+  main = as.character(years_keep[1])
 )
 plot(
   eb[[poor_cols[2]]], resids_2[, 2],
   pch = 19,
-  xlab = paste0("EBLUPs (", poor_cols[2], ")"),
-  ylab = paste0("Standardized residuals (", poor_cols[2], ")")
+  xlab = .diag_fitted_label,
+  ylab = "Standardized residuals",
+  main = as.character(years_keep[2])
 )
 par(mfrow = c(1, 1))
 dev.off()
@@ -2620,9 +2633,10 @@ resid_shapiro_dt <- data.frame(
     aes(x = -Inf, y = Inf, label = label),
     hjust = -0.1, vjust = 1.2, inherit.aes = FALSE, size = 3.5
   ) +
-  facet_wrap(~Time, scales = "free") +
+  facet_wrap(~Time, scales = "free", labeller = labeller(Time = .diag_year_labels)) +
   theme_minimal() +
-  labs(title = paste0("Standardized residual histograms by year (", diag_model, ")"))
+  labs(title = paste0("Standardized residual histograms by year (", diag_model, ")"),
+       x = "Standardized residual", y = "Count")
 ggsave(here::here("outputs", "figures", "mfh_residual_histogram.png"),
        .p_resid_hist, width = 10, height = 6, dpi = 150)
 
@@ -2633,9 +2647,10 @@ ggsave(here::here("outputs", "figures", "mfh_residual_histogram.png"),
   ggplot(aes(sample = Residual)) +
   stat_qq() +
   stat_qq_line() +
-  facet_wrap(~Time, scales = "free") +
+  facet_wrap(~Time, scales = "free", labeller = labeller(Time = .diag_year_labels)) +
   theme_minimal() +
-  labs(title = paste0("QQ plots of standardized residuals by year (", diag_model, ")"))
+  labs(title = paste0("QQ plots of standardized residuals by year (", diag_model, ")"),
+       x = "Theoretical normal quantile", y = "Standardized residual")
 ggsave(here::here("outputs", "figures", "mfh_qq_residual.png"),
        .p_resid_qq, width = 10, height = 6, dpi = 150)
 
@@ -2681,6 +2696,7 @@ re_shapiro_dt <- data.frame(
                         paste0("Descriptive W = ", round(W, 3), "\n", "p = ", signif(p_value, 3))))
 
 # Plot histograms with test annotations
+.diag_re_year_labels <- setNames(as.character(years_keep), names(raneff_dt))
 .p_re_hist <- raneff_dt %>%
   as_tibble() %>%
   pivot_longer(cols = everything(), names_to = "Time", values_to = "RandEff") %>%
@@ -2691,9 +2707,11 @@ re_shapiro_dt <- data.frame(
     aes(x = -Inf, y = Inf, label = label),
     hjust = -0.1, vjust = 1.2, inherit.aes = FALSE, size = 3.5
   ) +
-  facet_wrap(~Time, scales = "free") +
+  facet_wrap(~Time, scales = "free", labeller = labeller(Time = .diag_re_year_labels)) +
   theme_minimal() +
-  labs(title = paste0("Random-effects histograms by year/outcome (", diag_model, ")"))
+  labs(title = paste0("Random-effects histograms by year (", diag_model, ")"),
+       x = if (isTRUE(log_transform)) "Random effect (log scale)" else "Random effect",
+       y = "Count")
 ggsave(here::here("outputs", "figures", "mfh_qq_random_effect.png"),
        .p_re_hist, width = 10, height = 6, dpi = 150)
 
@@ -3253,10 +3271,13 @@ plots <- lapply(X = years_keep,
                  by = "domain") |>
            ggplot() +
            geom_sf(aes(fill = modelpov), color = NA) +
-            sae_fill_level(
-              name = pov_lab$short,
-              limits = range(db_wide_all[[rate_col]], na.rm = TRUE)
-            ) +
+            (if (identical(indicator_type, "mean_welfare")) {
+              sae_fill_welfare(name = pov_lab$axis_label,
+                limits = range(db_wide_all[[rate_col]], na.rm = TRUE))
+            } else {
+              sae_fill_level(name = pov_lab$short,
+                limits = range(db_wide_all[[rate_col]], na.rm = TRUE))
+            }) +
             theme_minimal(base_size = 16) +
             labs(
               title = paste0("Spatial Distribution of ", pov_lab$short,
@@ -3324,10 +3345,14 @@ p_growth <- ggplot(shp_dt) +
   sae_fill_change(
     name   = "Growth Rate (capped at 1)",
     limits = c(.growth_limit_min, 0.5),
+    guide = guide_colourbar(
+      direction = "horizontal", title.position = "top",
+      barwidth = grid::unit(12, "cm"), barheight = grid::unit(0.45, "cm")
+    ),
     oob    = squish
   ) +
   labs(
-    title    = "Spatial Distribution of Poverty Growth Rates",
+    title    = paste("Spatial Distribution of", pov_lab$short, "Growth Rates"),
     subtitle = "Growth rates capped at 1 to reduce outlier influence",
     caption = sae_map_caption(.map_attribution, "Data source: Author calculation")
   ) +

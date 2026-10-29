@@ -60,9 +60,12 @@ configuration**. As an alternative, open `app_wizard.R` in RStudio and select **
 
 Two example datasets are included, both for learning and testing only.
 `Data/simulated/` holds fully synthetic files built by an included seeded script.
-`Data/Spain/` holds the Spain province example used in the guidance notes, derived
-from the GPL-2 `sae` package -- see `Data/Spain/README.md` for its attribution,
-licence and open provenance item. Neither may feed a real estimate. For actual
+`Data/Spain_2y/` holds the synthetic 2012–2013 Spain teaching example, derived
+from the GPL-2 `sae` example -- see `Data/Spain_2y/START_HERE.md` for its tested
+configurations and `Data/Spain_2y/README.md` for attribution and limitations.
+The original `Data/Spain/` remains in the repository working copy but is excluded
+from the release. Spain_2y does not reproduce historical guidance results.
+Neither example may feed a real estimate. For actual
 analyses, select your own survey, auxiliary-covariate, and geometry files in
 step 1.
 
@@ -218,7 +221,7 @@ The step buttons are clickable. Green indicates a complete step, amber indicates
 an outstanding item, and blue indicates the current step.
 
 Selecting another survey, auxiliary or geometry file in step 1 (for example
-switching from `Data/Spain/` to `Data/simulated/`) updates the settings that
+switching from `Data/Spain_2y/` to `Data/simulated/`) updates the settings that
 depend on it. A column mapping keeps its column when the new file has it;
 otherwise the usual column name for that variable is chosen if the file has one
 (for example `domain` or `prov`, `psu` or `ea_id`), and the field is cleared if

@@ -17,11 +17,12 @@ are lost; set `SAE_INPUT_ENCODING` before launch to force a specific source
 encoding. Geometry formats: sf
 RDS/RData, zipped ESRI shapefile, GeoPackage, GeoJSON, KML, and GML.
 
-This pre-release includes the documented Spain example and fully synthetic
-examples under `Data/Spain/` and `Data/simulated/`. Neither provides real
+This pre-release includes the two-year Spain teaching example and fully synthetic
+examples under `Data/Spain_2y/` and `Data/simulated/`. Neither provides real
 estimates. This candidate uses documented IGN/CNIG CartoBase ANE boundaries
 under CC BY 4.0; survey derivation and other release approvals remain open.
-See [data limitations and map attribution](../../Data/Spain/README.md) and `THIRD_PARTY_NOTICES.md`.
+See [data limitations and map attribution](../../Data/Spain_2y/README.md) and `THIRD_PARTY_NOTICES.md`.
+The original `Data/Spain/` is retained in the repository working copy for provenance and excluded from this release. For the current example, use `Data/Spain_2y/START_HERE.md` and its six explicit configurations.
 
 ## Readiness check, runs and maps
 

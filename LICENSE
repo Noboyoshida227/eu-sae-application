@@ -30,14 +30,16 @@ SOFTWARE.
 --------------------------------------------------------------------------
 Other terms apply to some non-code material distributed with this package:
 
-  * Data/Spain/survey.rds and Data/Spain/auxiliary.rds are derived from the
+  * Data/Spain_2y/survey.rds, Data/Spain_2y/auxiliary.rds and their generation
+    records are derived from the
     CRAN package `sae` (Molina & Marhuenda) and are distributed under the
     GNU General Public License, version 2. The full text is in
     LICENSES/GPL-2.0.txt. These files are NOT covered by the MIT licence
     above. They are distributed with the release archive; see
-    Data/Spain/README.md.
+    Data/Spain_2y/README.md. The original Data/Spain/ is preserved in the
+    repository working copy and excluded from this release.
 
-  * Data/Spain/shapefile.rds and Data/Spain/IGN_source/ are IGN/CNIG
+  * Data/Spain_2y/shapefile.rds contains IGN/CNIG
     CartoBase ANE, licensed CC BY 4.0. Preserve the attribution.
 
   * Further detail, including material that remains outside the MIT grant,

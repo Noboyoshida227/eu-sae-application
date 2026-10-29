@@ -114,14 +114,22 @@ for (bad_name in c("EU_SAE_5.2.0_w5", "../escape", "EU_SAE_../escape", "EU_SAE_"
 }
 unlink(name_fixture, recursive = TRUE)
 inventory <- sae_release_inventory(".")
-check(all(c("Data/Spain/survey.rds", "Data/Spain/auxiliary.rds", "Data/Spain/shapefile.rds",
-            "Data/Spain_2y/survey.rds", "Data/Spain_2y/auxiliary.rds", "Data/Spain_2y/shapefile.rds",
+check(all(c("Data/Spain_2y/survey.rds", "Data/Spain_2y/auxiliary.rds", "Data/Spain_2y/shapefile.rds",
             "Data/simulated/survey_example.csv", "Data/simulated/auxiliary_example.csv",
             "Data/simulated/geometry_example.geojson") %in% inventory) &&
-        !any(grepl("^(app_runs/|docs/internal/)|Rplots|package_versions.local", inventory)) &&
+        !any(grepl("^(Data/Spain/|app_runs/|docs/internal/)|Rplots|package_versions.local", inventory)) &&
         identical(inventory[startsWith(inventory, "docs/guidance/literature/")],
                   "docs/guidance/literature/README.md"),
       "release inventory contains approved examples and excludes internal/generated/literature files")
+local({
+  scratch <- tempfile("release_exclusion_")
+  dir.create(file.path(scratch, "scripts"), recursive = TRUE)
+  on.exit(unlink(scratch, recursive = TRUE), add = TRUE)
+  write.csv(data.frame(path = c(inventory, "Data/Spain/survey.rds")),
+            file.path(scratch, "scripts", "release_inventory.csv"), row.names = FALSE)
+  check(inherits(try(sae_release_inventory(scratch), silent = TRUE), "try-error"),
+        "release guard rejects accidentally reintroduced original Spain data")
+})
 check(grepl("sae_write_release_manifest", wizard_manifest_text, fixed = TRUE),
       "wizard manifest delegates to the shared inventory implementation")
 # Guides are listed by the shared "Guides and notes" menu (R/workbench_ui.R,
@@ -701,6 +709,15 @@ check(identical(sae_resolve_input_path("data/survey.rds", path_fixture),
 writeLines("Ambiguous fixture", file.path(path_fixture, "Data", "simulated", "survey.rds"))
 check(inherits(try(sae_resolve_input_path("survey.rds", path_fixture, TRUE), silent = TRUE), "try-error"),
       "ambiguous saved filenames require user selection")
+new_release <- file.path(path_fixture, "new_release")
+dir.create(file.path(new_release, "Data", "Spain_2y"), recursive = TRUE)
+writeLines("Two-year fixture", file.path(new_release, "Data", "Spain_2y", "survey.rds"))
+check(identical(sae_resolve_input_path("survey.rds", new_release, TRUE),
+                normalizePath(file.path(new_release, "Data", "Spain_2y", "survey.rds"), winslash = "/")),
+      "a released package resolves a unique Spain_2y bare filename")
+check(!file.exists(sae_resolve_input_path("Data/Spain/survey.rds", new_release, TRUE)) &&
+        !file.exists(sae_resolve_input_path("data/survey.rds", new_release, TRUE)),
+      "references to the original Spain example never silently select the regenerated dataset")
 # The fixture is owned by this test and must remain in R's temporary directory.
 stopifnot(startsWith(normalizePath(path_fixture, winslash = "/"),
                     paste0(normalizePath(tempdir(), winslash = "/"), "/")))
@@ -708,14 +725,14 @@ unlink(path_fixture, recursive = TRUE)
 
 # IGN boundary and attribution regression checks.
 source("R/input_readers.R")
-# Data/Spain/auxiliary.rds is deliberately excluded from the repository
+# Data/Spain_2y/auxiliary.rds is deliberately excluded from Git
 # (GPL-2; see THIRD_PARTY_NOTICES.md), so these checks run only where the
 # Spain example data is present - a full working copy or an extracted release
 # archive - and are skipped in a fresh clone such as CI.
-if (file.exists("Data/Spain/auxiliary.rds") &&
-    file.exists("Data/Spain/shapefile.rds")) {
-  ign_geometry <- sae_read_geometry_input("Data/Spain/shapefile.rds")
-  ign_aux <- readRDS("Data/Spain/auxiliary.rds")
+if (file.exists("Data/Spain_2y/auxiliary.rds") &&
+    file.exists("Data/Spain_2y/shapefile.rds")) {
+  ign_geometry <- sae_read_geometry_input("Data/Spain_2y/shapefile.rds")
+  ign_aux <- readRDS("Data/Spain_2y/auxiliary.rds")
   ign_names <- unique(as.data.frame(ign_aux)[, c("prov", "provlab")])
   ign_names <- ign_names[order(ign_names$prov), ]
   check(identical(names(ign_geometry), c("prov", "provlab", "geometry")) &&
@@ -751,9 +768,11 @@ if (file.exists("Data/Spain/auxiliary.rds") &&
   message("SKIP: IGN boundary and attribution checks (Spain example data not present).")
 }
 
-check(!inherits(try(parse("Data/Spain/generate_spain_boundary.R", encoding = "UTF-8"),
+if (file.exists("Data/Spain/generate_spain_boundary.R")) {
+  check(!inherits(try(parse("Data/Spain/generate_spain_boundary.R", encoding = "UTF-8"),
                      silent = TRUE), "try-error"),
       "offline IGN boundary generator parses")
+}
 
 
 # Estimated-change figures use paired signed changes, not interval widths.

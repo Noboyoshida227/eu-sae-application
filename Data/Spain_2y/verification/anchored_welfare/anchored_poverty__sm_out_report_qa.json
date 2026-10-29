@@ -1,0 +1,100 @@
+{
+  "pass": true,
+  "html_images": 51,
+  "docx_media": 37,
+  "report_variance_rows": {
+    "html": [
+      {
+        "Method": "UFH",
+        "Year": "2012",
+        "Formula": "direct_povrate ~ gen + age5 + educ1 + educ2 + mkt + age4_X_educ3 + labor2_X_educ3",
+        "Domains used": "52",
+        "Predictors": "7",
+        "AIC": "-59.9016",
+        "BIC": "-42.3404",
+        "logLik": "28.4142",
+        "Sigma": "0.1244",
+        "Random-effect variance": "0.013967",
+        "OLS companion R2": "0.3656",
+        "OLS companion adjusted R2": "0.2646"
+      },
+      {
+        "Method": "UFH",
+        "Year": "2013",
+        "Formula": "direct_povrate ~ 1",
+        "Domains used": "52",
+        "Predictors": "0",
+        "AIC": "-58.0544",
+        "BIC": "-54.1519",
+        "logLik": "17.5196",
+        "Sigma": "0.1345",
+        "Random-effect variance": "0.022378",
+        "OLS companion R2": "0.0000",
+        "OLS companion adjusted R2": "0.0000"
+      },
+      {
+        "Method": "MFH2",
+        "Year": "2012",
+        "Formula": "poor_2012 ~ gen + age5 + educ1 + educ2 + ntl + age4_X_educ3 + labor2_X_educ3",
+        "Domains used": "52",
+        "Predictors": "7",
+        "AIC": "-62.9196",
+        "BIC": "-45.3585",
+        "logLik": "40.4598",
+        "Sigma": "0.1208",
+        "Random-effect variance": "0.003925",
+        "OLS companion R2": "0.4013",
+        "OLS companion adjusted R2": "0.3061"
+      },
+      {
+        "Method": "MFH2",
+        "Year": "2013",
+        "Formula": "poor_2013 ~ gen + educ2 + abs + mkt + age4_X_gen + age3_X_educ3 + age4_X_educ3 + nat1_X_educ3",
+        "Domains used": "52",
+        "Predictors": "8",
+        "AIC": "-65.4602",
+        "BIC": "-45.9477",
+        "logLik": "42.7301",
+        "Sigma": "0.1170",
+        "Random-effect variance": "0.003925",
+        "OLS companion R2": "0.3624",
+        "OLS companion adjusted R2": "0.2438"
+      }
+    ],
+    "docx": [
+      {
+        "Method": "UFH",
+        "Year": "2012",
+        "Sigma": "0.1244",
+        "Random-effect variance": "0.013967",
+        "OLS companion R2": "0.3656",
+        "OLS companion adjusted R2": "0.2646"
+      },
+      {
+        "Method": "UFH",
+        "Year": "2013",
+        "Sigma": "0.1345",
+        "Random-effect variance": "0.022378",
+        "OLS companion R2": "0.0000",
+        "OLS companion adjusted R2": "0.0000"
+      },
+      {
+        "Method": "MFH2",
+        "Year": "2012",
+        "Sigma": "0.1208",
+        "Random-effect variance": "0.003925",
+        "OLS companion R2": "0.4013",
+        "OLS companion adjusted R2": "0.3061"
+      },
+      {
+        "Method": "MFH2",
+        "Year": "2013",
+        "Sigma": "0.1170",
+        "Random-effect variance": "0.003925",
+        "OLS companion R2": "0.3624",
+        "OLS companion adjusted R2": "0.2438"
+      }
+    ]
+  },
+  "scope": "Parsed both report formats, checked selected-model table values, required text and image/media availability; representative plots inspected separately."
+}

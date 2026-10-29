@@ -21,7 +21,7 @@
          never sent to anyone.
       3. docs\maintenance\CHANGELOG.md has a "## <version>" heading, so what changed is
          written down where recipients will find it.
-      4. The Spain example data and every other inventory file is present.
+      4. The Spain_2y example data and every other inventory file is present.
 
     The full process is described in docs\maintenance\RELEASING.md.
 
@@ -115,12 +115,12 @@ $missing = $inventory.path | Where-Object { -not (Test-Path -LiteralPath $_ -Pat
 if ($missing) {
     Write-Bad "Files listed in scripts\release_inventory.csv are missing:"
     $missing | ForEach-Object { Write-Bad "     $_" }
-    if ($missing -match 'Data/Spain(_2y)?/(survey|auxiliary)\.rds|Data/Spain_2y/generation/') {
+    if ($missing -match 'Data/Spain_2y/(survey|auxiliary)\.rds|Data/Spain_2y/generation/') {
         Write-Bad ""
-        Write-Bad "survey.rds and auxiliary.rds in Data\Spain and Data\Spain_2y, and"
+        Write-Bad "survey.rds and auxiliary.rds in Data\Spain_2y, and"
         Write-Bad "Data\Spain_2y\generation\, are kept OUT of the repository on purpose (GPL-2)."
         Write-Bad "Copy them in from a previous release zip (GitHub Releases); see"
-        Write-Bad "Data\Spain\README.md and Data\Spain_2y\README.md."
+        Write-Bad "Data\Spain_2y\README.md. The original Data\Spain is not shipped."
     }
     exit 1
 }

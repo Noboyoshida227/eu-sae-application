@@ -1,0 +1,347 @@
+{
+  "date": "2026-10-29",
+  "installed_utc": "2026-10-29T21:04:47.732557+00:00",
+  "pass": true,
+  "change_scope": "Map legends, MFH diagnostic display labels, and regenerated HTML/Word reports only.",
+  "model_estimation_rerun": false,
+  "bootstrap_rerun": false,
+  "data_and_existing_configuration_files_unchanged": true,
+  "original_spain_all_files_unchanged": true,
+  "all_numerical_outputs_byte_identical": true,
+  "all_html_report_tables_identical": true,
+  "original_final_manifest_preserved": "Claude outputs/spain_regeneration/anchored_welfare_20261029/final_manifest.json",
+  "current_final_manifest": "Claude outputs/spain_regeneration/anchored_welfare_20261029/presentation_refresh_manifest.json",
+  "audit_folder": "Claude outputs/spain_regeneration/presentation_refresh_20261029",
+  "source_sha256": {
+    "R/map_style.R": "4f7cdf7957e26e5ba3b910a1aedd31d9bf00ac6e716656056e8fc5b50eed6b03",
+    "scripts/01_ufh.R": "6a899d0f64480afc460ab399877a43d44a19d4e621a2e7fbd1a505979c529606",
+    "scripts/02_mfh.R": "fd5c79a36e7977ce2beda32c1d83ca1a208f48f79b568dd462258a04525eb47c",
+    "scripts/03_comparison.R": "e9c8c1b329c6589437c65615d6d19e3fa8e20810059460602faaf28506704af7"
+  },
+  "data_sha256": {
+    "Data/Spain": {
+      "auxiliary.rds": "3c62e6e682a6d30ec201ca6892da2f8433d0a92270b7a0c219131c7ebfb97998",
+      "province_crosswalk.csv": "869475d6dc886f6d6f916128f0810f0987eb54f00086aa67b9c51ef244537bbe",
+      "shapefile.rds": "cc00941daf511d2ec5dac279e0560094ffec02b77778dd56357697ec6b9585f7",
+      "survey.rds": "b86ac348be3898075aa7df07c0d37798255daf22d79f89e8d1c1d2755544ad32"
+    },
+    "Data/Spain_2y": {
+      "auxiliary.rds": "b4b7815793c6c734efddcdc6f9218ffb09bfb5f1621194e418ec0696b587b841",
+      "CPI_Spain_teaching.csv": "359e8ae815e8a23144a841ef9feb90b45d77fea9b5f02aff0b227ab1fb262d9e",
+      "generation/draws.csv": "6ec9d8861e8e40254dea1b3e2fe2dce81918e0b40d93fbcf3f5822bbf03b1b23",
+      "generation/draws.rds": "f38e2a08abeaa8b87da67df1b031fc1462de7dc02fce5cfbc2f4fedb8829dabf",
+      "generation/generation_evidence.rds": "c638ecb168411467a2598f585a72c7464aaeb1d32d903565f18a70e94bcb62a9",
+      "generation/multipliers.csv": "b7ba95bb294c2b218e4a50f649a5ee95463d59b9650679f0a94053084130a402",
+      "generation/province_labels.csv": "4170336ad0ade608a880973b263be6540523021583d89edb8bc57ff29009cfa8",
+      "generation/redistribution_audit.csv": "c6d254631063fb5ba54c610291e7da10769c66047b06dcb570de92fe24e700e1",
+      "generation/transfer_list.csv": "0d54382df38f2c741e14f1ee300d11c1a7927a1d91ee4bed2ebb3e9085fba4fb",
+      "province_crosswalk.csv": "869475d6dc886f6d6f916128f0810f0987eb54f00086aa67b9c51ef244537bbe",
+      "shapefile.rds": "cc00941daf511d2ec5dac279e0560094ffec02b77778dd56357697ec6b9585f7",
+      "survey.rds": "19268db6ffd762eb81d5130529fe09ad3861ea490557802ccd72c043090942a2"
+    }
+  },
+  "backup_archives": {
+    "anchored_poverty__sm_all_outputs.zip": "7f6dc2ee5d56cbed9ea831c72030884f1908a9ce36d2ba24fcec2666a604817b",
+    "anchored_poverty__sm_out_outputs.zip": "62c606b2ba03f707fe64bc30bb80e5fbbda0977469d296261357eff65ee17ebd",
+    "mean_welfare__sm_all_outputs.zip": "608fc259d586915efa9ff00da076b066f8fb45a696f6b868c6d094f8d24cf8a3",
+    "mean_welfare__sm_out_outputs.zip": "96fae38508be1a200acfb5d8aad4c3011b4b4cbe5a8abc8504bef68bca810b88"
+  },
+  "visual_review": {
+    "pass": true,
+    "reviewed": [
+      "mean-welfare MFH maps",
+      "mean-welfare UFH map",
+      "comparison level and RMSE map grids",
+      "HTML currency legend asset",
+      "MFH residual-fitted plots for welfare and anchored poverty",
+      "MFH histograms, QQ plots and random-effect facets"
+    ],
+    "limitations": "Representative PNGs visually reviewed. HTML/Word content and embedded graphics checked; Word pagination not reviewed page by page."
+  },
+  "runs": {
+    "anchored_poverty__sm_all": {
+      "pass": true,
+      "unchanged_nonpresentation_files": 59,
+      "all_html_tables_identical": true,
+      "html_images": 51,
+      "docx_media": 37,
+      "changed_files": {
+        "figures/mfh_qq_random_effect.png": {
+          "before": "fba76a14bde8df110e1f09adaa8d85e6bca9e67aab39e3ac448f1c58f3e1d5be",
+          "after": "d0754625201348757f23ab74619dd83181dd3a8ae57521cad2c190e2c673653d"
+        },
+        "figures/mfh_qq_residual.png": {
+          "before": "8f6240e1173da5a815bbc8900d7b0e5423f2e960febec285d41fd10e8e96fcb1",
+          "after": "917980411961b972f5659d76e18efae6091f1cf6051fcf7aa286021fdf758e20"
+        },
+        "figures/mfh_residual_histogram.png": {
+          "before": "1ac32ff9b035737e46438e7cc7b3f68b3865f3d7c7315ea71a228181afc1ab99",
+          "after": "e028796444ecf51faf636524e3a7fa7bffdba1b944abf82b5d6d7bf8aa4ee0b5"
+        },
+        "figures/mfh_residual_vs_eblup.png": {
+          "before": "ec0ff21b05839ce8c3a0c2857cd244c4f0061e9e3671a6de9c2725bf51d74c5d",
+          "after": "1021a62aac723718d1d662f99df09f0a1114244256ebf64b8b6e6b4ae3562e8a"
+        },
+        "final_report.docx": {
+          "before": "86d908fccc73984560850f45c7387fa40c0ec142edfab4e51b1471479e6fa20b",
+          "after": "5e5ca67deaa2c4fef02f2f1518b1a657724f7fb910789a54ce35ffde077dfec7"
+        }
+      }
+    },
+    "anchored_poverty__sm_out": {
+      "pass": true,
+      "unchanged_nonpresentation_files": 59,
+      "all_html_tables_identical": true,
+      "html_images": 51,
+      "docx_media": 37,
+      "changed_files": {
+        "figures/mfh_qq_random_effect.png": {
+          "before": "1abfcb1c825999089957d25ad8245b2cb44569f332f470f9ece5f7913bfb61e7",
+          "after": "9a38b59bf53817848332f63a7269ed9e0faed605141b30883273cc49ce58c8e2"
+        },
+        "figures/mfh_qq_residual.png": {
+          "before": "5c47afb46072582ba28f1b637ee55da84f5f119dd82d87c4123273dfb2632825",
+          "after": "e8284223f00a2cc1f5d6ae0de46186fc3dd5bc03e6ae0d5e4137396e509fa8d7"
+        },
+        "figures/mfh_residual_histogram.png": {
+          "before": "606819b09b01965a59ef2ddb864b448c6bf03103d65f23a5c0f0da7eed55c58c",
+          "after": "8cb0f11dd3d146b7680a13d5186cbd6b1da96885680dfc76ea69458d808b4f2a"
+        },
+        "figures/mfh_residual_vs_eblup.png": {
+          "before": "73d175e6126e2da46278e0de2059c6e6e02658c9c987e31771742149ee8ae2b4",
+          "after": "24f09769a3546566a5b97c4b9f6a2078092ed24ebaf14c8ae9f46767b8bf0d8a"
+        },
+        "final_report.docx": {
+          "before": "3f42dfcb2c3305909ea1906519e917dda2ad7483ea44ea165a3712e9d3d31545",
+          "after": "5a7cd79b3bea128b507fceed7f0b7a933ecb1da00e268e778de90f53ce0dfee4"
+        }
+      }
+    },
+    "mean_welfare__sm_all": {
+      "pass": true,
+      "unchanged_nonpresentation_files": 55,
+      "all_html_tables_identical": true,
+      "html_images": 51,
+      "docx_media": 37,
+      "changed_files": {
+        "figures/mfh_map_y1.png": {
+          "before": "5fd83bb47a90574ec6afeba54a98bc9d4fe8fac00623b1082582eaabb9d163b4",
+          "after": "27e46930fe5a4ed434a06027e9d6a2241c6c2f1a240bda7d3bedfef78d95d46a"
+        },
+        "figures/mfh_map_y2.png": {
+          "before": "63e54fcda067d6e36f9c0aa680d1038b28d3e55e5f1dc6fb38e22216f4740555",
+          "after": "8b73af1eafeb6db40a326e557e4e6616177e88c8ce987ff35d3e8f80869fd51d"
+        },
+        "figures/mfh_qq_random_effect.png": {
+          "before": "3b3e5ffe5d9b9828aca956f520455432b3f836f6ca2daea73d1fdaecd54bb432",
+          "after": "ca23939f447ecc444069a4278cfad4066fdee6a2d709042a50b16b6fa3f0d9b6"
+        },
+        "figures/mfh_qq_residual.png": {
+          "before": "a737bf97d142598f06759d94c5f3aaed2583fcb0dce273fb41eb92207ab2cbac",
+          "after": "04a9f6dc95dcf5839ad716dfdbaebee410e5ac8c7cc6a43e83ee033c20c2d097"
+        },
+        "figures/mfh_residual_histogram.png": {
+          "before": "2d9a342b1f3bbdaa22eeb9c897811044e99292942823979b1cfae5b9b934d2a6",
+          "after": "a2c77d9933f87e8f2fd7ed3429da6d05331d980446c985dbc11e13330d3c617a"
+        },
+        "figures/mfh_residual_vs_eblup.png": {
+          "before": "0848f190c3bf7106e6c091ea5972c9eb8448c6de3b673634f2c1576c2647d1fe",
+          "after": "70f122cd97252adc706f755fd18aa0c1be8f3d0d7d1e2b91ad6073b3ceab6314"
+        },
+        "figures/poverty_maps/grid_estimates.png": {
+          "before": "ad51f26112caaa4c073ff7cdb734aebf02b3819fa19d4dc2f26ee438542b2489",
+          "after": "017ebc99e32beeeb4a09e177f24946ac5c15fbbfd9ede7ebec6043a2a09e0047"
+        },
+        "figures/poverty_maps/grid_panels/legend.png": {
+          "before": "04ccbc45b0a64bf1f81be0a69343dd33f99d2876554bc7706f5b3bab7e05f823",
+          "after": "e34b177c9821be3e902e9caec733fe378b4219c16346f4e3cd488c71e859f895"
+        },
+        "figures/poverty_maps/map_direct_2012.png": {
+          "before": "37433168423be29eb3ff55d3ef5fb959fd1a6dea54cb2eb65e8d4e05684a9e04",
+          "after": "19e7335268e1fb956ee5af93f4581d29d12d466b5c9e7aa0689ee6a2a9a2ca7e"
+        },
+        "figures/poverty_maps/map_direct_2013.png": {
+          "before": "81ad4aa26fc3cd7a42182ac3622674922f4c10cc300ba3f99526a0071eb47688",
+          "after": "9a2da730e748b18d98231cdbf53b0cd3a7235e9571b91c17d37c63431ea0086a"
+        },
+        "figures/poverty_maps/map_fh_2012.png": {
+          "before": "de7578456fc2c691b1654df0c6856fd9914b63198977dd8834620e9d569aa260",
+          "after": "1dfda3fe3cdbf0b364dd57c911bcffb757d7a326e3c310e6322f95a3c9451876"
+        },
+        "figures/poverty_maps/map_fh_2013.png": {
+          "before": "4b251d9c058295a823eefdb3bec080923045ee7b747c350b20841e89d25222b9",
+          "after": "9fcfcf4ffba46205b4358f996a8fa8655f6803f6a535213d2b1c99364edf9392"
+        },
+        "figures/poverty_maps/map_mfh_2012.png": {
+          "before": "545a7c55851d852e27194512e4be92a5687a0687114fc8a23d002709164d21db",
+          "after": "2058200dc82acc3fb20b81cae76fa204fced60d8cc37073910fb4722346dc98e"
+        },
+        "figures/poverty_maps/map_mfh_2013.png": {
+          "before": "e11b451c4a885bddb473680afa7318819efe424d33446ae772bbfef4ec84778a",
+          "after": "735433ddfba4c85e48e60931b58dfc8dc8ce812f9de93074d7137af53e12dbd6"
+        },
+        "figures/rmse_maps/grid_panels/legend.png": {
+          "before": "94e5bdec9b8c04c88ffbc9ea701514a6ae4fd5ae66f6720d0b3701cb95869c68",
+          "after": "bc6e1ccadfc1279ac56aaf4394e98a3d1462f93c757fdd707b0ce4581746ca8e"
+        },
+        "figures/rmse_maps/grid_rmse.png": {
+          "before": "a2324c175cef71f0a9722c37a3855123b49b67ec277009d7618ce48f790d43ff",
+          "after": "29a268d2e62d0d5839e99785d66eb24ae152622fe756c9a8e97c4eb669b9acc0"
+        },
+        "figures/rmse_maps/rmse_map_direct_2012.png": {
+          "before": "5a42d1ff275c24c0eeeb7103d4206c344f89f7fe85f4e2ecdd5560f404dfe901",
+          "after": "b17e82fc671cca3e944ede25f41d3ec3e8a3960cff39a029f6918bc8783d6b12"
+        },
+        "figures/rmse_maps/rmse_map_direct_2013.png": {
+          "before": "6853f32a13ffcf76eee6e2ca3a59ce2ce8b1f5d13bc66cf77a3efa22c5c06f27",
+          "after": "e5b48607473ccb6a929c50b6927383b9a4c703442f2980f55f2f614a14cba563"
+        },
+        "figures/rmse_maps/rmse_map_fh_2012.png": {
+          "before": "e4b30e9a3c669318ddeee646f47d28c7173d21bfbcb37da98c52f435f84a1c57",
+          "after": "fc46bf8a2dd504f8cee93bc75adc4d9e63ae6c7ed8e2ea821b8cad73d43da423"
+        },
+        "figures/rmse_maps/rmse_map_fh_2013.png": {
+          "before": "3e2bc384806909416c3383447f73285210bf552c5bd4aa09a430657305457516",
+          "after": "d5960b344b480b70223e5dc3e4e76258acb5b554d9141c9e3566ec596b8eeab7"
+        },
+        "figures/rmse_maps/rmse_map_mfh_2012.png": {
+          "before": "19acfd7dd0105816a5d64751b87d16ea7c0979d8b682872b64965e374b099607",
+          "after": "fe0589bd8777cdc95685bbf0e7aec0ce1d1518da8c096eda557548cddb4febf0"
+        },
+        "figures/rmse_maps/rmse_map_mfh_2013.png": {
+          "before": "0a60d0a2b327fd798405eebba9635bfd4d9d4db2a357ac0c97c0293f73c36dba",
+          "after": "e692d27dd2957d096d4a2b8b685e9168edab7a4de6ef1f38d7ac1df2d6a43eb9"
+        },
+        "figures/ufh_map_y1.png": {
+          "before": "038915e2d53daa1175cb7085c0dd3d316f961f3e9f060e91bcaebd2ac4f8c80a",
+          "after": "cef81795698827933645ffdbd3339c3715543c014f98806f2c619d8fbde6217d"
+        },
+        "figures/ufh_map_y2.png": {
+          "before": "9851021023e22a3449df62fdee0b50bbd0f2d6dbda978911a97cb0468274cf2d",
+          "after": "0c8089beceb8cca65a2884e99a408f3146d88e56dc54bacafed09bc0fb8d47f8"
+        },
+        "final_report.docx": {
+          "before": "721ae287ad90e95fb35a43ab59cdce046c21a8ea3644c02558c3f74c823517c6",
+          "after": "cde98b9ef6491b44bb1e16c54cb637bfd3f4dcf3a77d33c1649740414c3627ee"
+        },
+        "final_report.html": {
+          "before": "4c08054838e42fb64a691d071ff3cb6a41b815836c82b681fbc43c8f7f0184e5",
+          "after": "8537fa911b2ba89cf399cb52d598f3e0dc7db1bdd1fa95c6a25a94da5cc54151"
+        }
+      }
+    },
+    "mean_welfare__sm_out": {
+      "pass": true,
+      "unchanged_nonpresentation_files": 55,
+      "all_html_tables_identical": true,
+      "html_images": 51,
+      "docx_media": 37,
+      "changed_files": {
+        "figures/mfh_map_y1.png": {
+          "before": "828b9e7a0b7900b8de1153704a4fd2155909c71942a6ebecb5e95def9ea010c2",
+          "after": "b873e43db94db71aeb37020e6f16eac4aa538db8adac2e839e4ff2382b31d65e"
+        },
+        "figures/mfh_map_y2.png": {
+          "before": "444a9e7e462c5c17adc38e412100f7f5361afcc523cf68fbf588b57b9c91a608",
+          "after": "ee21a7581369c5b55b66fa787ae03e36b6eea05abfd736b8a7ff4db4594bfb6c"
+        },
+        "figures/mfh_qq_random_effect.png": {
+          "before": "bfc026099d2d2f81c83767434502f1d9491a03cc75e865e0a92c80cf6a420047",
+          "after": "aee65b4d545343b7433a286513ec1c6a8ec61085eafdd7f24e10ce4fcaa86497"
+        },
+        "figures/mfh_qq_residual.png": {
+          "before": "b2e73cba994deaf100ccba711f4035245f47948820278e98160c1d7bd3eb7a0a",
+          "after": "f19dbee873446165d8e5b8b30ee63e4a5429e5980d46192b9e706f635bd84244"
+        },
+        "figures/mfh_residual_histogram.png": {
+          "before": "5b0b06de485a022727e5ece52004f536ea5b0614d84f6b2ae37af2a6500a52a6",
+          "after": "70fb913791e9dcf15768e2cd83a6fb4a3f6f197343b4b34803d32a81f6595a2f"
+        },
+        "figures/mfh_residual_vs_eblup.png": {
+          "before": "84ba2653e5abd83a8bc4a76d7f159d5630e9d80045693f639b6d53ad14fec7d4",
+          "after": "943353da5bc6881d7d5e49ec09b8cf07ec0a73918b8977aba13f39740f52438b"
+        },
+        "figures/poverty_maps/grid_estimates.png": {
+          "before": "77b26df14babc1f46966599cbd12dccd7765bbf24c39af222d8fb4c3bcee79d0",
+          "after": "3dc4412091ab904076c27a4d14a937234b84dcb0817591ab72319635c5ce6805"
+        },
+        "figures/poverty_maps/grid_panels/legend.png": {
+          "before": "5e8ea448a79097d1970a4f1fee9a372cc2fc2decbfe940383ec686bd0b480515",
+          "after": "a215897ee3fab8e028fb26ce29eb47005e6a519f6ef909c5780d0fa9e17166e0"
+        },
+        "figures/poverty_maps/map_direct_2012.png": {
+          "before": "59dd175a1658ecea52bf2202615b5e08c849e8e3fbb8a816dfc15d9f61d1fcc2",
+          "after": "0c51892e9c6726903e994fde26bebf1d824106354a1a95c3de632afdd81e6398"
+        },
+        "figures/poverty_maps/map_direct_2013.png": {
+          "before": "9cbad3d3d3def7a8242da3971b169fe339c72c5786b26447304efd9ec6bda78b",
+          "after": "9a2f1c4c0a1ebeef0d91a2607adeee5c7e26135ebfacfa40b6e9929081a08bfa"
+        },
+        "figures/poverty_maps/map_fh_2012.png": {
+          "before": "bb94d441b0ed842f06df3441d27561eb2449563cd087c61e4578a0b8e0a0a7be",
+          "after": "f0e6b935166f7572fdd3e9af2da618f805e4a8817445008bcad8883f61e19e5e"
+        },
+        "figures/poverty_maps/map_fh_2013.png": {
+          "before": "c3c8b5ccc2e2b2e0b237e63569dd18348d1295edcf7ddf2a9cbd525d9d7c5730",
+          "after": "459a79005a221228b74e22f16ddc824ef21f68240f680bfede6f237020024181"
+        },
+        "figures/poverty_maps/map_mfh_2012.png": {
+          "before": "c152c395cecc78c725bb88cf501e1194ccf69b8a8f5849b7a5f2054299c0f0f7",
+          "after": "70b5329bd6e83c019733b6638d4a114b698c67c816ececfc398d58cecc5d11db"
+        },
+        "figures/poverty_maps/map_mfh_2013.png": {
+          "before": "aa9c0bd19bf70ded46695b9270cd32031103bde8888df3ab2c9df18856fdb2c8",
+          "after": "33b75d07066ee11762a3a3b97667d29528e69536b12cd2b8ef37ef316f57971e"
+        },
+        "figures/rmse_maps/grid_panels/legend.png": {
+          "before": "94e5bdec9b8c04c88ffbc9ea701514a6ae4fd5ae66f6720d0b3701cb95869c68",
+          "after": "bc6e1ccadfc1279ac56aaf4394e98a3d1462f93c757fdd707b0ce4581746ca8e"
+        },
+        "figures/rmse_maps/grid_rmse.png": {
+          "before": "879c1423b0e45ea9588e940c7bdd86dc56036f90465eab0af366f002080887af",
+          "after": "db8733a03a25ceefcc9b0d2b862d39b41a17404393773e17ac850cb518ad72ae"
+        },
+        "figures/rmse_maps/rmse_map_direct_2012.png": {
+          "before": "5a42d1ff275c24c0eeeb7103d4206c344f89f7fe85f4e2ecdd5560f404dfe901",
+          "after": "b17e82fc671cca3e944ede25f41d3ec3e8a3960cff39a029f6918bc8783d6b12"
+        },
+        "figures/rmse_maps/rmse_map_direct_2013.png": {
+          "before": "6853f32a13ffcf76eee6e2ca3a59ce2ce8b1f5d13bc66cf77a3efa22c5c06f27",
+          "after": "e5b48607473ccb6a929c50b6927383b9a4c703442f2980f55f2f614a14cba563"
+        },
+        "figures/rmse_maps/rmse_map_fh_2012.png": {
+          "before": "e4b30e9a3c669318ddeee646f47d28c7173d21bfbcb37da98c52f435f84a1c57",
+          "after": "fc46bf8a2dd504f8cee93bc75adc4d9e63ae6c7ed8e2ea821b8cad73d43da423"
+        },
+        "figures/rmse_maps/rmse_map_fh_2013.png": {
+          "before": "3e2bc384806909416c3383447f73285210bf552c5bd4aa09a430657305457516",
+          "after": "d5960b344b480b70223e5dc3e4e76258acb5b554d9141c9e3566ec596b8eeab7"
+        },
+        "figures/rmse_maps/rmse_map_mfh_2012.png": {
+          "before": "af6ca718f075abdb3be2f1406b21645d172899771182b18abf226384940ec4a2",
+          "after": "542e1b172a01a17b3014252d33e7c83993a41ace81ffbc98b388b6e45a76eb6b"
+        },
+        "figures/rmse_maps/rmse_map_mfh_2013.png": {
+          "before": "0975149e1f68fbbe168e568e35940dbcfb8d12ee1848979ba6bfacc6a9d4fb18",
+          "after": "0078322272f93d0339dd85051254a0736d1dd36754d7e1782ae088fcbe77e476"
+        },
+        "figures/ufh_map_y1.png": {
+          "before": "038915e2d53daa1175cb7085c0dd3d316f961f3e9f060e91bcaebd2ac4f8c80a",
+          "after": "cef81795698827933645ffdbd3339c3715543c014f98806f2c619d8fbde6217d"
+        },
+        "figures/ufh_map_y2.png": {
+          "before": "9851021023e22a3449df62fdee0b50bbd0f2d6dbda978911a97cb0468274cf2d",
+          "after": "0c8089beceb8cca65a2884e99a408f3146d88e56dc54bacafed09bc0fb8d47f8"
+        },
+        "final_report.docx": {
+          "before": "d9ac2aaf5d13ad9b9ea0968978d4878640f0f6c26ad5888d9415e0c74b0046f5",
+          "after": "44ea76f1f7da8d38d16b806319e92bd00e5720a8cb4653dc0d6630fec10926e0"
+        },
+        "final_report.html": {
+          "before": "3e55845569cb45a0befb5aefdccb8c4ce4c74d246f4956e135ef6b35d31018ec",
+          "after": "17d1e9b2e2487dee4b90e6ffac738fed31a46496c7081b02c8b439bff6a6fad7"
+        }
+      }
+    }
+  }
+}

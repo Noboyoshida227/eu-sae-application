@@ -43,7 +43,8 @@ writeLines(c(
   "Prerequisites: R 4.2+ (use the newest version approved by your organization). Pandoc is reused if installed (RStudio Desktop, Quarto, Positron, standalone) or downloaded once by the launcher; see Start_Here/README.md.",
   "Reports: final_report.html and editable final_report.docx; comparison outputs include signed estimated-change figures alongside CI-width figures.",
   "Excluded: internal notes, non-inventory literature, user Data folders, local libraries, credentials, run histories, generated outputs and local diagnostics.",
-  "Spain boundaries now use documented IGN/CNIG CartoBase ANE (CC BY 4.0); the survey derivation script remains missing.",
+  "Bundled examples: Data/Spain_2y (synthetic 2012-2013 data with anchored poverty and teaching CPI) and Data/simulated. Data/Spain is retained in the repository working copy and excluded from this release.",
+  "Spain_2y boundaries use documented IGN/CNIG CartoBase ANE (CC BY 4.0); the source example's upstream survey derivation script remains missing. Start with Data/Spain_2y/START_HERE.md for tested settings.",
   "See docs/validation/QER/QER_README.md for completed validation, result changes and remaining QER decisions. Passing code tests does not establish nominal interval coverage in all settings.",
   "Review docs/maintenance/RELEASE_CHECKLIST.md, docs/validation/MCPE_VALIDATION_STATUS.md, docs/maintenance/HISTORY_REMEDIATION.md and THIRD_PARTY_NOTICES.md.",
   "No Git history is included."

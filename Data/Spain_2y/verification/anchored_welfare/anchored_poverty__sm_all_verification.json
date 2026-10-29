@@ -1,0 +1,151 @@
+{
+  "pass": true,
+  "run": "anchored_poverty__sm_all",
+  "indicator": "poverty",
+  "policy": "sm_all",
+  "checks": {
+    "required_files": true,
+    "runner_completed": true,
+    "annual_domain_rows": true,
+    "ufh_direct_independently_recomputed": true,
+    "mfh_direct_independently_recomputed": true,
+    "ufh_2012_interior": true,
+    "ufh_2012_domains": true,
+    "ufh_2012_points": true,
+    "ufh_2012_mse": true,
+    "ufh_2012_residuals": true,
+    "ufh_2012_sampling": true,
+    "ufh_2012_uncertainty_method": true,
+    "ufh_2012_export": true,
+    "ufh_2013_interior": true,
+    "ufh_2013_domains": true,
+    "ufh_2013_points": true,
+    "ufh_2013_mse": true,
+    "ufh_2013_residuals": true,
+    "ufh_2013_sampling": true,
+    "ufh_2013_uncertainty_method": true,
+    "ufh_2013_export": true,
+    "mfh_interior": true,
+    "mfh_domains": true,
+    "mfh_sampling_covariance": true,
+    "mfh_residuals": true,
+    "mfh_bootstrap": true,
+    "mfh_points": true,
+    "mfh_mse_mcpe": true,
+    "joint_uncertainty_psd": true,
+    "joint_array_consistent": true,
+    "mfh_change_uncertainty": true,
+    "mfh_change_inference": true,
+    "mfh_2012_export": true,
+    "mfh_2013_export": true,
+    "ufh_change_uncertainty": true,
+    "ufh_reported_variances": true,
+    "mfh_reported_variances": true,
+    "master_workbook": true,
+    "figure_inventory": true
+  },
+  "failed": [],
+  "details": {
+    "UFH_2012": {
+      "interior": {
+        "pass": true,
+        "method": "reml",
+        "estimate": 0.0139670942136714,
+        "reference": 0.0139751889346783,
+        "interval": [0, 0.0326590091617894],
+        "agreement_tolerance": 0.000138399820346796,
+        "gain_over_zero": 22.205399714275,
+        "gain_over_upper": 3.37236330218271
+      },
+      "uncertainty_method": "parametric bootstrap of original-scale point estimator",
+      "bootstrap": {
+        "requested": 500,
+        "successful": 500,
+        "required": 450,
+        "seed": 2135,
+        "target_source": "not_benchmarked",
+        "failures": []
+      },
+      "formula": "direct_povrate ~ gen + age5 + educ1 + educ2 + mkt + age4_X_educ3 +      labor2_X_educ3",
+      "point_range": [0.00614923709103328, 0.495094466467498],
+      "mse_range": [0.000131879687652591, 0.00809762688983297]
+    },
+    "UFH_2013": {
+      "interior": {
+        "pass": true,
+        "method": "reml",
+        "estimate": 0.0223778460516002,
+        "reference": 0.0223902975300043,
+        "interval": [0, 0.0289263469592618],
+        "agreement_tolerance": 0.000136533488872266,
+        "gain_over_zero": 61.4037168610362,
+        "gain_over_upper": 0.465368386752942
+      },
+      "uncertainty_method": "parametric bootstrap of original-scale point estimator",
+      "bootstrap": {
+        "requested": 500,
+        "successful": 500,
+        "required": 450,
+        "seed": 2136,
+        "target_source": "not_benchmarked",
+        "failures": []
+      },
+      "formula": "direct_povrate ~ 1",
+      "point_range": [0.0146733080907029, 0.49263178651174],
+      "mse_range": [0.00103532902747234, 0.00727741476019991]
+    },
+    "MFH": {
+      "a": 0.0034828,
+      "q": 0.00607289028835411,
+      "rho": 0.65307,
+      "boundary": {
+        "boundary": false,
+        "variance_zero": false,
+        "correlation_limit": false,
+        "rho": 0.65307,
+        "rho_limit": 0.999999,
+        "reason": "interior_covariance_parameters",
+        "inference_status": "regular"
+      },
+      "endpoint_check": [
+        {
+          "model": "MFH2",
+          "selected": true,
+          "msae_converged": true,
+          "iterations": 17,
+          "robust_refit": false,
+          "sigma2": 0.0034828,
+          "sigma2_1": null,
+          "sigma2_2": null,
+          "rho": 0.65307,
+          "reml_loglik": 148.970630115833,
+          "score": "marginal_variance=-0.01448; rho=2.08e-05",
+          "newton_decrement": 1.11956225717267e-09,
+          "loglik_gain_approx": 5.59781128586333e-10,
+          "status": "ok",
+          "message": "The fitted parameters pass the REML score, active-bound, information, and observed-curvature checks.",
+          "covariance_boundary": false,
+          "variance_zero": false,
+          "correlation_limit": false,
+          "inference_status": "regular"
+        }
+      ],
+      "bootstrap": {
+        "successful": 500,
+        "attempts": 500,
+        "failed": 0,
+        "boundary": 25,
+        "boundary_fraction": 0.05
+      },
+      "point_range": [0.028409, 0.45343],
+      "mse_range": [0.00226497594762505, 0.00722682691235447],
+      "minimum_scaled_joint_eigenvalue": 0.333357883200502,
+      "minimum_change_variance": 0.00221671873688762
+    }
+  },
+  "figure_count": 101,
+  "runner_warnings": [],
+  "correlation_target_imposed": false,
+  "benchmarking": false,
+  "ai": false
+}

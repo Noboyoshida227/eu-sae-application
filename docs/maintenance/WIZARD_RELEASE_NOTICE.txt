@@ -63,11 +63,12 @@ is not required.
 
 Two example datasets are bundled, both for learning and testing only.
 Data/simulated/ holds fully synthetic files with the seeded script that
-generates them. Data/Spain/ holds the Spain province example derived from the
+generates them. Data/Spain_2y/ holds the synthetic 2012-2013 Spain example derived from the
 GPL-2 sae package; the survey and auxiliary files retain GPL-2 terms.
 The replacement map is IGN/CNIG CartoBase ANE under CC BY 4.0, with required
-attribution and a reproducible source record. See Data/Spain/README.md and
-THIRD_PARTY_NOTICES.md. The survey derivation script remains missing. Neither set may feed a real
+attribution and a preserved source record. See Data/Spain_2y/README.md and
+THIRD_PARTY_NOTICES.md. The original Data/Spain/ is retained locally for provenance
+and excluded from the release. Its upstream survey derivation script remains missing. Neither set may feed a real
 estimate; for actual analyses users must select their own survey, auxiliary,
 and geometry files. If the AI Assistant is enabled, users must
 separately acknowledge the external data transfer described in the interface.
