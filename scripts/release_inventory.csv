@@ -16,6 +16,16 @@ Data/Spain/generate_spain_boundary.R
 Data/Spain/province_crosswalk.csv
 Data/Spain/shapefile.rds
 Data/Spain/survey.rds
+Data/Spain_2y/README.md
+Data/Spain_2y/auxiliary.rds
+Data/Spain_2y/boundary_provenance.json
+Data/Spain_2y/generation/capped_province_years.csv
+Data/Spain_2y/generation/multipliers.csv
+Data/Spain_2y/generation/province_composition_before_after.csv
+Data/Spain_2y/generation/transfer_list.csv
+Data/Spain_2y/generation/weight_factors.csv
+Data/Spain_2y/shapefile.rds
+Data/Spain_2y/survey.rds
 Data/simulated/README.md
 Data/simulated/auxiliary_example.csv
 Data/simulated/generate_example_data.py

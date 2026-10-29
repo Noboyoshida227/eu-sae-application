@@ -115,11 +115,12 @@ $missing = $inventory.path | Where-Object { -not (Test-Path -LiteralPath $_ -Pat
 if ($missing) {
     Write-Bad "Files listed in scripts\release_inventory.csv are missing:"
     $missing | ForEach-Object { Write-Bad "     $_" }
-    if ($missing -match 'Data/Spain/(survey|auxiliary)\.rds') {
+    if ($missing -match 'Data/Spain(_2y)?/(survey|auxiliary)\.rds|Data/Spain_2y/generation/') {
         Write-Bad ""
-        Write-Bad "Data\Spain\survey.rds and auxiliary.rds are kept OUT of the repository on"
-        Write-Bad "purpose (GPL-2). Copy them in from a previous release zip (GitHub"
-        Write-Bad "Releases); see Data\Spain\README.md."
+        Write-Bad "survey.rds and auxiliary.rds in Data\Spain and Data\Spain_2y, and"
+        Write-Bad "Data\Spain_2y\generation\, are kept OUT of the repository on purpose (GPL-2)."
+        Write-Bad "Copy them in from a previous release zip (GitHub Releases); see"
+        Write-Bad "Data\Spain\README.md and Data\Spain_2y\README.md."
     }
     exit 1
 }

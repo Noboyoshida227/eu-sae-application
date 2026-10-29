@@ -110,6 +110,7 @@ for (bad_name in c("EU_SAE_5.2.0_w5", "../escape", "EU_SAE_../escape", "EU_SAE_"
 unlink(name_fixture, recursive = TRUE)
 inventory <- sae_release_inventory(".")
 check(all(c("Data/Spain/survey.rds", "Data/Spain/auxiliary.rds", "Data/Spain/shapefile.rds",
+            "Data/Spain_2y/survey.rds", "Data/Spain_2y/auxiliary.rds", "Data/Spain_2y/shapefile.rds",
             "Data/simulated/survey_example.csv", "Data/simulated/auxiliary_example.csv",
             "Data/simulated/geometry_example.geojson") %in% inventory) &&
         !any(grepl("^(app_runs/|docs/internal/)|Rplots|package_versions.local", inventory)) &&

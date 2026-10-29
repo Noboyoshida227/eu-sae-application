@@ -77,6 +77,10 @@ secrets.yml
 # repository deliberately; see Data/Spain/README.md and THIRD_PARTY_NOTICES.md.
 Data/Spain/survey.rds
 Data/Spain/auxiliary.rds
+# The two-year teaching variant and its generation record derive from the same data.
+Data/Spain_2y/survey.rds
+Data/Spain_2y/auxiliary.rds
+Data/Spain_2y/generation/
 
 # ---- Build artifacts and working folders ----
 node_modules/
