@@ -151,10 +151,15 @@ Required fields carry a red asterisk.
    panel with the stages of the run, then the result with buttons to open the
    report or the output folder and to view the configuration.
 
-The default variance option is **`sm_all`** for identity/log UFH and MFH: all
-working variances use GVF predictions. MFH defaults to **`rho_sm_all`** for the
-corresponding pooled-correlation covariance. UFH log models expose the variance
-selector and apply it on the log scale; arcsine UFH keeps its distinct
+The default variance option is **`sm_out`** for identity/log UFH and MFH: each
+direct variance is kept unless it is missing/non-finite or strictly below 0.001.
+MFH defaults to **`rho_sm_out`** for the corresponding pooled-correlation
+covariance. **`sm_all`** replaces all working variances with GVF predictions.
+Because the GVF uses sample size only, it gives areas of similar size similar
+variances whatever their poverty rate, so it can overstate the variances of
+low-poverty areas; use it when direct variances are broadly unstable and the GVF
+fits well (guidelines, Section 6.6). UFH log models expose the variance selector
+and apply it on the log scale; arcsine UFH keeps its distinct
 effective-sample-size variance. Explicit policies in saved configurations are
 preserved. Changing the default can change fitted estimates and uncertainty;
 raw Direct MSE remains the observed survey-design variance.
@@ -167,7 +172,7 @@ that earlier run, use its actual saved pipeline configuration or explicitly
 select `sm_out`. This distinction concerns older dashboard setup files;
 explicit policies in actual run configurations remain reproducible.
 
-The optional `sm_out` policy has one simple rule: replace a direct variance
+The `sm_out` policy has one simple rule: replace a direct variance
 only when it is missing/non-finite or strictly below 0.001. A direct variance
 equal to 0.001 is retained. Under benchmarking, choose **National** to make the
 population-weighted average of the domain estimates equal the direct national

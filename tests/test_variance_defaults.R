@@ -60,17 +60,17 @@ local({
   notices <- character()
   showNotification <- function(ui, ...) notices <<- c(notices, as.character(ui))
   defaults <- dashboard_setup_defaults()$inputs
-  verify(identical(defaults$ufh_var_choice, "sm_all") &&
-           identical(defaults$mfh_var_choice, "sm_all") &&
-           identical(defaults$mfh_cov_choice, "rho_sm_all"),
-         "fresh dashboard configuration defaults to full smoothing and matching covariance")
+  verify(identical(defaults$ufh_var_choice, "sm_out") &&
+           identical(defaults$mfh_var_choice, "sm_out") &&
+           identical(defaults$mfh_cov_choice, "rho_sm_out"),
+         "fresh dashboard configuration defaults to selective smoothing and matching covariance")
   for (missing in list(NULL, character(), NA_character_, "", "  ")) {
     restored <- restore(list(inputs = list(ufh_var_choice = missing,
       mfh_var_choice = missing, mfh_cov_choice = missing)))
-    verify(identical(restored$ufh_var_choice, "sm_all") &&
-             identical(restored$mfh_var_choice, "sm_all") &&
-             identical(restored$mfh_cov_choice, "rho_sm_all"),
-           "missing or blank saved policy fields resolve to full smoothing")
+    verify(identical(restored$ufh_var_choice, "sm_out") &&
+             identical(restored$mfh_var_choice, "sm_out") &&
+             identical(restored$mfh_cov_choice, "rho_sm_out"),
+           "missing or blank saved policy fields resolve to selective smoothing")
     cfg <- list(years_keep = c(2019L, 2020L),
       ufh = list(var_choice = missing),
       mfh = list(var_choice = missing, cov_choice = missing))
@@ -81,8 +81,8 @@ local({
     eval(assignment(ufh_ast, "ufh_var_choice"))
     eval(assignment(mfh_ast, "var_choice"))
     eval(assignment(mfh_ast, "cov_choice"))
-    verify(identical(ufh_var_choice, "sm_all") && identical(var_choice, "sm_all") &&
-             identical(cov_choice, "rho_sm_all"),
+    verify(identical(ufh_var_choice, "sm_out") && identical(var_choice, "sm_out") &&
+             identical(cov_choice, "rho_sm_out"),
            "direct script entry resolves missing settings to the same defaults")
   }
   cov_for <- c(sm_all = "rho_sm_all", sm_out = "rho_sm_out", direct = "rho_dir")
@@ -155,8 +155,8 @@ local({
         identical(x[[2L]], id))[[1L]]
       rendered <- xml2::read_html(as.character(eval(control)))
       selected <- xml2::xml_attr(xml2::xml_find_first(rendered, ".//option[@selected]"), "value")
-      verify(identical(selected, if (id == "mfh_cov_choice") "rho_sm_all" else "sm_all"),
-             paste(file, id, "renders the full-smoothing default"))
+      verify(identical(selected, if (id == "mfh_cov_choice") "rho_sm_out" else "sm_out"),
+             paste(file, id, "renders the selective-smoothing default"))
     }
     panel <- find_calls(ast, function(x) identical(x[[1L]], as.name("conditionalPanel")) &&
       length(find_calls(x, function(y) identical(y[[1L]], as.name("selectInput")) &&
@@ -204,7 +204,7 @@ local({
   # Evaluate the MFH production column selection against distinguishable
   # variance/covariance columns, including explicit old alternatives.
   for (choice in names(cov_for)) {
-    mfh_cfg <- if (choice == "sm_all") list() else list(var_choice = choice)
+    mfh_cfg <- if (choice == "sm_out") list() else list(var_choice = choice)
     for (name in c("var_menu", "cov_menu", "var_choice", "cov_choice", "vardir_cols"))
       eval(assignment(mfh_ast, name))
     expected_variances <- switch(choice, sm_all = c("v1_sm_all", "v2_sm_all"),
@@ -253,12 +253,12 @@ local({
     full_fit <- fit("sm_all")
     direct_fit <- fit("direct")
     selective_fit <- fit("sm_out")
-    verify(isTRUE(all.equal(default_fit$fh_model$ind, full_fit$fh_model$ind)) &&
-             isTRUE(all.equal(default_fit$variance_audit, full_fit$variance_audit)) &&
-             all(default_fit$variance_audit$variance_policy == "sm_all"),
-           paste("omitted UFH policy fits exactly as explicit full smoothing on", scale, "scale"))
-    verify(any(abs(default_fit$variance_audit$working_variance - direct_fit$variance_audit$working_variance) > 1e-10),
-           paste("default full smoothing changes actual working variances on", scale, "scale"))
+    verify(isTRUE(all.equal(default_fit$fh_model$ind, selective_fit$fh_model$ind)) &&
+             isTRUE(all.equal(default_fit$variance_audit, selective_fit$variance_audit)) &&
+             all(default_fit$variance_audit$variance_policy == "sm_out"),
+           paste("omitted UFH policy fits exactly as explicit selective smoothing on", scale, "scale"))
+    verify(any(abs(full_fit$variance_audit$working_variance - default_fit$variance_audit$working_variance) > 1e-10),
+           paste("explicit full smoothing changes actual working variances on", scale, "scale"))
     verify(all(direct_fit$variance_audit$variance_policy == "direct") &&
              all(selective_fit$variance_audit$variance_policy == "sm_out") &&
              isTRUE(all.equal(selective_fit$variance_audit$working_variance,
@@ -277,6 +277,6 @@ local({
   verify(isTRUE(all.equal(arcsin_default$variance_audit, arcsin_direct$variance_audit)) &&
            all(arcsin_default$variance_audit$variance_policy == "effective_sample_size") &&
            isTRUE(all.equal(arcsin_default$fh_model$ind, arcsin_direct$fh_model$ind)),
-         "arcsine keeps its distinct working variance regardless of the full-smoothing default")
+         "arcsine keeps its distinct working variance regardless of the variance default")
   cat(sprintf("All %d variance-default checks passed.\n", checks))
 })

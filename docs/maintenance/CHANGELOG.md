@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Restore `sm_out` as the default variance option for new or omitted UFH (identity/log) and MFH settings, with `rho_sm_out` as the matching MFH covariance. The `sm_all` GVF predicts variances from sample size alone, so for poverty rates it overstates the variances of low-poverty areas, over-shrinks their estimates and makes MFH RMSEs nearly constant. Explicit saved choices, including `sm_all`, are preserved. This can change estimates and uncertainty for new or incompletely specified runs.
+- Guidelines Section 6.6 discusses choosing between `sm_out` and `sm_all`; the guidelines, the covariance technical note, `README_WIZARD.md`, the download instructions, the methodology alignment and deviations notes, the app help text, and the English, Polish and Greek slide guides 2 and 3 (with their PDFs) describe the new default. The new Polish and Greek slide wording should be reviewed by the translation teams.
+
 ## 5.2.0-rc.6-wizard.5.16 - 2026-10-28
 
 - Corrected the supplementary download instructions to the current sm_all/rho_sm_all defaults, visible log selector, optional AI model advice and NSO publication-revision policy.

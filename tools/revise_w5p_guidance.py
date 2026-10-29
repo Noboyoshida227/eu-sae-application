@@ -1,7 +1,9 @@
 """Apply reviewed prose corrections without rebuilding the existing Word files.
 
-Run with bundled Python from any directory. The adjacent JSON records exact
-old/new phrases and stable section locators. Existing equations, drawings,
+Run with bundled Python from any directory. The adjacent JSON (or the file
+given with --changes) records exact old/new phrases and stable section
+locators. An entry with "insert_after" instead adds a new paragraph, styled
+like the anchor paragraph containing that text, with optional bold runs. Existing equations, drawings,
 styles, relationships and non-document XML parts are preserved. Re-running
 an applied correction is a no-op. A missing or ambiguous phrase stops the run.
 Snapshot the documents before first use; render and verify after applying.
@@ -9,7 +11,7 @@ Snapshot the documents before first use; render and verify after applying.
 from pathlib import Path
 from zipfile import ZipFile
 from lxml import etree as E
-import json, io, argparse
+import json, io, argparse, copy
 
 ROOT=Path(__file__).resolve().parents[1]
 NS={'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
@@ -32,15 +34,35 @@ def replace_in_paragraph(p, old, new):
         offset=nend
     return True
 
+def insert_paragraph_after(anchor, runs):
+    p=copy.deepcopy(anchor)
+    for a in [a for a in p.attrib if a.startswith('{http://schemas.microsoft.com/office/word/2010/wordml}')]:
+        del p.attrib[a]
+    for child in [c for c in p if c.tag!='{%s}pPr'%NS['w']]:p.remove(child)
+    for run in runs:
+        r=E.SubElement(p,'{%s}r'%NS['w'])
+        if run.get('bold'):E.SubElement(E.SubElement(r,'{%s}rPr'%NS['w']),'{%s}b'%NS['w'])
+        t=E.SubElement(r,'{%s}t'%NS['w']);t.text=run['text']
+        t.set('{http://www.w3.org/XML/1998/namespace}space','preserve')
+    anchor.addnext(p)
+
 def apply(path, changes, dry=False):
     with ZipFile(path) as z: members=[(i,z.read(i.filename)) for i in z.infolist()]
     xml=dict((i.filename,b) for i,b in members)['word/document.xml']
     root=E.fromstring(xml)
     before=[E.tostring(n,method='c14n') for n in root.xpath('.//m:oMath',namespaces=NS)]
-    paragraphs=root.xpath('.//w:p',namespaces=NS)
     applied=[]
     for c in changes:
+        paragraphs=root.xpath('.//w:p',namespaces=NS)
         texts=[''.join(p.xpath('.//w:t/text()',namespaces=NS)) for p in paragraphs]
+        if 'insert_after' in c:
+            runs=c.get('runs',[{'text':c['new']}])
+            if ''.join(r['text'] for r in runs)!=c['new']:raise ValueError('Invalid run mapping')
+            if c['new'] in texts:continue
+            anchors=[p for p,t in zip(paragraphs,texts) if c['insert_after'] in t]
+            if len(anchors)!=1:
+                raise ValueError(f"{path.name}: {c['locator']}: expected 1 anchor, found {len(anchors)}")
+            insert_paragraph_after(anchors[0],runs);applied.append(c['locator']);continue
         matches=[p for p,t in zip(paragraphs,texts) if c['old'] in t and c['new'] not in t]
         # A later, explicitly recorded follow-up can supersede this wording.
         # Keep the cumulative original-to-final recipe replayable and idempotent.
@@ -72,6 +94,7 @@ def apply(path, changes, dry=False):
     return {'file':path.relative_to(ROOT).as_posix(),'changes':applied,'equations_preserved':len(before),'dry_run':dry}
 
 if __name__=='__main__':
-    ap=argparse.ArgumentParser();ap.add_argument('--dry-run',action='store_true');args=ap.parse_args()
-    changes=json.loads(Path(__file__).with_name('w5p_guidance_changes.json').read_text(encoding='utf-8'))
+    ap=argparse.ArgumentParser();ap.add_argument('--dry-run',action='store_true')
+    ap.add_argument('--changes',default=str(Path(__file__).with_name('w5p_guidance_changes.json')));args=ap.parse_args()
+    changes=json.loads(Path(args.changes).read_text(encoding='utf-8'))
     print(json.dumps([apply(ROOT/f,c,args.dry_run) for f,c in changes.items()],ensure_ascii=False,indent=2))

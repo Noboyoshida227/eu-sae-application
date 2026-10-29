@@ -17,6 +17,11 @@ details{margin:22px 0;padding:15px 20px;background:var(--wash)}summary{cursor:po
 @media(max-width:700px){h1{font-size:30px}.steps{grid-template-columns:1fr}th,td{padding:10px 6px}td:first-child{width:38%}body{font-size:16px}}
 @media print{header{padding:10px 0;background:white;color:black}nav{display:none}main{padding:0}a{color:black}h2,h3{break-after:avoid}.catalogue-item,tr{break-inside:avoid}.steps{display:block}}
 </style></head><body><main><nav><a href="../INDEX.html">Documentation catalogue</a></nav><h1 id="changelog">Changelog</h1>
+<h2 id="unreleased">Unreleased</h2>
+<ul>
+<li>Restore <code>sm_out</code> as the default variance option for new or omitted UFH (identity/log) and MFH settings, with <code>rho_sm_out</code> as the matching MFH covariance. The <code>sm_all</code> GVF predicts variances from sample size alone, so for poverty rates it overstates the variances of low-poverty areas, over-shrinks their estimates and makes MFH RMSEs nearly constant. Explicit saved choices, including <code>sm_all</code>, are preserved. This can change estimates and uncertainty for new or incompletely specified runs.</li>
+<li>Guidelines Section 6.6 discusses choosing between <code>sm_out</code> and <code>sm_all</code>; the guidelines, the covariance technical note, <code>README_WIZARD.md</code>, the download instructions, the methodology alignment and deviations notes, the app help text, and the English, Polish and Greek slide guides 2 and 3 (with their PDFs) describe the new default. The new Polish and Greek slide wording should be reviewed by the translation teams.</li>
+</ul>
 <h2 id="520-rc6-wizard516---2026-10-28">5.2.0-rc.6-wizard.5.16 - 2026-10-28</h2>
 <ul>
 <li>Corrected the supplementary download instructions to the current sm_all/rho_sm_all defaults, visible log selector, optional AI model advice and NSO publication-revision policy.</li>

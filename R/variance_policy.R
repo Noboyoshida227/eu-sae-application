@@ -3,11 +3,16 @@
 # Under sm_out, the direct sampling variance is retained unless it is
 # missing/non-finite or below the fixed threshold. This intentionally does
 # not replace large direct variances.
+#
+# sm_all replaces every variance with a GVF prediction from sample size
+# alone. For poverty rates it gives areas of similar size similar variances
+# whatever their rate, overstating the variance of low-poverty areas.
 
 SAE_SM_OUT_VARIANCE_THRESHOLD <- 0.001
 
-# New or omitted settings use full smoothing. Explicit saved alternatives
-# remain unchanged; a missing covariance follows the effective variance.
+# New or omitted settings use selective smoothing (sm_out). Explicit saved
+# alternatives remain unchanged; a missing covariance follows the effective
+# variance.
 .sae_variance_setting_missing <- function(x) {
   is.null(x) || length(x) == 0L ||
     (is.atomic(x) && length(x) == 1L &&
@@ -15,7 +20,7 @@ SAE_SM_OUT_VARIANCE_THRESHOLD <- 0.001
 }
 
 sae_variance_choice <- function(x = NULL) {
-  if (.sae_variance_setting_missing(x)) "sm_all" else x
+  if (.sae_variance_setting_missing(x)) "sm_out" else x
 }
 
 sae_covariance_choice <- function(x = NULL, var_choice = NULL) {

@@ -415,16 +415,16 @@ cat("LASSO screening (UFH):",
 
 # ---- Variance smoothing choice (only meaningful when arcsin is NOT used) ----
 # Options mirror the MFH menu:
-#   "sm_out"  - smooth only non-finite or below-0.001 variances
-#   "sm_all"  - replace ALL sampling variances with smoothed values (default)
+#   "sm_out"  - smooth only non-finite or below-0.001 variances (default)
+#   "sm_all"  - replace ALL sampling variances with smoothed values
 #   "direct"  - use raw direct variances as-is (NA/0 still backfilled)
 # Arcsin uses the effective-sample-size working variance 1/(4*n_eff),
 # independently of this setting, and retains original direct variances.
 ufh_var_choice <- sae_variance_choice(ufh_cfg$var_choice)
 if (!ufh_var_choice %in% c("direct", "sm_out", "sm_all")) {
   warning("Unknown ufh_cfg$var_choice '", ufh_var_choice,
-          "' - falling back to 'sm_all'.")
-  ufh_var_choice <- "sm_all"
+          "' - falling back to 'sm_out'.")
+  ufh_var_choice <- "sm_out"
 }
 if (identical(ufh_transformation, "arcsin")) {
   cat("Variance smoothing option: (ignored under arcsin transformation)\n")
@@ -754,7 +754,7 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
                         backtransformation = "bc",
                         formula_override = NULL,
                         candidate_vars_override = NULL,
-                        var_choice = "sm_all",
+                        var_choice = "sm_out",
                         do_benchmark = FALSE,
                         population_path = "",
                         benchmark_target_path = "",

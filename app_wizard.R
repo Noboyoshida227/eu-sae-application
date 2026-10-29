@@ -857,8 +857,8 @@ ui <- fluidPage(
             conditionalPanel(
               condition = "input.ufh_transformation == 'no' || input.ufh_transformation == 'log'",
             selectInput("ufh_var_choice",
-              tip_label("Variance option (UFH)", "Sampling variance input for identity or log UFH. The default 'sm_all' replaces all working variances with GVF predictions. 'sm_out' replaces only missing/non-finite or below-0.001 variances; 'direct' retains survey variances except missing/zero safety backfills. Under log, the selected policy applies to log-scale variances. Arcsin uses effective-sample-size working variance 1/(4*n_eff) independently of this choice. Raw Direct uncertainty is reported separately."),
-                choices = c("sm_all", "sm_out", "direct"), selected = "sm_all")
+              tip_label("Variance option (UFH)", "Sampling variance input for identity or log UFH. The default 'sm_out' keeps survey variances and replaces only missing/non-finite or below-0.001 values with GVF predictions. 'sm_all' replaces all working variances with GVF predictions from sample size alone, which can overstate variances where poverty rates are low; 'direct' retains survey variances except missing/zero safety backfills. Under log, the selected policy applies to log-scale variances. Arcsin uses effective-sample-size working variance 1/(4*n_eff) independently of this choice. Raw Direct uncertainty is reported separately."),
+                choices = c("sm_out", "sm_all", "direct"), selected = "sm_out")
             ),
             ic_criterion_input("ufh", selected = "BIC",
               tip_text = "Information criterion used for stepwise covariate selection. BIC penalizes complexity more heavily and tends to select simpler models. AIC favours predictive accuracy. Not used when covariates are entered for both years with LASSO off."),
@@ -926,11 +926,11 @@ ui <- fluidPage(
                 choices = c("lambda.1se", "lambda.min"), selected = "lambda.1se")
             ),
             selectInput("mfh_var_choice",
-              tip_label("Variance option (MFH)", "Sampling variance input: the default 'sm_all' replaces all variances with GVF predictions; 'sm_out' replaces only missing/non-finite or below-0.001 variances; 'direct' retains survey variances except missing/zero safety backfills. For log means, the policy applies on the log-mean variance scale. The covariance options below update automatically to match."),
-              choices = c("sm_all", "sm_out", "direct"), selected = "sm_all"),
+              tip_label("Variance option (MFH)", "Sampling variance input: the default 'sm_out' keeps survey variances and replaces only missing/non-finite or below-0.001 values with GVF predictions; 'sm_all' replaces all variances with GVF predictions from sample size alone, which can overstate variances where poverty rates are low; 'direct' retains survey variances except missing/zero safety backfills. For log means, the policy applies on the log-mean variance scale. The covariance options below update automatically to match."),
+              choices = c("sm_out", "sm_all", "direct"), selected = "sm_out"),
             selectInput("mfh_cov_choice",
               tip_label("Covariance option", "How the covariance of sampling errors over time is estimated. Available options depend on the variance choice above. 'rho_sm_out' multiplies the national average autocorrelation with outlier-smoothed variances (available with sm_out). 'rho_sm_all' multiplies it with fully smoothed variances (available with sm_all). 'rho_dir' multiplies it with direct variances. 'direct' uses the direct variance-covariance matrix. 'zero' assumes no cross-year sampling correlation."),
-              choices = c("rho_sm_all", "direct", "zero"), selected = "rho_sm_all"),
+              choices = c("rho_sm_out", "direct", "zero"), selected = "rho_sm_out"),
             selectInput("mfh_diag_model",
               tip_label("Selected MFH model", "MFH2 is the package default. If MFH3 is selected, the package follows Molina and Romero: fit MFH3, use MFH2 if MFH3 does not converge or errors, and otherwise use the MFH3 random-effect variance homogeneity test to choose MFH3 or MFH2. MFH1 remains an additional sensitivity model."),
               choices = c(

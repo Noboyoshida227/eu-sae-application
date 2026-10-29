@@ -1,0 +1,201 @@
+{
+  "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx": [
+    {
+      "insert_after": "Workbench 5.15 update (w5o, October 2026).",
+      "new": "Variance default update (after w5p, October 2026). New or omitted variance settings now default to sm_out, with rho_sm_out as the matching MFH covariance, instead of sm_all and rho_sm_all. Explicit choices in saved configurations are preserved. Section 6.6 explains why full smoothing can overstate the sampling variances of low-poverty areas and when sm_all remains appropriate.",
+      "locator": "Release-candidate update, variance default change",
+      "count": 1
+    },
+    {
+      "old": "Section 11 retains historical w5o screenshots and country examples; displayed sm_out choices and example results do not represent the new sm_all / rho_sm_all defaults.",
+      "new": "Section 11 retains historical w5o screenshots and country examples. Their displayed sm_out / rho_sm_out choices match the current defaults, but their numerical results are historical.",
+      "locator": "About this guidance note, historical screenshots",
+      "count": 1
+    },
+    {
+      "old": "Where GVF smoothing applies, new configurations use sm_all variances and matching rho_sm_all MFH covariance. Explicit saved settings are retained. Optional sm_out replaces only missing, non-finite, or strictly below-0.001 direct variances.",
+      "new": "Where GVF smoothing applies, new configurations use sm_out variances, which replace only missing, non-finite, or strictly below-0.001 direct variances, and matching rho_sm_out MFH covariance. Explicit saved settings are retained. Optional sm_all replaces all variances with GVF predictions; Section 6.6 explains when it overstates variances.",
+      "locator": "Companion technical notes, variance policy",
+      "count": 1
+    },
+    {
+      "old": "The note and guidance use sm_all with rho_sm_all as the default, retaining sm_out with its fixed below-0.001 rule as a sensitivity option.",
+      "new": "The note and guidance use sm_out, with its fixed below-0.001 rule, and rho_sm_out as the default, retaining sm_all with rho_sm_all as an option.",
+      "locator": "Companion technical notes, covariance note summary",
+      "count": 1
+    },
+    {
+      "old": "Start with sm_all, which replaces all working sampling variances with GVF predictions and follows the full-smoothing illustration in Molina and Romero (2025) most closely. Compare with direct when design variances are credible and with sm_out as an optional sensitivity, and document the chosen treatment. Under sm_out, a finite direct variance at least 0.001 is retained; a missing, non-finite, or strictly smaller value is replaced with its GVF prediction. Large direct variances are not replaced. Full smoothing still requires suitable GVF fit and diagnostics.",
+      "new": "Start with sm_out, the default for new configurations. It keeps each area's direct variance and replaces only a missing, non-finite, or strictly below-0.001 value with its GVF prediction; large direct variances are not replaced. Use sm_all, which replaces all working sampling variances with GVF predictions, only when direct variances are broadly unstable and the GVF fits well. Compare with direct when design variances are credible, and document the chosen treatment.",
+      "locator": "Section 6.6, starting choice",
+      "count": 1
+    },
+    {
+      "old": "Replace all variances with smoothed variances.",
+      "new": "Replace all variances with GVF-smoothed variances. The GVF uses sample size only, so it can overstate variances where poverty rates are low (Section 6.6).",
+      "locator": "Sections 6.6 and 7.9 option tables, sm_all row",
+      "count": 2
+    },
+    {
+      "old": "New configurations default to sm_all. Explicit variance choices in saved configurations are preserved; compare with direct and sm_out where feasible.",
+      "new": "New configurations default to sm_out. Explicit variance choices in saved configurations are preserved; compare with direct and sm_all where feasible.",
+      "locator": "Section 6.6, default statement",
+      "count": 1
+    },
+    {
+      "insert_after": "New configurations default to sm_out. Explicit variance choices in saved configurations are preserved; compare with direct and sm_all where feasible.",
+      "new": "Choosing between sm_out and sm_all. Full smoothing (sm_all) follows the full-smoothing illustration in Molina and Romero (2025) and removes the noise in individual variance estimates, but it is only as good as the GVF. Because the GVF predicts each variance from the area sample size alone, areas with similar sample sizes receive similar variances whatever the value of the indicator. For a poverty headcount, the sampling variance is approximately p(1 − p) deff / n, so it depends strongly on the poverty rate p. When poverty rates differ widely across areas of similar size, sm_all overestimates the sampling variances of low-poverty areas and underestimates those of high-poverty areas. The lognormal correction in Annex G.3 raises every smoothed variance further when the GVF explains little of the variation in the direct variances.",
+      "runs": [
+        {
+          "text": "Choosing between sm_out and sm_all.",
+          "bold": true
+        },
+        {
+          "text": " Full smoothing (sm_all) follows the full-smoothing illustration in Molina and Romero (2025) and removes the noise in individual variance estimates, but it is only as good as the GVF. Because the GVF predicts each variance from the area sample size alone, areas with similar sample sizes receive similar variances whatever the value of the indicator. For a poverty headcount, the sampling variance is approximately p(1 − p) deff / n, so it depends strongly on the poverty rate p. When poverty rates differ widely across areas of similar size, sm_all overestimates the sampling variances of low-poverty areas and underestimates those of high-poverty areas. The lognormal correction in Annex G.3 raises every smoothed variance further when the GVF explains little of the variation in the direct variances."
+        }
+      ],
+      "locator": "Section 6.6, new discussion: why sm_all can overstate variances",
+      "count": 1
+    },
+    {
+      "insert_after": "Choosing between sm_out and sm_all. Full smoothing (sm_all) follows",
+      "new": "Overstated variances have visible consequences. The model gives too little weight to the direct estimates of low-poverty areas and shrinks them too far toward the regression prediction, and their reported MSEs reflect the inflated variance rather than the survey data. MFH RMSEs then look almost constant across areas, and model RMSEs can exceed direct RMSEs mainly where poverty is low. In the two-year Spanish teaching example (Data/Spain_2y), sm_all assigned low-poverty provinces about 2.4 to 2.5 times their direct variances, and MFH RMSEs were below direct RMSEs in 63 to 73 percent of provinces, against 94 percent under sm_out.",
+      "locator": "Section 6.6, new discussion: consequences and example",
+      "count": 1
+    },
+    {
+      "insert_after": "Overstated variances have visible consequences.",
+      "new": "Because most Workbench applications estimate poverty rates, new configurations default to sm_out. Prefer sm_all only when direct variances are broadly unreliable, for example when many are zero or missing or areas have very few PSUs, and when the GVF fits well. For mean welfare modeled in logs, the sampling variance of the log area mean depends mainly on the sample size and the dispersion of welfare rather than on its level, so the GVF is usually better suited there. Whichever option is used, compare model and direct RMSEs across the range of the indicator: nearly constant model RMSEs, or model RMSEs above direct RMSEs concentrated in low-poverty areas, suggest that full smoothing overstates variances. Under sm_out, direct variances from small samples remain noisy and are treated as known, so individual model RMSEs should be read with care.",
+      "locator": "Section 6.6, new discussion: default and when to prefer sm_all",
+      "count": 1
+    },
+    {
+      "old": "UFH defaults to sm_all with no transformation and with log mean welfare. The selected option is honored and saved. Compare with direct when raw design variances are credible and with sm_out as an optional sensitivity.",
+      "new": "UFH defaults to sm_out with no transformation and with log mean welfare. The selected option is honored and saved. Compare with direct when raw design variances are credible, and with sm_all when direct variances are broadly unstable and the GVF fits well (Section 6.6).",
+      "locator": "Section 7.9, UFH default",
+      "count": 1
+    },
+    {
+      "old": "sm_all does not replace that analytical treatment.",
+      "new": "neither sm_out nor sm_all replaces that analytical treatment.",
+      "locator": "Section 7.9, arcsine treatment",
+      "count": 1
+    },
+    {
+      "old": "New configurations pair sm_all with rho_sm_all; rho_sm_out remains an optional sensitivity.",
+      "new": "New configurations pair sm_out with rho_sm_out; rho_sm_all, with fully smoothed variances, remains an option.",
+      "locator": "Section 8.7, covariance default",
+      "count": 1
+    },
+    {
+      "old": "New MFH configurations default to sm_all variances with rho_sm_all covariance, combining a national sampling-error correlation with fully smoothed domain variances.",
+      "new": "New MFH configurations default to sm_out variances with rho_sm_out covariance, combining a national sampling-error correlation with selectively smoothed domain variances.",
+      "locator": "Section 8.7, recommended covariance",
+      "count": 1
+    },
+    {
+      "old": "(sm_all with rho_sm_all, sm_out with rho_sm_out, direct with rho_dir)",
+      "new": "(sm_out with rho_sm_out, sm_all with rho_sm_all, direct with rho_dir)",
+      "locator": "Section 8.7, derived covariance pairs",
+      "count": 1
+    },
+    {
+      "old": "consider moving from unstable direct domain covariances to rho_sm_all or another documented stabilized specification.",
+      "new": "consider moving from unstable direct domain covariances to rho_sm_out, rho_sm_all or another documented stabilized specification.",
+      "locator": "Section 8.7, convergence advice",
+      "count": 1
+    },
+    {
+      "old": "Displayed sm_out / rho_sm_out choices and numerical results are historical; current new configurations default to sm_all / rho_sm_all where GVF applies, and the UFH log variance selector is now available.",
+      "new": "Displayed sm_out / rho_sm_out choices match the current defaults where GVF applies; numerical results are historical, and the UFH log variance selector is now available.",
+      "locator": "Section 11 introduction, historical screenshots",
+      "count": 1
+    },
+    {
+      "old": "When no transformation is used, also choose direct, sm_out, or sm_all sampling variances.",
+      "new": "With no transformation or log, also choose sm_out (the default), sm_all, or direct sampling variances.",
+      "locator": "Section 11.6, UFH variance choice",
+      "count": 1
+    },
+    {
+      "old": "New configurations use sm_all for UFH with no transformation or log mean welfare, and sm_all with rho_sm_all for MFH. Explicit saved choices are retained.",
+      "new": "New configurations use sm_out for UFH with no transformation or log mean welfare, and sm_out with rho_sm_out for MFH. Explicit saved choices are retained. Consider sm_all only when direct variances are broadly unstable and the GVF fits well; it can overstate variances where poverty rates are low (Section 6.6).",
+      "locator": "Section 14.2, recommended variance settings",
+      "count": 1
+    },
+    {
+      "old": "Optional sm_out keeps its 0.001 cutoff on the modeled response scale.",
+      "new": "The sm_out default keeps its 0.001 cutoff on the modeled response scale.",
+      "locator": "Section 14.2, sm_out cutoff",
+      "count": 1
+    },
+    {
+      "old": "New configurations use sm_all; the selected UFH option is honored for log mean welfare. The optional sm_out threshold of 0.001 is application-specific;",
+      "new": "Because the basic GVF uses only log sample size, its predictions do not vary with the level of the indicator; Section 6.6 explains why full smoothing can then overstate variances for low poverty rates. New configurations use sm_out; the selected UFH option is honored for log mean welfare. The sm_out threshold of 0.001 is application-specific;",
+      "locator": "Annex G.3, default and GVF limitation",
+      "count": 1
+    },
+    {
+      "old": "the national-correlation options, including the rho_sm_all default, adapt",
+      "new": "the national-correlation options, including the rho_sm_out default, adapt",
+      "locator": "Annex H, responsibility",
+      "count": 1
+    },
+    {
+      "old": "sm_all is now the default for untransformed and log working variances and follows the paper's full-smoothing illustration most closely. Optional sm_out retains finite variances at least 0.001 and replaces nonfinite or smaller values; the scale-specific cutoff remains an application policy.",
+      "new": "sm_out is the default for untransformed and log working variances: it retains finite variances at least 0.001 and replaces nonfinite or smaller values; the scale-specific cutoff is an application policy. Optional sm_all follows the paper's full-smoothing illustration most closely but, because the GVF uses sample size only, can overstate variances where poverty rates are low.",
+      "locator": "Annex H alignment table, Sampling-variance smoothing",
+      "count": 1
+    },
+    {
+      "old": "The default rho_sm_all combines a national sampling-error correlation with fully smoothed variances; rho_sm_out remains optional with selective smoothing.",
+      "new": "The default rho_sm_out combines a national sampling-error correlation with selectively smoothed (sm_out) variances; rho_sm_all, with fully smoothed variances, remains optional.",
+      "locator": "Annex H alignment table, Sampling-error covariance default",
+      "count": 1
+    },
+    {
+      "old": "This pooled construction remains an application extension, even though full variance smoothing now follows the paper's illustration more closely.",
+      "new": "This pooled construction remains an application extension.",
+      "locator": "Annex H alignment table, Sampling-error covariance extension",
+      "count": 1
+    },
+    {
+      "old": "the Workbench's arcsine UFH default and rho_sm_all default address",
+      "new": "the Workbench's arcsine UFH default and rho_sm_out default address",
+      "locator": "Annex H.1, overall interpretation",
+      "count": 1
+    }
+  ],
+  "docs/guidance/Technical notes/Note on Estimating the Sampling-Error Covariance Matrix (revised).docx": [
+    {
+      "old": "sm_all is the default and replaces all working variances with GVF predictions. Optional sm_out retains a finite direct variance at least 0.001 and replaces missing, nonfinite or strictly smaller values with GVF predictions; it does not replace large variances. This cutoff is an application policy requiring indicator/scale sensitivity checks. For log means it applies on the log-mean variance scale.",
+      "new": "sm_out is the default: it retains a finite direct variance at least 0.001 and replaces missing, nonfinite or strictly smaller values with GVF predictions; it does not replace large variances. This cutoff is an application policy requiring indicator/scale sensitivity checks. For log means it applies on the log-mean variance scale. Optional sm_all replaces all working variances with GVF predictions. Because the GVF uses sample size only, sm_all can overstate the variances of low-poverty areas; the guidelines (Section 6.6) discuss the choice.",
+      "locator": "Variance choices on the diagonal, default",
+      "count": 1
+    },
+    {
+      "old": "Use rho_sm_all with sm_all as the default when sampling dependence is plausible and domain covariances are noisy; assess the GVF fit and covariance assumptions.",
+      "new": "Use rho_sm_out with sm_out as the default when sampling dependence is plausible and domain covariances are noisy. Its 0.001 cutoff is scale-specific and does not replace large variances.",
+      "locator": "Variance choices on the diagonal, recommended default",
+      "count": 1
+    },
+    {
+      "old": "Use rho_sm_out with sm_out as an optional sensitivity. Its unchanged 0.001 cutoff is scale-specific and does not replace large variances.",
+      "new": "Use rho_sm_all with sm_all when direct variances are broadly unstable and the GVF fits well; assess the GVF fit and covariance assumptions.",
+      "locator": "Variance choices on the diagonal, optional full smoothing",
+      "count": 1
+    },
+    {
+      "old": "(sm_all with rho_sm_all, sm_out with rho_sm_out, and direct with rho_dir)",
+      "new": "(sm_out with rho_sm_out, sm_all with rho_sm_all, and direct with rho_dir)",
+      "locator": "Variance choices on the diagonal, matching pairs",
+      "count": 1
+    },
+    {
+      "old": "New configurations default to sm_all with rho_sm_all.",
+      "new": "New configurations default to sm_out with rho_sm_out.",
+      "locator": "Variance choices on the diagonal, configuration default",
+      "count": 1
+    }
+  ]
+}
