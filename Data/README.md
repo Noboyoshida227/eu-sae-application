@@ -5,7 +5,7 @@ These examples are for learning and testing, not for producing real estimates.
 | Folder | Purpose and limitations |
 |---|---|
 | [Spain](Spain/README.md) | Spain province example used in the guidance. The survey and auxiliary files carry their documented GPL-2 terms. The replacement province map is IGN/CNIG CartoBase ANE under CC BY 4.0, with attribution and an offline regeneration script. The survey derivation script is not held. |
-| [Spain_2y](Spain_2y/README.md) | Two-year (2012–2013) teaching variant of the Spain example, calibrated so that both UFH and MFH complete with interior variance estimates. Its samples and incomes were deliberately altered, so it does not reproduce the guidance results. Same GPL-2 and CC BY 4.0 terms as `Spain`. |
+| [Spain_2y](Spain_2y/README.md) | Two-year (2012–2013) teaching variant of the Spain example, calibrated so that both UFH and MFH complete with interior variance estimates and keep covariates under AIC and BIC, for poverty and for mean welfare. Includes INE's CPI for constant prices. Its samples and incomes were deliberately altered, so it does not reproduce the guidance results. Same GPL-2 and CC BY 4.0 terms as `Spain`. |
 | [simulated](simulated/README.md) | Fully synthetic survey, auxiliary covariates, and abstract geometry. The included seeded Python generator reproduces these files; see its README for mapping instructions. |
 
 For your own analysis, create a clearly named folder such as `Data/Romania_2025/`
