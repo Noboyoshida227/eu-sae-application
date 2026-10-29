@@ -16,7 +16,7 @@ Data/Spain/generate_spain_boundary.R
 Data/Spain/province_crosswalk.csv
 Data/Spain/shapefile.rds
 Data/Spain/survey.rds
-Data/Spain_2y/CPI_Spain_INE.csv
+Data/Spain_2y/CPI_Spain_teaching.csv
 Data/Spain_2y/README.md
 Data/Spain_2y/auxiliary.rds
 Data/Spain_2y/boundary_provenance.json

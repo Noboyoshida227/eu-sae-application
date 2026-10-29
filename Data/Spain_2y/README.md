@@ -5,7 +5,8 @@ showing UFH and MFH side by side, for poverty and for mean welfare. With the
 original example (`Data/Spain/`), the MFH2 fit for 2012–2013 sits on a
 covariance boundary. With this variant, both methods complete for 2012 and
 2013 with interior variance estimates. Covariate selection, with BIC as well as
-AIC, keeps at least four covariates in every UFH and MFH model.
+AIC, keeps at least three covariates in every UFH and MFH model. The survey
+also carries a poverty line anchored at 2010 prices.
 
 It was made by deliberately altering the original samples and incomes. Results
 from it **do not reproduce the guidance notes** and do not describe Spanish
@@ -13,11 +14,11 @@ provinces. To reproduce published results, use `Data/Spain/`.
 
 | File | What it is |
 |---|---|
-| `survey.rds` | 3,432 household records: 52 provinces × 2 years (2012, 2013), with the same columns as `Data/Spain/survey.rds` |
+| `survey.rds` | 3,432 household records: 52 provinces × 2 years (2012, 2013), with the columns of `Data/Spain/survey.rds` plus `povline_anchored` (see "Anchored poverty line") |
 | `auxiliary.rds` | 104 province-year rows: the 2012 and 2013 rows of `Data/Spain/auxiliary.rds`, unchanged |
 | `shapefile.rds` | Province boundaries: a byte-identical copy of `Data/Spain/shapefile.rds` (IGN/CNIG, CC BY 4.0) |
 | `boundary_provenance.json` | A copy of the boundary's source, licence and modification record |
-| `CPI_Spain_INE.csv` | Spain's consumer price index (INE), annual averages for 2010–2015, 2021 = 100, for mean welfare in constant prices |
+| `CPI_Spain_teaching.csv` | An illustrative consumer price index for 2010–2015 (2021 = 100), for mean welfare in constant prices and the anchored poverty line. Column `CPI` is INE's index adjusted so that 2012–2013 inflation is 5%; column `CPI_INE` keeps INE's published values |
 | `generation/` | The construction record: PSU transfer list, weight factors, province composition before and after, and the income multipliers |
 
 ## Suggested variable mapping (Step 2)
@@ -38,15 +39,19 @@ The mapping is the same as for `Data/Spain/`, with strata left blank:
 
 The application's default analysis years (2012 and 2013) match this dataset.
 
+**Anchored poverty.** Map the poverty line (column) to `povline_anchored`
+instead of `povline`.
+
 **Mean welfare.** `income` is in current (nominal) prices. To map mean welfare
 in constant prices:
 1. Choose **current prices: convert with a price index**.
-2. Select `CPI_Spain_INE.csv` as the CPI file, with year column `year` and CPI
-   column `CPI`.
+2. Select `CPI_Spain_teaching.csv` as the CPI file, with year column `year` and
+   CPI column `CPI`.
 3. Keep the index type as a fixed reference year, with incomes referring to the
    survey year.
 
-The default base year is 2012. The factor for 2013 is 92.717 / 94.023 = 0.9861.
+The default base year is 2012. The factor for 2013 is 92.717 / 97.35285 =
+1 / 1.05 = 0.952381.
 
 ## How it differs from `Data/Spain/`
 
@@ -101,6 +106,30 @@ Identifiers, PSU codes, household sizes, poverty lines and every auxiliary
 variable are unchanged. As in `Data/Spain/`, the weighted population is a
 property of the synthetic example, not an official total.
 
+## Anchored poverty line
+
+`povline` is the original year-specific line. It rises 0.59% from 2012 to
+2013, much less than prices (5% by the teaching CPI). `povline_anchored` holds
+the line's purchasing power fixed at 2010 prices.
+
+The 2010 anchor is the original 2012 line deflated to 2010 prices with column
+`CPI` of `CPI_Spain_teaching.csv`. Each year's anchored line is that anchor in
+the year's current prices, so it compares directly with the nominal `income`:
+
+```
+z_2010             = povline_2012 × CPI_2010 / CPI_2012 = 6,477.48 × 87.701 / 92.717 = 6,127.05
+povline_anchored_t = z_2010 × CPI_t / CPI_2010
+```
+
+| Year | `povline` | `povline_anchored` | Headcount, original line | Headcount, anchored line |
+|---|---|---|---|---|
+| 2012 | 6,477.48 | 6,477.48 | 0.206 | 0.206 |
+| 2013 | 6,515.86 | 6,801.36 | 0.214 | 0.226 |
+
+Because the anchor comes from the 2012 line, the two lines coincide in 2012.
+The choice of 2010 as the base year sets the price basis of the anchor (6,127.05
+in 2010 prices) but does not change the lines.
+
 ## Tested results
 
 The full Workbench run (UFH → MFH → Comparison, 500 bootstrap replicates each)
@@ -116,20 +145,25 @@ poverty; log and BIC for mean welfare.
 | Poverty | sm_out, BIC | 4 / 5 | 5 / 7 | 0.80 |
 | Poverty | sm_all, AIC, `region` as strata | 4 / 5 | 12 / 13 | 0.73 |
 | Poverty | sm_all, BIC, national benchmarking | 4 / 5 | 5 / 7 | 0.80 |
+| Poverty, anchored line | sm_all, AIC | 4 / 5 | 12 / 10 | 0.71 |
+| Poverty, anchored line | sm_out, BIC | 4 / 5 | 5 / 7 | 0.78 |
+| Poverty, anchored line | sm_all, BIC, national benchmarking | 4 / 5 | 5 / 7 | 0.78 |
 | Mean welfare (log, CPI) | sm_all, AIC | 7 / 4 | 14 / 9 | 0.68 |
 | Mean welfare (log, CPI) | sm_all, BIC | 7 / 4 | 12 / 4 | 0.68 |
+
+The anchored-line and mean-welfare runs used `CPI_Spain_teaching.csv`.
 
 In every run:
 - MFH2 converged with interior covariance parameters, and its inference status is "regular";
 - the MFH bootstrap completed 500/500 with no replicate on a covariance boundary, and the UFH poverty bootstrap completed 500/500 in both years;
 - all 52 provinces have finite estimates and positive MSEs in both years;
-- every poverty estimate lies between 0.042 and 0.86;
+- every poverty estimate lies between 0.04 and 0.87;
 - the comparison table is complete.
 
-The UFH poverty bootstrap was also traced: in both years, no replicate's
-variance estimate was truncated at the end of emdi's search interval. The
-earlier version of this folder had 27% truncated in 2013. The HTML/Word report
-was not tested.
+The UFH poverty bootstrap with the original line was also traced: in both
+years, no replicate's variance estimate was truncated at the end of emdi's
+search interval. The earlier version of this folder had 27% truncated in 2013.
+The HTML/Word report was not tested.
 
 **Teaching note.** Under the default `sm_all` variance option, the median MFH
 bootstrap RMSE for poverty is above the UFH RMSE: 0.082 and 0.073 against 0.071
@@ -157,7 +191,7 @@ the files if you pass them on.
 
 Like their `Data/Spain/` counterparts, these GPL-2 files are **not stored in
 the Git repository**. They ship inside the release archive instead.
-`shapefile.rds`, `boundary_provenance.json`, `CPI_Spain_INE.csv` and this
+`shapefile.rds`, `boundary_provenance.json`, `CPI_Spain_teaching.csv` and this
 README are in the repository. After cloning, copy `survey.rds`, `auxiliary.rds`
 and `generation/` into this folder from the `Data/Spain_2y/` folder of a
 release archive.
@@ -172,10 +206,18 @@ script are in `Data/Spain/`. Required attribution:
 Keep the IGN attribution, the [CC BY 4.0 link](https://creativecommons.org/licenses/by/4.0/)
 and the description of modifications in `boundary_provenance.json` when sharing it.
 
-`CPI_Spain_INE.csv` holds the annual average (mean of the 12 monthly values,
-rounded to 3 decimals) of INE's national CPI series IPC251852, "Nacional. Índice
-general. Índice." (base 2021 = 100). The monthly values were retrieved from the
-INE API (`servicios.ine.es/wstempus`) on 29 October 2026. INE publishes its
-statistics under **CC BY 4.0**. Required attribution:
+`CPI_Spain_teaching.csv` is adapted from INE's national CPI series IPC251852,
+"Nacional. Índice general. Índice." (base 2021 = 100). The monthly values were
+retrieved from the INE API (`servicios.ine.es/wstempus`) on 29 October 2026.
+- **`CPI_INE`:** INE's annual averages (the mean of the 12 monthly values,
+  rounded to 3 decimals).
+- **`CPI`:** a teaching modification, **not an official INE figure**. It equals
+  `CPI_INE` up to 2012. For 2013 it is set to 92.717 × 1.05 = 97.35285, so that
+  2012–2013 inflation is exactly 5% (INE: 1.41%). Values for 2014 and 2015 are
+  INE's multiplied by the same factor (97.35285 / 94.023), rounded to 3
+  decimals, so their annual changes stay as published.
+
+INE publishes its statistics under **CC BY 4.0**, which permits this adaptation
+with attribution and an indication of the changes. Required attribution:
 
 > Elaboración propia con datos extraídos del sitio web del INE: www.ine.es
