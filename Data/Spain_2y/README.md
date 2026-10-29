@@ -5,8 +5,9 @@ showing UFH and MFH side by side, for poverty and for mean welfare. With the
 original example (`Data/Spain/`), the MFH2 fit for 2012–2013 sits on a
 covariance boundary. With this variant, both methods complete for 2012 and
 2013 with interior variance estimates. Covariate selection, with BIC as well as
-AIC, keeps at least three covariates in every UFH and MFH model. The survey
-also carries a poverty line anchored at 2010 prices.
+AIC, keeps covariates in every UFH and MFH model. For poverty, the model RMSEs
+are clearly below the direct RMSEs. The survey also carries a poverty line
+anchored at 2010 prices.
 
 It was made by deliberately altering the original samples and incomes. Results
 from it **do not reproduce the guidance notes** and do not describe Spanish
@@ -75,32 +76,36 @@ A household's weight can therefore differ between 2012 and 2013.
 **2. Province-year income multipliers.** Household incomes were multiplied by
 exp(λ), where λ is a capped province-year effect plus a national constant per
 year. The effect has two parts:
-- **Covariate signal:** 0.45·S. S is a unit-SD index of the province's
+- **Covariate signal:** 0.30·S. S is a unit-SD index of the province's
   standardized `educ3` (tertiary education share) and `labor1` (employment
   share) from `auxiliary.rds`. It raises incomes where both are high, and is the
   same in both years, as the covariates are.
-- **Random part:** 0.35·z₁ in 2012 and 0.35·(0.6 z₁ + 0.8 z₂) in 2013, where z₁
+- **Random part:** 0.22·z₁ in 2012 and 0.22·(0.6 z₁ + 0.8 z₂) in 2013, where z₁
   and z₂ are centred standard-normal draws (seed 20261028). The random parts
   correlate 0.6 across years.
 
-The signal is what makes covariate selection keep covariates. Without it, BIC
-selected intercept-only models for 2013.
+The two parts are balanced against each other:
+- **Signal:** it is what makes covariate selection keep covariates. Without
+  it, BIC selected intercept-only models for 2013.
+- **Random part:** it is what the models cannot explain, so it decides how far
+  UFH and MFH can improve on the direct estimates. With a random part of 0.35,
+  the model estimates stayed close to the direct ones. Below about 0.20, the
+  MFH variance estimate reaches zero.
 
 The cap keeps at least k poor and k non-poor sampled households in every
-province-year, where k = max(1, ⌈0.08 n⌉) and n is the number of households.
-It bound in 24 of the 104 province-years. The national constant keeps the
+province-year, where k = max(1, ⌈0.12 n⌉) and n is the number of households.
+It bound in 27 of the 104 province-years. The national constant keeps the
 headcount at its original value.
 
 | | 2012 | 2013 |
 |---|---|---|
 | Person-weighted headcount (original) | 0.206 (0.206) | 0.214 (0.214) |
-| Mean income, current prices (original) | 13,834 (12,368) | 14,731 (12,413) |
-| Direct headcount by province (min–max) | 0.05–0.86 | 0.04–0.86 |
+| Mean income, current prices (original) | 13,007 (12,368) | 13,001 (12,413) |
+| Direct headcount by province (min–max) | 0.07–0.71 | 0.06–0.63 |
 | Person-weighted population | 170.5 million (unchanged) | 172.2 million (unchanged) |
 
-Province poverty is more spread out than in the original example (standard
-deviation across province-years 0.21, against 0.13). This is the price of a
-covariate signal strong enough for BIC.
+Province poverty is about as spread out as in the original example (standard
+deviation across province-years 0.15, against 0.13).
 
 Identifiers, PSU codes, household sizes, poverty lines and every auxiliary
 variable are unchanged. As in `Data/Spain/`, the weighted population is a
@@ -124,7 +129,7 @@ povline_anchored_t = z_2010 × CPI_t / CPI_2010
 | Year | `povline` | `povline_anchored` | Headcount, original line | Headcount, anchored line |
 |---|---|---|---|---|
 | 2012 | 6,477.48 | 6,477.48 | 0.206 | 0.206 |
-| 2013 | 6,515.86 | 6,801.36 | 0.214 | 0.226 |
+| 2013 | 6,515.86 | 6,801.36 | 0.214 | 0.225 |
 
 Because the anchor comes from the 2012 line, the two lines coincide in 2012.
 The choice of 2010 as the base year sets the price basis of the anchor (6,127.05
@@ -139,35 +144,60 @@ poverty; log and BIC for mean welfare.
 
 | Indicator | MFH settings | Covariates UFH 2012 / 2013 | Covariates MFH 2012 / 2013 | MFH ρ̂ |
 |---|---|---|---|---|
-| Poverty | sm_all, AIC | 4 / 5 | 12 / 13 | 0.72 |
-| Poverty | sm_all, BIC | 4 / 5 | 5 / 7 | 0.80 |
-| Poverty | sm_out, AIC | 4 / 5 | 12 / 13 | 0.74 |
-| Poverty | sm_out, BIC | 4 / 5 | 5 / 7 | 0.80 |
-| Poverty | sm_all, AIC, `region` as strata | 4 / 5 | 12 / 13 | 0.73 |
-| Poverty | sm_all, BIC, national benchmarking | 4 / 5 | 5 / 7 | 0.80 |
-| Poverty, anchored line | sm_all, AIC | 4 / 5 | 12 / 10 | 0.71 |
-| Poverty, anchored line | sm_out, BIC | 4 / 5 | 5 / 7 | 0.78 |
-| Poverty, anchored line | sm_all, BIC, national benchmarking | 4 / 5 | 5 / 7 | 0.78 |
-| Mean welfare (log, CPI) | sm_all, AIC | 7 / 4 | 14 / 9 | 0.68 |
-| Mean welfare (log, CPI) | sm_all, BIC | 7 / 4 | 12 / 4 | 0.68 |
+| Poverty | sm_all, AIC | 3 / 5 | 12 / 15 | 0.76 |
+| Poverty | sm_all, BIC | 3 / 5 | 5 / 5 | 0.83 |
+| Poverty | sm_out, AIC | 3 / 5 | 12 / 15 | 0.77 |
+| Poverty | sm_out, BIC | 3 / 5 | 5 / 5 | 0.76 |
+| Poverty | sm_all, AIC, `region` as strata | 3 / 5 | 12 / 15 | 0.77 |
+| Poverty | sm_all, BIC, national benchmarking | 3 / 5 | 5 / 5 | 0.84 |
+| Poverty, anchored line | sm_all, BIC, national benchmarking | 3 / 2 | 5 / 5 | 0.84 |
+| Mean welfare (log, CPI) | sm_all, AIC | 7 / 5 | 13 / 7 | 0.66 |
+| Mean welfare (log, CPI) | sm_all, BIC | 7 / 5 | 5 / 5 | 0.61 |
 
 The anchored-line and mean-welfare runs used `CPI_Spain_teaching.csv`.
 
 In every run:
 - MFH2 converged with interior covariance parameters, and its inference status is "regular";
-- the MFH bootstrap completed 500/500 with no replicate on a covariance boundary, and the UFH poverty bootstrap completed 500/500 in both years;
+- the MFH bootstrap completed 500/500, with at most 10% of replicates on a covariance boundary;
+- the UFH poverty bootstrap completed 500/500 in both years;
 - all 52 provinces have finite estimates and positive MSEs in both years;
-- every poverty estimate lies between 0.04 and 0.87;
+- every poverty estimate lies between 0.02 and 0.68;
 - the comparison table is complete.
 
 The UFH poverty bootstrap with the original line was also traced: in both
-years, no replicate's variance estimate was truncated at the end of emdi's
-search interval. The earlier version of this folder had 27% truncated in 2013.
-The HTML/Word report was not tested.
+years, no replicate's variance estimate was truncated at either end of emdi's
+search interval. The HTML/Word report was not tested.
 
-**Teaching note.** Under the default `sm_all` variance option, the median MFH
-bootstrap RMSE for poverty is above the UFH RMSE: 0.082 and 0.073 against 0.071
-and 0.062 (2012 and 2013). Under `sm_out`, the two are close (0.074 and 0.065).
+### Precision: model against direct estimates (poverty)
+
+Median RMSE across the 52 provinces, and the share of provinces where the
+model RMSE is below the direct RMSE:
+
+| MFH settings | Year | Direct | UFH | MFH | UFH < direct | MFH < direct |
+|---|---|---|---|---|---|---|
+| sm_all, BIC, national benchmarking | 2012 | 0.078 | 0.059 | 0.061 | 85% | 73% |
+| | 2013 | 0.072 | 0.056 | 0.062 | 83% | 65% |
+| sm_all, AIC | 2012 | 0.077 | 0.059 | 0.062 | 85% | 73% |
+| | 2013 | 0.071 | 0.056 | 0.062 | 83% | 62% |
+| sm_out, BIC | 2012 | 0.077 | 0.059 | 0.059 | 85% | 94% |
+| | 2013 | 0.071 | 0.056 | 0.056 | 83% | 94% |
+| sm_out, AIC | 2012 | 0.077 | 0.059 | 0.064 | 85% | 94% |
+| | 2013 | 0.071 | 0.056 | 0.058 | 83% | 94% |
+| Anchored line, sm_all, BIC, benchmarking | 2012 | 0.078 | 0.059 | 0.060 | 85% | 73% |
+| | 2013 | 0.074 | 0.061 | 0.062 | 83% | 69% |
+
+**Why MFH gains are smaller under `sm_all`.** `sm_all` replaces every sampling
+variance with a fitted value from log(variance) ~ log(sample size), which does
+not depend on the poverty rate. It also multiplies the fitted value by
+exp(σ²/2), about 1.4–1.5 here. Provinces with low poverty have small direct
+variances, so their smoothed variance, and therefore their MFH RMSE, can
+exceed their direct RMSE. Under `sm_out`, which keeps the direct variances,
+MFH beats the direct estimate in 94% of provinces.
+
+**Mean welfare.** Precision gains are small: the median UFH RMSE is about 4%
+above the direct RMSE, and the median MFH RMSE 2–6% below. Income levels
+differ between provinces far more than the sampling error of a province's mean
+income, so the models place most weight on the direct estimates.
 
 ## Provenance, licence and attribution
 
