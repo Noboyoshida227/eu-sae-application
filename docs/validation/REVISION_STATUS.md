@@ -6,7 +6,7 @@ w5p repairs matrix-year/key validation, pre-cleanup readiness, raw Direct uncert
 
 The older issue register is retained below. The current technical disposition and evidence are in [QER review note](QER/QER_README.md) and [methodology alignment](../guidance/METHODOLOGY_ALIGNMENT.md); open institutional approvals are not software defects that a local revision can close.
 
-The owner's w5p follow-up sets `sm_all`/`rho_sm_all` as applicable defaults while preserving explicit saved policies and arcsine UFH's distinct variance treatment. The optional `sm_out` policy and its validation limitation remain. T=2 is a deliberate publication-policy choice: successive windows and freezing each year after its second appearance limit routine revisions; the app does not manage the NSO's publication register.
+Since October 29, 2026, new or omitted variance settings resolve to `sm_out`, with matching MFH `rho_sm_out`. This reverses the w5p follow-up that had made `sm_all`/`rho_sm_all` the defaults: full smoothing predicts variances from sample size alone, so for poverty rates it overstates the variances of low-poverty areas. Explicit saved policies, including `sm_all`, are preserved, and arcsine UFH keeps its distinct variance treatment. The `sm_out` validation limitation under B3 remains. T=2 is a deliberate publication-policy choice: successive windows and freezing each year after its second appearance limit routine revisions; the app does not manage the NSO's publication register.
 
 `Implemented` means the candidate contains a code or documentation change for
 the finding; it is not a production-method approval. `Partial` identifies work
@@ -17,7 +17,7 @@ closure is claimed.
 |---|---|---|
 | B1 | Implemented | LASSO folds use and record a deterministic analysis seed. |
 | B2 | Implemented | Removed the unreachable covariance branch; UFH change inference labels period independence and exports raw and BH-adjusted p-values. |
-| B3 | Partial | The explicit application policy uses the absolute 0.001 cutoff for sm_out (log-scale variance for log means). It is disclosed as an implementation choice, not prescribed by Molina–Romero or EMDI; representative policy validation remains open. |
+| B3 | Partial | The default policy, sm_out, uses the absolute 0.001 cutoff (log-scale variance for log means). It is disclosed as an implementation choice, not prescribed by Molina–Romero or EMDI; representative policy validation remains open. |
 | B4 | Implemented | AI prompts are evidence-conditional and no longer assert fixed conclusions or eight combinations. |
 | B5 | Partial | Added explicit external-transfer consent, prompt minimization, a prompt-injection guard and configurable gateway URLs. Lawful basis, provider/retention terms and institutional approval remain open. |
 | B6 | Partial—blocks production/official release | Non-inventory literature files are excluded. The candidate includes only listed Spain RDS and simulated examples; the replacement Spain map has documented IGN/CNIG CC BY 4.0 provenance; the survey derivation remains missing. The canonical repository was restarted with a fresh history on 17 Sep 2026 and the previous one deleted on 27 Sep 2026 (`docs/maintenance/HISTORY_REMEDIATION.md`); older repositories still need review, and non-code rights remain unapproved. |

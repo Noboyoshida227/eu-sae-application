@@ -2,7 +2,9 @@
 
 **Date:** October 28, 2026. **Candidate:** `EU_SAE_520_w5p`, version `5.2.0-rc.6-wizard.5.16`, including the `sm_all` default, T=2 publication-policy revision, optional AI recommendation on UFH or MFH, and documentation navigation revision.
 
-The current candidate passed a fresh regression suite and mocked AI-report checks. The earlier default-policy integrations remain applicable: new/missing variance settings resolve to `sm_all`, with matching MFH `rho_sm_all`; explicit saved alternatives remain available. Arcsine UFH retains its separate effective-sample-size treatment. These checks verify software execution and numerical consistency, not statistical coverage, survey validity or a real AI provider's judgment. See the [deviations and justification note](../guidance/MOLINA_ROMERO_DEVIATIONS_w5p.md).
+**Subsequent default change, October 29, 2026.** New or omitted variance settings again resolve to `sm_out`, with matching MFH `rho_sm_out`; `sm_all` remains an explicit option, and saved choices are preserved. The checks in this receipt were run under the `sm_all` default and are not relabeled. For the restored default, the 66 variance-default checks were revised and pass, including that an omitted policy gives the same UFH fit as explicit `sm_out`; the main suite then passed in GitHub Actions. No new omitted-settings integration was run; the explicit-`sm_out` integrations below exercise the same policy.
+
+The current candidate passed a fresh regression suite and mocked AI-report checks. The earlier default-policy integrations remained applicable: new/missing variance settings then resolved to `sm_all`, with matching MFH `rho_sm_all`; explicit saved alternatives remain available. Arcsine UFH retains its separate effective-sample-size treatment. These checks verify software execution and numerical consistency, not statistical coverage, survey validity or a real AI provider's judgment. See the [deviations and justification note](../guidance/MOLINA_ROMERO_DEVIATIONS_w5p.md).
 
 ## Current navigation and language-folder validation
 

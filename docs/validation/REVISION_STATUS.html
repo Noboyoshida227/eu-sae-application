@@ -20,7 +20,7 @@ details{margin:22px 0;padding:15px 20px;background:var(--wash)}summary{cursor:po
 <p>Baseline: EU SAE application package v5.1.0. Current local review candidate: 5.2.0-rc.6-wizard.5.16 (w5p), revising w5o (5.15) and the QER candidate w5n (5.14).</p>
 <p>w5p repairs matrix-year/key validation, pre-cleanup readiness, raw Direct uncertainty, logged benchmark factors and standalone MFH figure qualifications. It retires the dormant bootstrap implementation and synchronizes methodology guidance. See <a href="../guidance/MOLINA_ROMERO_DEVIATIONS_w5p.html">the deviations note</a> and <a href="W5P_VALIDATION_RECEIPT.html">fresh validation receipt</a>. The historical issue register and coverage limitations below remain in force.</p>
 <p>The older issue register is retained below. The current technical disposition and evidence are in <a href="QER/QER_README.html">QER review note</a> and <a href="../guidance/METHODOLOGY_ALIGNMENT.html">methodology alignment</a>; open institutional approvals are not software defects that a local revision can close.</p>
-<p>The owner's w5p follow-up sets <code>sm_all</code>/<code>rho_sm_all</code> as applicable defaults while preserving explicit saved policies and arcsine UFH's distinct variance treatment. The optional <code>sm_out</code> policy and its validation limitation remain. T=2 is a deliberate publication-policy choice: successive windows and freezing each year after its second appearance limit routine revisions; the app does not manage the NSO's publication register.</p>
+<p>Since October 29, 2026, new or omitted variance settings resolve to <code>sm_out</code>, with matching MFH <code>rho_sm_out</code>. This reverses the w5p follow-up that had made <code>sm_all</code>/<code>rho_sm_all</code> the defaults: full smoothing predicts variances from sample size alone, so for poverty rates it overstates the variances of low-poverty areas. Explicit saved policies, including <code>sm_all</code>, are preserved, and arcsine UFH keeps its distinct variance treatment. The <code>sm_out</code> validation limitation under B3 remains. T=2 is a deliberate publication-policy choice: successive windows and freezing each year after its second appearance limit routine revisions; the app does not manage the NSO's publication register.</p>
 <p><code>Implemented</code> means the candidate contains a code or documentation change for the finding; it is not a production-method approval. <code>Partial</code> identifies work done but an unresolved decision or validation. <code>Open</code> means no substantive closure is claimed.</p>
 <table>
 <thead>
@@ -44,7 +44,7 @@ details{margin:22px 0;padding:15px 20px;background:var(--wash)}summary{cursor:po
 <tr>
 <td>B3</td>
 <td>Partial</td>
-<td>The explicit application policy uses the absolute 0.001 cutoff for sm_out (log-scale variance for log means). It is disclosed as an implementation choice, not prescribed by Molina–Romero or EMDI; representative policy validation remains open.</td>
+<td>The default policy, sm_out, uses the absolute 0.001 cutoff (log-scale variance for log means). It is disclosed as an implementation choice, not prescribed by Molina–Romero or EMDI; representative policy validation remains open.</td>
 </tr>
 <tr>
 <td>B4</td>
