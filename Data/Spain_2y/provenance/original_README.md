@@ -91,9 +91,9 @@ carry this credit only when the selected geometry includes the attribution metad
 Do not strip that metadata when adapting this file.
 
 - [Official catalogue](https://centrodedescargas.cnig.es/CentroDescargas/cartobase-ane)
-- [IGN licence](IGN_source/IGN_licence.pdf)
-- [Source record, checksums and transformations](boundary_provenance.json)
-- [Province crosswalk](province_crosswalk.csv)
+- [IGN licence](../LICENSES/IGN_licence.pdf)
+- [Source record, checksums and transformations](../boundary_provenance.json)
+- [Province crosswalk](../province_crosswalk.csv)
 - [Pinned distribution documentation](https://github.com/rOpenSpain/mapSpain/blob/4cd2698c3f6783eb1498edfe0224646953abe71c/README.md)
 
 The two original mirror GeoPackages are included in `IGN_source/`.

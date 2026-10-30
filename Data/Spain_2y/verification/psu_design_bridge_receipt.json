@@ -51,5 +51,18 @@
       "run_config_mean_welfare_sm_all.yml"
     ]
   },
-  "limits": "Execution check on two of six synthetic configurations. It is not coverage evidence, and it does not replace the QER gate rerun."
+  "limits": "Execution check on two of six synthetic configurations. It is not coverage evidence, and it does not replace the QER gate rerun.",
+  "documentation_link_changes": {
+    "reason": "Repair links for the navigation check. The two files had hashes recorded in earlier receipts.",
+    "Data/Spain_2y/provenance/original_README.md": {
+      "previous_sha256": "f4c57770194c662aaebd6d4105580aacac701739a3a1d0b843cc1737816ae465",
+      "current_sha256": "93d5d8440c4f55c2b1432276d37a8596128bd17b0dd7e04a07683cba1eb46517",
+      "change": "Three relative links corrected."
+    },
+    "Data/Spain_2y/verification/PRESENTATION_REFRESH.md": {
+      "previous_sha256": "ef30ca69164bedf270c507192bd46b71a9f9a193112682666d3fb46e0a781353",
+      "current_sha256": "f9c3f266c663bc7062860edf4b7f6b66a9ac2e06b7e5aa05225eef2becbc2f7b",
+      "change": "Eight links to unpackaged local reports replaced with their run-relative paths as text."
+    }
+  }
 }

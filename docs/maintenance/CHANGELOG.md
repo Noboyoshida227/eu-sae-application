@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 5.2.0-rc.6-wizard.5.17 - 2026-10-30
+
+QER-RC1 (`EU_SAE_520_w5q`): a pre-release for quality enhancement review, not for official statistics.
+
 - Replace the PSU-consistency checkbox with an explicit cross-year PSU design: linked, independent or not specified. `not_specified` blocks MFH and leaves UFH available; legacy checked settings load as linked and unchecked settings as not specified. Independent surveys use year-specific PSUs and strata and zero sampling covariance, without constraining the random-effect covariance. Count only nonmissing outcomes in UFH sample sizes and SRS variances, and keep model comparison guidance descriptive.
 - Complete the PSU design rollout. The six Spain_2y configurations and the integration test declare linked PSUs, and a bundled-configuration regression was added. A linked declaration with no PSU, or no stratum and PSU pair, shared across years now gives a readiness, log and report warning. The block message explains how to run UFH alone. Guides, method notes and the Spain_2y and simulated data instructions were updated.
 

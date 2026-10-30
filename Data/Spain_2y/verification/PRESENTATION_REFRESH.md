@@ -13,10 +13,10 @@ On October 29, 2026, the four anchored-poverty and mean-welfare runs were refres
 
 | Indicator | MFH variance policy | HTML | Word |
 |---|---|---|---|
-| Mean welfare | sm_all | [Report](../../../Claude%20outputs/spain_regeneration/anchored_welfare_20261029/runs/mean_welfare__sm_all/outputs/final_report.html) | [Report](../../../Claude%20outputs/spain_regeneration/anchored_welfare_20261029/runs/mean_welfare__sm_all/outputs/final_report.docx) |
-| Mean welfare | sm_out | [Report](../../../Claude%20outputs/spain_regeneration/anchored_welfare_20261029/runs/mean_welfare__sm_out/outputs/final_report.html) | [Report](../../../Claude%20outputs/spain_regeneration/anchored_welfare_20261029/runs/mean_welfare__sm_out/outputs/final_report.docx) |
-| Anchored poverty | sm_all | [Report](../../../Claude%20outputs/spain_regeneration/anchored_welfare_20261029/runs/anchored_poverty__sm_all/outputs/final_report.html) | [Report](../../../Claude%20outputs/spain_regeneration/anchored_welfare_20261029/runs/anchored_poverty__sm_all/outputs/final_report.docx) |
-| Anchored poverty | sm_out | [Report](../../../Claude%20outputs/spain_regeneration/anchored_welfare_20261029/runs/anchored_poverty__sm_out/outputs/final_report.html) | [Report](../../../Claude%20outputs/spain_regeneration/anchored_welfare_20261029/runs/anchored_poverty__sm_out/outputs/final_report.docx) |
+| Mean welfare | sm_all | `mean_welfare__sm_all/outputs/final_report.html` | `mean_welfare__sm_all/outputs/final_report.docx` |
+| Mean welfare | sm_out | `mean_welfare__sm_out/outputs/final_report.html` | `mean_welfare__sm_out/outputs/final_report.docx` |
+| Anchored poverty | sm_all | `anchored_poverty__sm_all/outputs/final_report.html` | `anchored_poverty__sm_all/outputs/final_report.docx` |
+| Anchored poverty | sm_out | `anchored_poverty__sm_out/outputs/final_report.html` | `anchored_poverty__sm_out/outputs/final_report.docx` |
 
 These links point to local verification outputs, which are not part of the release package. The corrected standalone MFH diagnostic plots are in each run's `outputs/figures/` folder. The final reports use the existing Comparison diagnostic plots, which already displayed years.
 
