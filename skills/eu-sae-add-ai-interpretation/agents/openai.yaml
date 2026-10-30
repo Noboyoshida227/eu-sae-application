@@ -1,0 +1,4 @@
+interface:
+  display_name: "EU SAE Report AI Interpretations"
+  short_description: "Add grounded AI commentary to exported SAE reports"
+  default_prompt: "Use $eu-sae-add-ai-interpretation to add AI interpretations to my final report using the matching EU_SAE_results.xlsx, preserving all statistical results."
