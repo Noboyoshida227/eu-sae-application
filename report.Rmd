@@ -577,8 +577,22 @@ if (!is.null(model_fit_diag) && nrow(model_fit_diag) > 0) {
 
 ## MFH Numerical Diagnostics
 
+```{r mfh-numerical-label, include=FALSE}
+# The diagnostics describe the selected MFH model; name it (and say whether a
+# robust refit was used) instead of assuming the robust MFH2 fit.
+mfh_numerical_fit_label <- local({
+  d <- mfh_numerical_diag
+  has <- !is.null(d) && nrow(d) > 0
+  m <- if (has && "model" %in% names(d)) toupper(as.character(d$model[1])) else NA_character_
+  if (length(m) != 1L || is.na(m) || !nzchar(m)) m <- mfh_selected_model
+  if (length(m) != 1L || is.na(m) || !nzchar(m)) m <- "MFH"
+  robust <- has && "robust_refit_used" %in% names(d) && isTRUE(as.logical(d$robust_refit_used[1]))
+  paste0(if (robust) "robust " else "", m)
+})
+```
+
 The table below records the inversion method and condition-number diagnostic
-for the robust MFH2 fit. Successful Cholesky paths report a low-cost estimate
+for the selected `r mfh_numerical_fit_label` fit. Successful Cholesky paths report a low-cost estimate
 derived from the Cholesky factor; fallback paths report an exact value when it
 can be computed. A generalized inverse or an unavailable Fisher-information
 inverse requires review. The `g3_available` flag refers to the package's analytical

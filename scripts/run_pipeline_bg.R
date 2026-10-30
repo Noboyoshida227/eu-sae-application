@@ -113,6 +113,12 @@ if (stopped) {
 }
 
 # ---- Step 2b: AI interpretations (optional) ----
+# run_pipeline_from_config() unsets SAE_APP_CONFIG when it returns, but the AI
+# evidence reads the run configuration (benchmarking, MFH settings) from it.
+# Without this, the AI text treats benchmarking as off and reports no effect.
+if (is.character(job$config_path) && length(job$config_path) == 1L && file.exists(job$config_path)) {
+  Sys.setenv(SAE_APP_CONFIG = normalizePath(job$config_path, winslash = "/"))
+}
 ai <- job$ai %||% list()
 ai_requested <- isTRUE(ai$requested)
 ai_eligible  <- ok && ai_requested && "Comparison" %in% (job$steps %||% character()) &&

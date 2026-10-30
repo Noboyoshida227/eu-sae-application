@@ -1800,9 +1800,20 @@ if (file.exists(.run_metadata_path)) {
 .selected_refvar <- if (!isTRUE(.model_fit_failed) &&
                         is.list(selected_model$fit) &&
                         !is.null(selected_model$fit$refvar)) {
-  mean(as.numeric(selected_model$fit$refvar), na.rm = TRUE)
+  suppressWarnings(as.numeric(unlist(selected_model$fit$refvar)))
 } else {
   NA_real_
+}
+# MFH1 and MFH3 estimate one random-effect variance per year (sigma2_1, sigma2_2,
+# as in the MFH Convergence Check); MFH2 has one common variance. Report the
+# year's own value instead of the average of the two years.
+.refvar_for_year <- function(i) {
+  if (toupper(diag_model) %in% c("MFH1", "MFH3") &&
+      length(.selected_refvar) >= length(mfh_formula)) {
+    .selected_refvar[[i]]
+  } else {
+    .selected_refvar[[1]]
+  }
 }
 mfh_model_diagnostics <- dplyr::bind_rows(lapply(seq_along(mfh_formula), function(i) {
   sae_model_fit_diagnostics(
@@ -1811,7 +1822,7 @@ mfh_model_diagnostics <- dplyr::bind_rows(lapply(seq_along(mfh_formula), functio
     formula = mfh_formula[[i]],
     data = domain_dt,
     mixed_model = NULL,
-    random_variance = .selected_refvar,
+    random_variance = .refvar_for_year(i),
     note = "R2 columns are OLS companion diagnostics for the selected formula."
   )
 }))
