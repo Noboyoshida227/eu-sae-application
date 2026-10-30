@@ -1,4 +1,6 @@
 path
+docs/guidance/ADDITIONAL_CODE_w5p.md
+docs/guidance/ADDITIONAL_CODE_w5p.html
 RELEASE_NAME
 .gitattributes
 .github/workflows/quality.yml
@@ -245,7 +247,7 @@ docs/guidance/MOLINA_ROMERO_DEVIATIONS_w5p.md
 docs/validation/W5P_VALIDATION_RECEIPT.md
 docs/guidance/Technical notes/Note on Estimating the Sampling-Error Covariance Matrix (revised).pdf
 docs/guidance/Technical notes/Note on MSE Estimation - Levels and Changes.pdf
-START_HERE.html
+Start_Here/START_HERE.html
 docs/INDEX.html
 docs/maintenance/navigation.json
 docs/maintenance/NAVIGATION.md

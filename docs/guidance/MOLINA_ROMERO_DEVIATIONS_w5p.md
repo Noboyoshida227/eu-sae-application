@@ -1,5 +1,7 @@
 # How w5p follows and extends Molina and Romero (2025)
 
+For a file-by-file explanation of the principal implementation additions, see [Additional and adapted code in w5p](ADDITIONAL_CODE_w5p.md), including what each module does and why it is needed.
+
 **Implementation:** EU SAE Workbench `EU_SAE_520_w5p`, version `5.2.0-rc.6-wizard.5.16`, prepared locally on October 28, 2026. **Reference:** Molina, I., and Romero, E., *Comparable Small Area Estimates over Time*, manuscript dated January 29, 2025. The omission of STFH is outside this assessment, as requested.
 
 This note describes the implementation after the w5o code and documentation repairs and the owner's subsequent w5p revisions. The two-year design supports an NSO publication policy that limits routine revisions to one previously published year per release and one scheduled revision of each year's estimate. Where GVF variance selection applies, w5p made full smoothing (`sm_all`, with `rho_sm_all`) the default; a later owner revision (October 29, 2026) restores selective smoothing (`sm_out`, with `rho_sm_out`) as the default because full smoothing overstates the variances of low-poverty areas. Existing explicit variance choices remain available; arcsine UFH retains its separate effective-sample-size treatment.

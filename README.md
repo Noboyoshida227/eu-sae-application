@@ -1,6 +1,6 @@
 # EU SAE Workbench
 
-**Start with [START_HERE.html](START_HERE.html)**. Double-click that file in the extracted package to open the offline guide. It explains startup, the language-specific instructions, results and folder purposes.
+**Start with [Start_Here/START_HERE.html](Start_Here/START_HERE.html)**. Double-click that file in the extracted package to open the offline guide. It explains startup, the language-specific instructions, results and folder purposes.
 
 - [Documentation catalogue](docs/INDEX.html)
 - [Printable quick start](docs/instructions/English/QUICK_START.pdf)

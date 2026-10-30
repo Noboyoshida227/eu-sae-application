@@ -39,7 +39,7 @@ def main():
         if p.suffix=='.html':
             parser=Links();parser.feed(text);cache[p.resolve()]=parser
             links=parser.links
-            if rel in ['START_HERE.html','docs/INDEX.html']:require(not parser.remote_assets,'offline entry page has remote assets: '+rel)
+            if rel in ['Start_Here/START_HERE.html','docs/INDEX.html']:require(not parser.remote_assets,'offline entry page has remote assets: '+rel)
         else:links=re.findall(r'\]\(([^)]+)\)',text)
         for link in links:
             u=urlsplit(link)

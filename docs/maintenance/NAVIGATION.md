@@ -1,6 +1,6 @@
 # Maintaining the package navigation
 
-The user entry point is `START_HERE.html` at the package root. `docs/INDEX.html` is the complete offline catalogue. Both work without R or internet access. The application serves only the documentation folder and links its **Guides and notes** menu to the same catalogue.
+The user entry point is `Start_Here/START_HERE.html` in the `Start_Here` folder. `docs/INDEX.html` is the complete offline catalogue. Both work without R or internet access. The application serves only the documentation folder and links its **Guides and notes** menu to the same catalogue.
 
 Edit `docs/maintenance/navigation.json` for the starting-guide text, folder descriptions, document titles, languages, audiences and menu choices. This is the shared source for the HTML starting page, catalogue, root README, printable quick start and application menu. Substantive manuals remain their own sources; the catalogue links to them instead of duplicating them.
 

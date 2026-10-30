@@ -22,7 +22,7 @@ sae_release_inventory <- function(root = ".") {
     stop("Data/Spain is retained locally for provenance and must not enter the release. Ship Data/Spain_2y instead.")
   }
   required <- c("VERSION", "WIZARD_VERSION", "RELEASE_NAME", "app.R", "app_wizard.R", "report.Rmd",
-                "README.md", "START_HERE.html", "docs/INDEX.html",
+                "README.md", "Start_Here/START_HERE.html", "docs/INDEX.html",
                 "docs/maintenance/navigation.json", "docs/instructions/English/QUICK_START.pdf",
                 "docs/templates/report_reference.docx", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md",
                 "docs/validation/MCPE_VALIDATION_STATUS.md", "docs/instructions/English/SUPPORTED_PLATFORMS.md",

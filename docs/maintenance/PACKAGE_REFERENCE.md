@@ -1,6 +1,6 @@
 # Technical package reference
 
-For startup and navigation, open [START_HERE.html](../../START_HERE.html). This reference covers advanced inputs, reproducibility and source provenance.
+For startup and navigation, open [Start_Here/START_HERE.html](../../Start_Here/START_HERE.html). This reference covers advanced inputs, reproducibility and source provenance.
 
 ## Required inputs
 

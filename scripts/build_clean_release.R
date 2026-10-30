@@ -37,7 +37,7 @@ writeLines(c(
   paste("EU SAE candidate", wizard_version, "- reorganized layout"),
   "Prepared locally for review and testing; this build does not publish or upload the package. Whether to publish estimates as official statistics is for each national statistical office to decide.",
   "Includes only the explicit scripts/release_inventory.csv file list.",
-  "Start with START_HERE.html for launch steps, language-specific guides, results locations and the folder map; docs/INDEX.html contains the complete document catalogue.",
+  "Start with Start_Here/START_HERE.html for launch steps, language-specific guides, results locations and the folder map; docs/INDEX.html contains the complete document catalogue.",
   "Windows: open Start_Here and run Start_Wizard.bat or Start_Dashboard.bat. Keep Start_Here inside the package.",
   "macOS/Linux: open Start_Here and run Start_Wizard.command or Start_Dashboard.command (double-click on macOS). Keep Start_Here inside the package.",
   "Prerequisites: R 4.2+ (use the newest version approved by your organization). Pandoc is reused if installed (RStudio Desktop, Quarto, Positron, standalone) or downloaded once by the launcher; see Start_Here/README.md.",

@@ -111,3 +111,6 @@ __pycache__/
 # Private QER authoring backups and rendered QA pages
 _private_build/
 tools/qer_guide_build/
+# Local QER correspondence and assembled review packages
+/QER_package_*/
+/QER_package_*.zip
