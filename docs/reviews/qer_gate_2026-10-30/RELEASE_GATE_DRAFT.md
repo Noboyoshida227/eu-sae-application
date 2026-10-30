@@ -1,7 +1,7 @@
-# EU SAE Workbench release gate for QER — DRAFT
+# EU SAE Workbench release gate for QER
 
-**Status:** draft for owner approval, prepared 30 October 2026 against commit `c8989d4`. The "not specified" decision was approved separately.
-Nothing here is decided until the owner approves it. All tolerances and thresholds are **proposed, needs approval**.
+**Status:** approved by the owner on 30 October 2026, including the tolerances, thresholds and the name QER-RC1. Prepared against commit `c8989d4`. The "not specified" decision was approved separately. Two items still need an owner decision: macOS and Linux testing (§4, E4) and the scope of the full-workflow simulation (§6).
+Tolerances and thresholds apply as approved. Changes after this point need the owner’s approval and an entry in the ledger.
 
 This gate sets the rules for circulating a candidate to QER. It does not replace the production gates in [RELEASE_CHECKLIST.md](../../maintenance/RELEASE_CHECKLIST.md). This document records rules and repository facts; it is not validation evidence.
 
