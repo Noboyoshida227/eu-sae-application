@@ -3906,6 +3906,8 @@ server <- function(input, output, session) {
 
     # Year-variable checks (pre-harmonization) - mirrors the logic inside run_btn.
     year_msgs <- sae_psu_readiness_messages(input$psu_design, input$steps)
+    if ("MFH" %in% input$steps) year_msgs <- c(year_msgs, sae_psu_overlap_warning(
+      validation_survey, input$psu_design, sae_has_mapping(var_map$strata)))
     survey_raw_check <- tryCatch(sae_read_table_input(survey_for_validation, "Survey data"), error = function(e) NULL)
     rhs_raw_check    <- tryCatch(sae_read_table_input(rhs_for_validation, "Auxiliary covariates"), error = function(e) NULL)
     year_var_name    <- var_map$year
@@ -4278,6 +4280,8 @@ server <- function(input, output, session) {
       # Data readiness assessment
       # -- Pre-harmonization checks: year variable in raw data --
       year_msgs <- sae_psu_readiness_messages(input$psu_design, input$steps)
+      if ("MFH" %in% input$steps) year_msgs <- c(year_msgs, sae_psu_overlap_warning(
+        validation_survey, input$psu_design, sae_has_mapping(var_map$strata)))
       survey_raw_check <- tryCatch(sae_read_table_input(survey_for_validation, "Survey data"), error = function(e) NULL)
       rhs_raw_check    <- tryCatch(sae_read_table_input(rhs_for_validation, "Auxiliary covariates"), error = function(e) NULL)
       year_var_name    <- var_map$year  # the user-specified year column name

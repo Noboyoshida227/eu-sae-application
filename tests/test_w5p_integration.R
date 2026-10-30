@@ -156,7 +156,7 @@ for (scenario in scenarios) {
     benchmarking = list(enabled = TRUE, level = "national"),
     ufh = modifyList(shared, list(transformation = "no",
                                   bootstrap_nB = replicates)),
-    mfh = modifyList(shared, list(diag_model = model_rule, fit_mfh3 = FALSE,
+    mfh = modifyList(shared, list(psu_design = "linked", diag_model = model_rule, fit_mfh3 = FALSE,
                                   mcpe_nB = replicates,
                                   bench_nB = replicates)))
   if (!identical(variance_policy, "default"))

@@ -22,6 +22,14 @@ local({
     cfg$mfh <- list(psu_design = choice)
     verify(validate_app_config(cfg)$valid, paste("explicit design accepted:", choice))
   }
+  # Every shipped example must run without a separate design confirmation.
+  for (path in Sys.glob("Data/Spain_2y/run_config_*.yml")) {
+    verify(validate_app_config(yaml::read_yaml(path))$valid, paste("bundled config is valid:", basename(path)))
+    verify(identical(sae_config_psu_design(yaml::read_yaml(path)), "linked"),
+           paste("bundled config declares linked PSUs:", basename(path)))
+  }
+  verify(grepl("deselect MFH", sae_psu_readiness_messages("not_specified", "MFH"), fixed = TRUE),
+         "blocked MFH message explains how to run UFH alone")
   verify(grepl("ERROR", sae_psu_readiness_messages("not_specified", "MFH")) &&
            !grepl("ERROR", sae_psu_readiness_messages("not_specified", "UFH")),
          "readiness blocks only MFH when design is unspecified")
@@ -65,6 +73,22 @@ local({
                                 survey::svymean, na.rm = TRUE, covmat = TRUE)
     verify(near(vcov(joint), vcov(renamed_fit)), "independent results ignore accidental PSU code overlap")
   }
+  verify(!length(sae_psu_overlap_warning(d, "linked", TRUE)), "shared PSUs give no linkage warning")
+  for (choice in c("independent", "not_specified")) {
+    verify(!length(sae_psu_overlap_warning(renamed, choice)), paste("only linked is checked:", choice))
+  }
+  no_shared <- sae_psu_overlap_warning(renamed, "linked", TRUE)
+  verify(length(no_shared) == 1L && grepl("no PSU identifier", no_shared, fixed = TRUE) &&
+           !grepl("ERROR", no_shared, fixed = TRUE), "linked with no shared PSU warns without blocking")
+  moved <- d
+  moved$strata[moved$year == 2020] <- moved$strata[moved$year == 2020] + 10
+  moved_warning <- sae_psu_overlap_warning(moved, "linked", TRUE)
+  verify(length(moved_warning) == 1L && grepl("stratum code", moved_warning, fixed = TRUE),
+         "linked with no shared stratum and PSU warns")
+  verify(!length(sae_psu_overlap_warning(moved, "linked", FALSE)), "unstratified design ignores stratum codes")
+  verify(abs(vcov(survey::svyby(~poor, ~year, sae_mfh_survey_design(moved, "linked", TRUE), survey::svymean,
+                                na.rm = TRUE, covmat = TRUE))[1, 2]) < 1e-12,
+         "warned stratum case has the zero covariance the warning states")
   verify(inherits(try(sae_mfh_survey_design(d, "not_specified"), silent = TRUE), "try-error"),
          "direct survey-design helper rejects unknown overlap")
   # Execute actual top-level script assignments to check non-UI enforcement.
@@ -90,4 +114,9 @@ local({
     mfh_options = list(cov_choice = "direct"), psu_design = "independent")
   verify(grepl("**Covariance option:** zero", note, fixed = TRUE),
          "data note reports effective rather than overridden covariance")
+  mfh_lines <- readLines("scripts/02_mfh.R", encoding = "UTF-8")
+  verify(which(grepl("sae_psu_overlap_warning", mfh_lines, fixed = TRUE)) <
+           which(grepl("des <- sae_mfh_survey_design", mfh_lines, fixed = TRUE)) &&
+           any(grepl("psu_design_warning", readLines("report.Rmd", encoding = "UTF-8"), fixed = TRUE)),
+         "MFH logs and reports the linkage warning")
 })

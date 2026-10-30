@@ -7,7 +7,7 @@ Choose one of the three modes below. All use the same `survey.rds`, `auxiliary.r
 1. In the Workbench, load this folder's `survey.rds`, `auxiliary.rds` and `shapefile.rds`. Select household rows and years **2012 and 2013**.
 2. Set the variable mappings below. Leave strata and household linkage blank. Select poverty FGT(0), seed **123**, benchmarking **off**, AI **off**, and CPI/price transformation **off**.
 3. UFH: **arcsin**, bias correction **bc**, **BIC**, LASSO off and **500** bootstrap attempts. The sampling-variance smoothing selector is inactive on this scale.
-4. MFH: **MFH2**, **no transformation**, **AIC**, LASSO off, MFH3 off and **500** successful joint-bootstrap draws. Leave fixed-formula overrides empty. Use either **sm_out / rho_sm_out** or **sm_all / rho_sm_all**; both were verified. The sm_out configuration is a convenient starting example, not evidence that it is statistically superior.
+4. MFH: **MFH2**, **no transformation**, **AIC**, LASSO off, MFH3 off and **500** successful joint-bootstrap draws. Choose **Same identifiers represent the same PSUs across years**: this example has 442 paired PSUs, and MFH does not run until the cross-year PSU design is chosen. Leave fixed-formula overrides empty. Use either **sm_out / rho_sm_out** or **sm_all / rho_sm_all**; both were verified. The sm_out configuration is a convenient starting example, not evidence that it is statistically superior.
 5. Run **UFH → MFH → Comparison** and generate the final reports. Use the run's output links to open the HTML/Word reports, workbook, maps and diagnostics.
 
 | Setting | Column |

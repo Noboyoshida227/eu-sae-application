@@ -70,6 +70,11 @@ details{margin:22px 0;padding:15px 20px;background:var(--wash)}summary{cursor:po
 <td>A pooled correlation can stabilize noisy domain estimates but assumes it adequately represents domain dependence. The Workbench adapts the nationally pooled strategy of Boonstra and van den Brakel (2019) to PSU-level dependence. It is not an identical matched-unit implementation. Check stable PSU identifiers, the joint design and domain heterogeneity. PSU reuse alone establishes neither covariance magnitude nor sign. <a href="Technical%20notes/Note%20on%20Estimating%20the%20Sampling-Error%20Covariance%20Matrix%20%28revised%29.docx">Sampling-covariance note</a>.</td>
 </tr>
 <tr>
+<td><strong>Explicit cross-year PSU design.</strong> The manuscript treats the sampling covariance matrices as known inputs and does not set out a design declaration.</td>
+<td>Implementation safeguard; <strong>conditionally justified</strong>.</td>
+<td>MFH runs only after the analyst declares linked PSUs or independently sampled surveys, because software cannot infer the design from identifier codes. Linked uses the pooled survey design. Independent uses year-specific PSUs and strata and zero sampling covariance, and leaves the random-effect covariance unconstrained. Surveys that partly overlap, or overlap without linkable PSUs, are not resolved: MFH stays blocked for not-specified designs pending survey-design advice and QER.</td>
+</tr>
+<tr>
 <td><strong>Anchored poverty.</strong> The manuscript does not explicitly specify an anchored-poverty application.</td>
 <td>Country-requested extension of the indicator scope; <strong>conditionally justified</strong>.</td>
 <td>Added in response to requests from the Polish and Greek teams. Use the FGT workflow with analyst-supplied thresholds representing a consistent purchasing-power anchor. Document the reference-year line, price adjustment, welfare definition and survey/income periods. The application does not automatically derive or update an anchored line; an unchanged nominal threshold is not generally a constant-real anchor. See the implementation conditions below.</td>

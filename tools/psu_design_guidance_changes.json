@@ -1,0 +1,40 @@
+{
+  "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx": [
+    {
+      "insert_after": "Variance default update (after w5p, October 2026).",
+      "new": "Cross-year PSU design update (after w5p, October 2026). Step 4 replaces the PSU-consistency checkbox with an explicit choice: same PSUs across years, independently sampled surveys, or not specified. MFH does not run until the first or second is chosen. Independently sampled surveys use year-specific PSUs and strata and zero cross-year sampling covariance, without constraining the MFH random-effect covariance. Earlier checked settings load as linked and earlier unchecked settings as not specified.",
+      "locator": "Release-candidate update, cross-year PSU design",
+      "count": 1
+    },
+    {
+      "old": "Review whether PSU codes are consistent and sampling dependence is plausible. Use zero covariance for independent rounds or a documented sensitivity.",
+      "new": "Choose the cross-year PSU design in Step 4 from the survey documentation, and check that sampling dependence is plausible. Choosing independently sampled surveys sets the sampling covariance to zero. On linked surveys, zero covariance is only a documented sensitivity.",
+      "locator": "Section 6, MFH covariance default",
+      "count": 1
+    },
+    {
+      "old": "The PSU-consistency checkbox records your assessment of whether identifiers refer to the same sampling units across years. In this release, that checkbox alone does not change estimates; choose the sampling-covariance option to reflect the actual survey design.",
+      "new": "Choose the cross-year PSU design from the survey documentation. Same PSUs across years uses the selected covariance option. Independently sampled surveys use year-specific designs and zero sampling covariance. With Not specified, MFH does not run; to run UFH alone, deselect MFH. Identical code values alone establish neither linkage nor independence.",
+      "locator": "Section 11, Step 4 cross-year PSU design",
+      "count": 1
+    },
+    {
+      "old": "benchmarking and the PSU assessment, with the default settings",
+      "new": "benchmarking and the cross-year PSU design (the screenshot shows the earlier checkbox), with the default settings",
+      "locator": "Figure 14 caption",
+      "count": 1
+    },
+    {
+      "old": "PSU consistency assessed and recorded. Sampling-covariance choice reflects the design; the checkbox alone does not change estimation.",
+      "new": "Cross-year PSU design confirmed from the survey documentation and selected. The sampling-covariance choice reflects that design.",
+      "locator": "Annex checklist, PSU design",
+      "count": 1
+    },
+    {
+      "old": "Check PSU meanings across years and choose the sampling-covariance option accordingly. The PSU checkbox records the assessment only.",
+      "new": "Check PSU meanings across years and choose the cross-year PSU design and sampling-covariance option accordingly. MFH does not run while the design is not specified.",
+      "locator": "Annex workflow, PSU design",
+      "count": 1
+    }
+  ]
+}

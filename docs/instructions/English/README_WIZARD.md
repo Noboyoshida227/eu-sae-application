@@ -153,8 +153,9 @@ Required fields carry a red asterisk.
    strata and forces cross-year sampling-error covariance to zero. This does
    not force the MFH random-effect covariance to zero. Choose **Not specified**
    when overlap is unknown or cannot be linked; MFH is blocked pending design
-   advice. UFH remains available, but its change inference assumes independent
-   years. Identical code values alone do not establish linkage or independence.
+   advice. To run UFH alone, deselect MFH; its change inference assumes independent
+   years. If linked PSUs are chosen but none is shared across years, readiness and
+   the report give a warning. Identical code values alone do not establish linkage or independence.
    Old unchecked settings load as **Not specified**; old checked settings load
    as linked. The choice is saved with the setup and recorded in MFH outputs.
 5. **Add AI assistant** — optional external-transfer consent, API key, and

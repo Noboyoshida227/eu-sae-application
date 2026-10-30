@@ -105,6 +105,13 @@ endorsement of every implementation detail. See the [deviations note](MOLINA_ROM
   threshold applies to the log-scale variance.
   The optional `sm_all` policy does not use this cutoff; it remains conditional on
   the fitted GVF and does not propagate GVF-estimation uncertainty.
+- **Cross-year PSU design:** MFH requires a declaration of linked PSUs or
+  independently sampled surveys; `not_specified` blocks MFH, and UFH remains
+  available. Independent surveys use year-specific PSUs and strata and zero
+  sampling covariance, without constraining the random-effect covariance. A
+  linked declaration with no PSU, or no stratum and PSU pair, shared across
+  years gives a warning, because the estimated covariance is then zero.
+  Partly overlapping surveys remain a QER question.
 - **UFH changes:** separate yearly UFH fits retain the explicitly exported
   `period_independence` assumption. A joint survey covariance model has not
   been invented for these fits. This limitation matters with overlapping

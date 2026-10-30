@@ -41,6 +41,7 @@ ai:
   provider: anthropic
   external_transfer_consent: no
 mfh:
+  psu_design: linked
   survey_path: Data/Spain_2y/survey.rds
   rhs_path: Data/Spain_2y/auxiliary.rds
   shp_path: Data/Spain_2y/shapefile.rds

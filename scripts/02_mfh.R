@@ -745,6 +745,9 @@ survey_step1 <- survey_dt %>%
 if (isTRUE(use_strata) && "strata" %in% names(survey_step1)) {
   survey_step1$strata <- sae_strata_codes(survey_step1$strata, context = "MFH survey design")
 }
+.psu_overlap_warning <- sae_psu_overlap_warning(survey_step1, psu_design, use_strata)
+if (length(.psu_overlap_warning)) cat(.psu_overlap_warning, "
+")
 des <- sae_mfh_survey_design(survey_step1, psu_design, use_strata)
 
 # ---- Direct estimates: Domain x Year ----
@@ -1775,6 +1778,7 @@ if (file.exists(.run_metadata_path)) {
   if (is.list(.run_metadata)) {
     .run_metadata$psu_design <- psu_design
     .run_metadata$psu_design_label <- sae_psu_design_label(psu_design)
+    .run_metadata$psu_design_warning <- .psu_overlap_warning
     .run_metadata$mfh_cov_choice <- cov_choice
     .run_metadata$mfh_requested_model <- diag_model_requested
     .run_metadata$mfh_selected_model <- diag_model

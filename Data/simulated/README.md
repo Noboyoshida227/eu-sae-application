@@ -23,8 +23,8 @@ end to end, plus the script that generated them.
    domain counts show 0, and a join error
    (*"'by' must specify uniquely valid columns"*) follows — all three are the
    same problem.
-4. In Step 4 (Configure model), answer **yes** to the PSU-consistency
-   question. Then press **Check data readiness** in Step 6 (Review
+4. In Step 4 (Configure model), choose **Same identifiers represent the same
+   PSUs across years**. Then press **Check data readiness** in Step 6 (Review
    configuration); all tests should pass.
 
 A second example -- real Spanish province geography and synthetic 2012–2013

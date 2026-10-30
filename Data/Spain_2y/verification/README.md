@@ -6,6 +6,8 @@ The current survey includes the restored anchored-line column. Start with [the l
 
 `anchored_welfare/` contains each run's numerical JSON, variance CSV, report-content JSON and independently calculated direct-estimate CSV. The current receipt records the active hashes, configuration checks, source snapshot, original-Spain preservation, backup and exact anchored-column regeneration. The new runs use a frozen snapshot of the current local application; unrelated pre-existing UI/test edits were preserved.
 
+The six configurations now declare `psu_design: linked`, so their hashes differ from those in the receipts below. [psu_design_bridge_receipt.json](psu_design_bridge_receipt.json) records the old and new hashes, confirms that nothing else changed, and records the two configurations rerun to identical CSV tables.
+
 ## Historical original-line poverty evidence
 
 | Record | Purpose |

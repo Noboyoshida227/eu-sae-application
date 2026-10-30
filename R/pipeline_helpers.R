@@ -1445,7 +1445,8 @@ sae_require_psu_design <- function(choice) {
     stop(paste0("MFH requires a specified cross-year PSU design. Confirm linked PSU identifiers ",
       "or independently sampled surveys. If overlap is unknown or cannot be linked, ",
       "obtain survey-design advice before estimating cross-year sampling covariance. ",
-      "An unchecked legacy setting does not mean independent sampling."), call. = FALSE)
+      "An unchecked legacy setting does not mean independent sampling. ",
+      "To run UFH alone, deselect MFH."), call. = FALSE)
   }
   choice
 }
@@ -1472,6 +1473,31 @@ sae_psu_readiness_messages <- function(choice, steps) {
     "PSU design: independent surveys; year-specific designs and zero cross-year sampling covariance.",
     "This does not constrain the MFH random-effect covariance."))
   "PSU design: linked identifiers; confirm that PSU and stratum codes retain the same meaning across years."
+}
+
+# A linked declaration with no shared unit gives a zero estimated covariance
+# with no other sign of the problem. Warn only: shared codes prove nothing, so
+# this cannot confirm linkage. A survey design with nest = TRUE treats a PSU
+# that changes stratum as a different unit.
+sae_psu_overlap_warning <- function(data, psu_design, use_strata = FALSE) {
+  if (!identical(sae_psu_design(psu_design), "linked")) return(character())
+  years <- unique(data$year[!is.na(data$year)])
+  if (length(years) < 2L) return(character())
+  any_shared <- function(unit) {
+    length(Reduce(intersect, lapply(years, function(y) {
+      unit[!is.na(data$year) & data$year == y]
+    }))) > 0L
+  }
+  if (!any_shared(as.character(data$psu))) return(paste(
+    "PSU design: WARNING -- linked PSUs were selected, but no PSU identifier appears",
+    "in both years, so the estimated cross-year sampling covariance is zero.",
+    "Check the PSU mapping and the survey design."))
+  if (isTRUE(use_strata) && "strata" %in% names(data) &&
+      !any_shared(paste(data$strata, data$psu, sep = "\r"))) return(paste(
+    "PSU design: WARNING -- linked PSUs were selected, but no PSU keeps the same",
+    "stratum code in both years, so the estimated cross-year sampling covariance",
+    "is zero. Check that the stratum codes have the same meaning across years."))
+  character()
 }
 
 sae_mfh_survey_design <- function(data, psu_design, use_strata = FALSE) {

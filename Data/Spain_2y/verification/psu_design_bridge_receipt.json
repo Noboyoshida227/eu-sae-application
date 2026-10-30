@@ -1,0 +1,55 @@
+{
+  "purpose": "Bridge the historical Spain_2y receipts to configurations that declare the cross-year PSU design.",
+  "created": "2026-10-30",
+  "base_commit": "c8989d46e434877aff83e6c1d5efa05683ea736c",
+  "change": "Added one line, mfh.psu_design: linked, to each configuration. No other byte changed.",
+  "reason": "MFH requires an explicit design. The example has 442 paired PSUs, and the verified runs used the pooled design that linked selects.",
+  "historical_receipts": "Not edited. Their configuration hashes are the previous_sha256 values below.",
+  "configurations": {
+    "run_config_anchored_poverty_sm_all.yml": {
+      "previous_sha256": "f0101860e1b66ef393ac52e712b6b7a291a167b02154555ed2a62509a69dc783",
+      "current_sha256": "2c5b0d5bc1adda2c827a19b0d2ff66866271232c7389498c8cf337ba0a9859a7"
+    },
+    "run_config_anchored_poverty_sm_out.yml": {
+      "previous_sha256": "2532415317451bc4445ce3b725a10fa6e7fe68965c31449ad84f5cf923fb1a69",
+      "current_sha256": "fbfb83cb757ad1f02a56ca4cb12045e064d1ed38c1c59342fa48ab3fcf9cbea2"
+    },
+    "run_config_mean_welfare_sm_all.yml": {
+      "previous_sha256": "565583b05eaa4263620ad9f6587db6d80b56311c7179f7c54c2be9d24685958a",
+      "current_sha256": "535e5cb4d548acfd5e4658e4ae41a4855d0c129aa97eeffbd5ea44246134637b"
+    },
+    "run_config_mean_welfare_sm_out.yml": {
+      "previous_sha256": "33a5428f07746554cd0ec4047bb5f806f59308acfb12a1c7bce0a5ea519259dd",
+      "current_sha256": "63dbead68f1ff18a2c9e8c795ff62e36ef28c72baad93834ac713e41fe00118f"
+    },
+    "run_config_sm_all.yml": {
+      "previous_sha256": "e5ed936b72ee182368b4a4c10ac69905d9517c0e6c06ca71a567dc8b184cc8c9",
+      "current_sha256": "c3a23cab46efb9e5ec5d742d91f73a874003a24a7dd57c89a9ee16f04fae557b"
+    },
+    "run_config_sm_out.yml": {
+      "previous_sha256": "dee5520823299cf70c3019b1d0b8a9bc47c2adda30b4ce3d2b36425a0f0bc00e",
+      "current_sha256": "baeb1d2cfb9ddcdb22c82c78653357b53cf9697d1e281220fb059b9737c1ac67"
+    }
+  },
+  "rerun_check": {
+    "seed": 123,
+    "requested_replicates": 500,
+    "environment": "Windows, R 4.5.2",
+    "compared_to": "Saved audit outputs: sens2 (sm_out) and mean_welfare__sm_out",
+    "run_config_sm_out.yml": {
+      "csv_tables_identical": 22,
+      "csv_tables_compared": 22
+    },
+    "run_config_mean_welfare_sm_out.yml": {
+      "csv_tables_identical": 20,
+      "csv_tables_compared": 20
+    },
+    "not_rerun": [
+      "run_config_sm_all.yml",
+      "run_config_anchored_poverty_sm_all.yml",
+      "run_config_anchored_poverty_sm_out.yml",
+      "run_config_mean_welfare_sm_all.yml"
+    ]
+  },
+  "limits": "Execution check on two of six synthetic configurations. It is not coverage evidence, and it does not replace the QER gate rerun."
+}
