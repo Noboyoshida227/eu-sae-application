@@ -1609,7 +1609,7 @@ sig_plot_dt$significant_label <- ifelse(
 .write_xlsx_safe(sig_plot_dt, here::here("outputs", "data", "statistical_significance_comparison.xlsx"))
 
 # One legend range, centred on zero, for every change map (all methods):
-# white is always "no change" and the same blue or red means the same change.
+# light grey is always "no change" and the same blue or red means the same change.
 .change_map_limits <- sae_shared_limits(sig_plot_dt, "diff", symmetric = TRUE)
 
 # ---- Labels for the change figures (change maps, significance plots) ----

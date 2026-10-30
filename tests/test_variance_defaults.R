@@ -12,6 +12,7 @@ local({
     }
   }
   source("app_support.R", local = TRUE)
+  psu_design <- "linked"
   source("R/brief_generator.R", local = TRUE)
   app_ast <- parse("app.R", encoding = "UTF-8")
   ufh_ast <- parse("scripts/01_ufh.R", encoding = "UTF-8")
@@ -73,7 +74,7 @@ local({
            "missing or blank saved policy fields resolve to selective smoothing")
     cfg <- list(years_keep = c(2019L, 2020L),
       ufh = list(var_choice = missing),
-      mfh = list(var_choice = missing, cov_choice = missing))
+      mfh = list(psu_design = "linked", var_choice = missing, cov_choice = missing))
     verify(isTRUE(validate_app_config(cfg)$valid),
            "configuration validation accepts missing-policy defaults consistently")
     ufh_cfg <- cfg$ufh
@@ -84,6 +85,23 @@ local({
     verify(identical(ufh_var_choice, "sm_out") && identical(var_choice, "sm_out") &&
              identical(cov_choice, "rho_sm_out"),
            "direct script entry resolves missing settings to the same defaults")
+  }
+  for (legacy in list(FALSE, TRUE, NULL)) {
+    saved <- list(inputs = list(psu_consistent = legacy))
+    expected <- if (isTRUE(legacy)) "linked" else "not_specified"
+    verify(identical(sae_sanitize_setup(saved)$inputs$psu_design, expected) &&
+             identical(restore(saved)$psu_design, expected),
+           paste("legacy PSU migration:", expected))
+  }
+  for (choice in c("linked", "independent", "not_specified")) {
+    input <- list(psu_design = choice, mfh_cov_choice = "direct")
+    saved <- collect()
+    verify(identical(saved$psu_design, choice) &&
+             identical(restore(list(inputs = saved))$psu_design, choice),
+           paste("PSU choice survives setup round trip:", choice))
+    if (choice == "independent") verify(identical(saved$mfh_cov_choice, "zero") &&
+      identical(restore(list(inputs = input))$mfh_cov_choice, "zero"),
+      "independent setup collection and restoration enforce zero covariance")
   }
   cov_for <- c(sm_all = "rho_sm_all", sm_out = "rho_sm_out", direct = "rho_dir")
   for (choice in names(cov_for)) {
@@ -130,7 +148,7 @@ local({
   # Exercise the production variance observer, including covariance choices
   # that should survive a variance change rather than being reset.
   observer <- find_calls(app_ast, function(x) identical(x[[1L]], as.name("observeEvent")) &&
-    identical(paste(deparse(x[[2L]]), collapse = ""), "input$mfh_var_choice"))[[1L]][[3L]]
+    identical(paste(deparse(x[[2L]]), collapse = ""), "list(input$mfh_var_choice, input$psu_design)"))[[1L]][[3L]]
   isolate <- function(x) x
   updateSelectInput <- function(session, inputId, choices, selected) {
     updated <<- list(id = inputId, choices = choices, selected = selected)
@@ -143,6 +161,11 @@ local({
              identical(updated$choices, c(unname(cov_for[choice]), "direct", "zero")),
            paste("variance observer pairs", choice, "while retaining compatible covariance", current))
   }
+
+  input <- list(mfh_var_choice = "sm_out", mfh_cov_choice = "direct", psu_design = "independent")
+  eval(observer)
+  verify(identical(updated$selected, "zero") && identical(updated$choices, "zero"),
+         "independent survey choice restricts the covariance control to zero")
 
   # Render the actual controls from each interface and evaluate their display
   # condition for each transformation; no browser or application is started.

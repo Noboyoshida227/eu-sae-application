@@ -20,6 +20,10 @@ if (!exists("sae_variance_choice", mode = "function")) {
 # Purely deterministic: no LLM needed.
 # ===========================================================================
 
+if (!exists("sae_psu_design", mode = "function")) {
+  source(file.path("R", "pipeline_helpers.R"), local = TRUE)
+}
+
 #' Generate a data properties and initial assessment note
 #'
 #' @param validation  Output from validate_inputs()
@@ -28,13 +32,14 @@ if (!exists("sae_variance_choice", mode = "function")) {
 #' @param mfh_options Named list of MFH settings selected in the UI
 #' @param steps       Character vector of pipeline steps selected (e.g. c("UFH","MFH","Comparison"))
 #' @param psu_consistent_user Logical or NULL -- user's answer to PSU consistency question
+#' @param psu_design Cross-year PSU design; overrides the legacy checkbox answer.
 #' @return Character string (Markdown)
 generate_data_note <- function(validation,
                                var_map,
                                ufh_options = NULL,
                                mfh_options = NULL,
                                steps       = c("UFH", "MFH"),
-                               psu_consistent_user = NULL) {
+                               psu_consistent_user = NULL, psu_design = NULL) {
 
   s <- validation$summary
   ln <- character()
@@ -97,10 +102,14 @@ generate_data_note <- function(validation,
     ln <- c(ln, sprintf("- **PSU codes identical across years (data check):** %s",
                          if (s$psu_consistent_over_time) "Yes" else "No"))
   }
-  if (!is.null(psu_consistent_user)) {
-    ln <- c(ln, sprintf("- **PSU codes consistent over time (user confirmed):** %s",
-                         if (psu_consistent_user) "Yes" else "No"))
-  }
+  psu_choice <- sae_psu_design(psu_design, psu_consistent_user)
+  ln <- c(ln, sprintf("- **Cross-year PSU design (user specified):** %s",
+                       sae_psu_design_label(psu_choice)),
+          "- Matching code values alone do not establish that the same sampling units were followed.")
+  if (psu_choice == "independent") ln <- c(ln,
+    "- MFH uses year-specific survey designs and zero cross-year sampling covariance.")
+  if (psu_choice == "not_specified") ln <- c(ln,
+    "- MFH requires confirmation of the cross-year survey design. UFH change inference assumes independent years.")
   ln <- c(ln, "")
 
   # ---- 4. Validation flags ----
@@ -164,7 +173,8 @@ generate_data_note <- function(validation,
     mfh_var <- sae_variance_choice(mfh_options$var_choice)
     ln <- c(ln, sprintf("- **Variance option:** %s", mfh_var))
     ln <- c(ln, sprintf("- **Covariance option:** %s",
-                       sae_covariance_choice(mfh_options$cov_choice, mfh_var)))
+                       if (psu_choice == "independent") "zero" else
+                         sae_covariance_choice(mfh_options$cov_choice, mfh_var)))
     ln <- c(ln, sprintf("- **Selected MFH model:** %s", mfh_options$diag_model %||% "N/A"))
     ln <- c(ln, sprintf("- **Fit MFH3:** %s",
                          if (isTRUE(mfh_options$fit_mfh3)) "Yes" else "No"))
@@ -330,39 +340,44 @@ format_comparison_section <- function(section_num, ufh_bench, mfh_bench) {
                                if (is.na(ufh_hicv)) "N/A" else as.character(ufh_hicv),
                                if (is.na(mfh_hicv)) "N/A" else as.character(mfh_hicv)))
 
-    # Recommendation
-    if (!is.na(mfh_cv_med) && !is.na(ufh_cv_med)) {
+    # Descriptive summaries only: these aggregates do not establish matched
+    # domains, compatible scales/benchmarks or valid inference for either fit.
+    if (is.finite(mfh_cv_med) && is.finite(ufh_cv_med)) {
       if (mfh_cv_med < ufh_cv_med) {
         lines <- c(lines,
-          "   -> MFH achieves lower median CV, suggesting improved precision from",
-          "      borrowing strength across time periods.")
+          "   -> MFH has a lower reported median CV for this year.")
       } else if (ufh_cv_med < mfh_cv_med) {
         lines <- c(lines,
-          "   -> UFH achieves lower median CV; the multivariate extension may not",
-          "      provide additional precision gains for this year.")
+          "   -> UFH has a lower reported median CV for this year.")
       } else {
         lines <- c(lines,
           "   -> Both models yield similar median CV.")
       }
     }
 
-    if (!is.na(mfh_mse) && !is.na(ufh_mse)) {
+    if (is.finite(mfh_mse) && is.finite(ufh_mse)) {
       if (mfh_mse < ufh_mse) {
         lines <- c(lines,
-          "   -> MFH has lower median MSE, indicating more accurate estimates.")
+          "   -> MFH has a lower median estimated MSE for this year.")
       } else if (ufh_mse < mfh_mse) {
         lines <- c(lines,
-          "   -> UFH has lower median MSE for this year.")
+          "   -> UFH has a lower median estimated MSE for this year.")
       }
     }
     lines <- c(lines, "")
   }
 
   lines <- c(lines,
-    "   Note: Review Q-Q plots and residual diagnostics in both HTML reports",
-    "   (40-fh_v2.html for UFH, 50-mfh_v2.html for MFH) to visually",
-    "   compare normality assumptions. The model with better-aligned Q-Q plots",
-    "   and lower CV/MSE is generally preferred.",
+    "   These summaries do not establish model accuracy or a preferred model.",
+    "   Compare estimated precision only for matched domains, indicators, years,",
+    "   reporting scales and benchmark definitions; those conditions are not",
+    "   verified by these aggregate summaries. Estimated MSEs remain conditional",
+    "   on the model and its inputs and do not establish interval coverage.",
+    "   Review convergence, covariance-boundary warnings and unavailable inference",
+    "   in the final report and model diagnostics. Annual precision does not",
+    "   establish precision of changes; UFH change inference assumes period independence.",
+    "   Q-Q plots are descriptive checks, not a model-selection rule.",
+    "   Analyst judgment and application-specific validation remain necessary.",
     "")
 
   lines
@@ -458,13 +473,17 @@ generate_analysis_brief <- function(diagnostics,
         "- Comment on convergence, normality (Shapiro-Wilk results and what Q-Q plots",
         "  would show), benchmark quality (CV, MSE), and any domains of concern.\n\n",
         "## MFH (Multivariate Fay-Herriot) Assessment\n",
-        "- Same structure as UFH. Note whether borrowing strength across time periods",
-        "  improved precision.\n\n",
-        "## Which Model is Preferred?\n",
+        "- Same structure as UFH. Describe reported estimated precision without",
+        "  attributing differences to temporal borrowing from aggregate summaries alone.\n\n",
+        "## Evidence for Model Choice\n",
         "- Compare UFH vs MFH on: (1) normality of residuals and random effects,",
-        "  (2) precision (CV), (3) accuracy (MSE), (4) number of problematic domains.",
-        "- State which approach is better for this dataset and why.\n",
-        "- Note any caveats (e.g., one model may be better for one year but not another).\n\n",
+        "  (2) reported CV, (3) estimated MSE, (4) number of problematic domains.",
+        "- These aggregate summaries do not verify matched domains, scales,",
+        "  benchmark definitions or inference status. State insufficient evidence",
+        "  for a preference when those checks are unavailable.\n",
+        "- Smaller estimated MSE or CV and better Q-Q plots alone do not establish",
+        "  accuracy, coverage or a preferred model. Distinguish levels from changes,",
+        "  flag covariance-boundary or unavailable inference, and require analyst review.\n\n",
         "## Recommendations\n",
         "- Actionable next steps for the analyst.\n\n",
         template_brief

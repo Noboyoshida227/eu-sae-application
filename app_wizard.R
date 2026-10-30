@@ -1023,9 +1023,9 @@ ui <- fluidPage(
               )
             ),
             h4("Data assessment"),
-            checkboxInput("psu_consistent",
-            tip_label("PSU codes are consistent over time", "Check this if the same PSU identifiers refer to the same sampling units across years. The answer is recorded with the run settings; it does not change the estimates (the cross-year covariance of sampling errors is computed from the PSU codes in the data)."),
-            value = FALSE)
+            radioButtons("psu_design",
+              tip_label("How are PSUs related across years?", "Linked: identifiers (and strata, if used) refer to the same units across years. Independent: the surveys were sampled independently; MFH uses year-specific survey designs and zero cross-year sampling covariance. Not specified: MFH is blocked until the survey design is confirmed. UFH remains available, but its change inference assumes independent years."),
+              choices = sae_psu_design_choices(), selected = "not_specified")
           )
         )
       ),
@@ -1733,7 +1733,7 @@ wizard_server <- function(input, output, session) {
             }
             paste("on -", lvl)
           } else "off"),
-      row("PSU codes consistent over time", if (isTRUE(input$psu_consistent)) "yes" else "no"),
+      row("Cross-year PSU design", sae_psu_design_label(input$psu_design)),
 
       sec("5. AI assistant"),
       row("Enabled", if (isTRUE(input$llm_enabled)) "yes" else "no"),

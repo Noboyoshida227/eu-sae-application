@@ -144,7 +144,19 @@ Required fields carry a red asterisk.
    choose **constant (real) prices already**. The run log, the readiness
    messages, the review page and the report name the CPI file and column.
 4. **Configure model** — UFH and MFH choices, Bootstrap replicates (default
-   500), benchmarking, covariate selection, and PSU consistency.
+   500), benchmarking, covariate selection, and cross-year PSU design.
+
+   Choose **Same identifiers represent the same PSUs across years** only when
+   PSU identifiers (and stratum codes, if used) have stable meanings across years.
+   Choose **The two surveys are independently sampled** only when the sampling
+   design confirms independence: MFH then uses year-specific PSU groups and
+   strata and forces cross-year sampling-error covariance to zero. This does
+   not force the MFH random-effect covariance to zero. Choose **Not specified**
+   when overlap is unknown or cannot be linked; MFH is blocked pending design
+   advice. UFH remains available, but its change inference assumes independent
+   years. Identical code values alone do not establish linkage or independence.
+   Old unchecked settings load as **Not specified**; old checked settings load
+   as linked. The choice is saved with the setup and recorded in MFH outputs.
 5. **Add AI assistant** — optional external-transfer consent, API key, and
    output language.
 6. **Review configuration** — configuration summary, the data files of the
@@ -349,8 +361,8 @@ and no conversion they include inflation, and Data Readiness says so.
 
 All maps use one colour scheme (`R/map_style.R`). Level maps (poverty rates,
 RMSE, mean welfare) use the reversed magma scale, lighter = lower and darker =
-higher; change maps (poverty change, growth rates) use a blue–white–red scale
-with white at zero. In the final report (Comparison step), all poverty maps
+higher; change maps (poverty change, growth rates) use a blue–light grey–red scale
+with light grey at zero. In the final report (Comparison step), all poverty maps
 (every method, both years) share one legend range, all RMSE maps share
 another, and the poverty-change maps share one range that is symmetric around
 zero, so the same colour means the same value on every map of that kind. The

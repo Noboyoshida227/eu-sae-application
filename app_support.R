@@ -62,6 +62,11 @@ validate_app_config <- function(cfg) {
   # MFH step notes in its log that it is ignored.
 
   steps <- cfg$run$steps %||% c("UFH", "MFH", "Comparison")
+  if ("MFH" %in% steps) {
+    psu_error <- tryCatch({ sae_require_psu_design(sae_config_psu_design(cfg)); NULL },
+                          error = function(e) conditionMessage(e))
+    if (!is.null(psu_error)) errs <- c(errs, psu_error)
+  }
   bad_steps <- setdiff(steps, c("UFH", "MFH", "Comparison"))
   if (length(bad_steps) > 0) {
     errs <- c(errs, paste0("Invalid run steps: ", paste(bad_steps, collapse = ", ")))

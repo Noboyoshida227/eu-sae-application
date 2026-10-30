@@ -274,6 +274,8 @@ if (!is.null(run_meta)) {
       "Benchmark level",
       "Benchmark source",
       "Benchmark target file",
+      "Cross-year PSU design (MFH)",
+      "Effective MFH sampling covariance option",
       "Requested MFH model",
       "Selected MFH model",
       "MFH3 reference-variance test adjustment",
@@ -299,6 +301,8 @@ if (!is.null(run_meta)) {
       bm$level_label %||% bm$level %||% "",
       benchmark_source,
       benchmark_target,
+      run_meta$psu_design_label %||% "Not recorded",
+      run_meta$mfh_cov_choice %||% "Not recorded",
       run_meta$mfh_requested_model %||% "",
       run_meta$mfh_selected_model %||% "",
       mfh_refvar_label,
@@ -1157,8 +1161,8 @@ cat(comparison_ai_section_html(ai_state, "change_significance",
 
 Change maps use one diverging scale centred on zero, with the same range on
 every change map: blue indicates a decrease in `r change_noun` between the
-two years, white no change, and red an increase. Domains without an estimate
-are shown in grey. The significance plots after the maps show the estimated
+two years, light grey no change, and red an increase. Domains without an estimate
+are shown in a paler grey. The significance plots after the maps show the estimated
 change in each domain with its pointwise 95% confidence interval: intervals that
 exclude zero (statistically significant changes) are drawn in red, the others in
 grey.

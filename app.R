@@ -258,7 +258,7 @@ dashboard_setup_defaults <- function() {
       mcpe_bootstrap_replicates = 500L,
       mfh_candidates_y1 = "",
       mfh_candidates_y2 = "",
-      psu_consistent = FALSE,
+      psu_design = "not_specified",
       llm_enabled = FALSE,
       llm_external_consent = FALSE,
       language = "en"
@@ -294,6 +294,10 @@ sae_sanitize_setup <- function(setup) {
   if (!is.list(setup) || !is.list(setup$inputs) || is.null(names(setup$inputs))) {
     return(NULL)
   }
+  psu_design <- tryCatch(sae_psu_design(setup$inputs$psu_design, setup$inputs$psu_consistent),
+                         error = function(e) NULL)
+  if (is.null(psu_design)) return(NULL)
+  setup$inputs$psu_design <- psu_design
   is_scalar <- function(v) !is.null(v) && is.atomic(v) && length(v) == 1L
   out <- list(
     saved_at = if (is_scalar(setup$saved_at)) as.character(setup$saved_at) else NULL,
@@ -1420,9 +1424,9 @@ ui <- fluidPage(
 
       # ---- Data assessment ----
       h4("Data assessment"),
-      checkboxInput("psu_consistent",
-        tip_label("PSU codes are consistent over time", "Check this if the same PSU identifiers refer to the same sampling units across years. The answer is recorded with the run settings; it does not change the estimates (the cross-year covariance of sampling errors is computed from the PSU codes in the data)."),
-        value = FALSE),
+      radioButtons("psu_design",
+        tip_label("How are PSUs related across years?", "Linked: identifiers (and strata, if used) refer to the same units across years. Independent: the surveys were sampled independently; MFH uses year-specific survey designs and zero cross-year sampling covariance. Not specified: MFH is blocked until the survey design is confirmed. UFH remains available, but its change inference assumes independent years."),
+        choices = sae_psu_design_choices(), selected = "not_specified"),
       tags$hr(),
 
       # ---- LLM settings ----
@@ -1518,13 +1522,14 @@ server <- function(input, output, session) {
   # ---- Link variance and covariance options for MFH ----
   # When the variance option changes, update the available covariance choices
   # so that the smoothing level is consistent.
-  observeEvent(input$mfh_var_choice, {
+  observeEvent(list(input$mfh_var_choice, input$psu_design), {
     vc <- sae_variance_choice(input$mfh_var_choice)
     default_sel <- sae_covariance_choice(var_choice = vc)
     cov_choices <- c(default_sel, "direct", "zero")
+    if (identical(sae_psu_design(input$psu_design), "independent")) cov_choices <- "zero"
     current_sel <- isolate(input$mfh_cov_choice)
     selected <- if (length(current_sel) == 1L && current_sel %in% cov_choices)
-      current_sel else default_sel
+      current_sel else cov_choices[1L]
     updateSelectInput(session, "mfh_cov_choice",
                       choices = cov_choices, selected = selected)
   })
@@ -2516,7 +2521,7 @@ server <- function(input, output, session) {
       }
     }
     inputs <- sae_setup_variance_inputs(inputs)
-    inputs$mfh_cov_choice <- sae_covariance_choice(input$mfh_cov_choice,
+    inputs$mfh_cov_choice <- if (identical(sae_psu_design(input$psu_design), "independent")) "zero" else sae_covariance_choice(input$mfh_cov_choice,
                                                    inputs$mfh_var_choice)
     inputs$povline_numeric_by_year <- get_povline_numeric_by_year(parse_years(inputs$years))
     if (length(inputs$povline_numeric_by_year) > 0L) {
@@ -2564,6 +2569,7 @@ server <- function(input, output, session) {
   apply_dashboard_setup <- function(setup, label = "saved setup") {
     defaults <- dashboard_setup_defaults()
     setup <- setup %||% defaults
+    setup$inputs$psu_design <- sae_psu_design(setup$inputs$psu_design, setup$inputs$psu_consistent)
     variance_notice <- sae_setup_variance_notice(setup)
     # Read the prices choice before the defaults are filled in: setups saved
     # before w5k have only deflate_welfare, and the default welfare_prices
@@ -2573,6 +2579,7 @@ server <- function(input, output, session) {
     # saved sm_out/direct variance retains its matching rho option.
     setup$inputs <- modifyList(defaults$inputs,
                                sae_setup_variance_inputs(setup$inputs))
+    if (setup$inputs$psu_design == "independent") setup$inputs$mfh_cov_choice <- "zero"
     setup$data_files <- modifyList(defaults$data_files, setup$data_files %||% list())
 
     restoring_setup(TRUE)
@@ -2730,8 +2737,8 @@ server <- function(input, output, session) {
                     value = x$mfh_candidates_y1 %||% "")
     updateTextInput(session, "mfh_candidates_y2",
                     value = x$mfh_candidates_y2 %||% "")
-    updateCheckboxInput(session, "psu_consistent",
-                        value = isTRUE(x$psu_consistent))
+    updateRadioButtons(session, "psu_design",
+                       selected = sae_psu_design(x$psu_design))
     updateCheckboxInput(session, "llm_enabled",
                         value = isTRUE(x$llm_enabled))
     updateCheckboxInput(session, "llm_external_consent", value = FALSE)
@@ -3780,7 +3787,7 @@ server <- function(input, output, session) {
       input$regional_benchmark_file, input$population_file,
       input$var_year, input$var_domain, input$var_psu,
       input$var_weight, input$var_strata, input$var_hh_size,
-      input$survey_unit, input$var_hh_id,
+      input$survey_unit, input$var_hh_id, input$psu_design,
       input$var_benchmark_level, input$var_welfare, input$var_povline,
       input$rhs_domain, input$shp_domain,
       # Poverty-line config
@@ -3898,7 +3905,7 @@ server <- function(input, output, session) {
     append_log(sprintf("Validation complete: %d flag(s)", length(flags$flags)))
 
     # Year-variable checks (pre-harmonization) - mirrors the logic inside run_btn.
-    year_msgs <- character()
+    year_msgs <- sae_psu_readiness_messages(input$psu_design, input$steps)
     survey_raw_check <- tryCatch(sae_read_table_input(survey_for_validation, "Survey data"), error = function(e) NULL)
     rhs_raw_check    <- tryCatch(sae_read_table_input(rhs_for_validation, "Auxiliary covariates"), error = function(e) NULL)
     year_var_name    <- var_map$year
@@ -4258,7 +4265,8 @@ server <- function(input, output, session) {
     # Only missing values use the new defaults. Explicit saved alternatives
     # and the legacy selective-smoothing alias retain their meaning.
     mfh_var_val <- sae_variance_choice(input$mfh_var_choice)
-    mfh_cov_val <- sae_covariance_choice(input$mfh_cov_choice, mfh_var_val)
+    mfh_cov_val <- if (identical(sae_psu_design(input$psu_design), "independent")) "zero" else
+      sae_covariance_choice(input$mfh_cov_choice, mfh_var_val)
 
     if (!is.null(harmonized)) {
       validation_survey <- filter_to_analysis_years(harmonized$survey, years)
@@ -4269,7 +4277,7 @@ server <- function(input, output, session) {
 
       # Data readiness assessment
       # -- Pre-harmonization checks: year variable in raw data --
-      year_msgs <- character()
+      year_msgs <- sae_psu_readiness_messages(input$psu_design, input$steps)
       survey_raw_check <- tryCatch(sae_read_table_input(survey_for_validation, "Survey data"), error = function(e) NULL)
       rhs_raw_check    <- tryCatch(sae_read_table_input(rhs_for_validation, "Auxiliary covariates"), error = function(e) NULL)
       year_var_name    <- var_map$year  # the user-specified year column name
@@ -4483,7 +4491,7 @@ server <- function(input, output, session) {
           candidate_vars_y2 = mfh_candidates_y2
         ),
         steps               = input$steps,
-        psu_consistent_user = isTRUE(input$psu_consistent)
+        psu_design = sae_psu_design(input$psu_design)
       )
       dir.create("outputs/data", showWarnings = FALSE, recursive = TRUE)
       dir.create("outputs/tables", showWarnings = FALSE, recursive = TRUE)
@@ -4645,6 +4653,7 @@ server <- function(input, output, session) {
     }
 
     mfh_cfg <- list(
+      psu_design              = sae_psu_design(input$psu_design),
       survey_path             = survey_path,
       rhs_path                = rhs_path,
       shp_path                = shp_path,

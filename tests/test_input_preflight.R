@@ -125,7 +125,7 @@ local({
   source("app_support.R", local = TRUE)
   sv_path <- file.path(work, "survey.rds"); ax_path <- file.path(work, "aux.rds"); geo_path <- file.path(work, "geo.rds")
   saveRDS(incomplete, sv_path); saveRDS(auxiliary, ax_path); saveRDS(data.frame(domain = auxiliary$domain), geo_path)
-  mc <- list(survey_path = sv_path, rhs_path = ax_path, shp_path = geo_path, rhs_domain = "domain",
+  mc <- list(psu_design = "linked", survey_path = sv_path, rhs_path = ax_path, shp_path = geo_path, rhs_domain = "domain",
     var_map = list(domain = "domain", year = "year", welfare = "welfare", povline = "povline", weight = "weight", hh_size = "hh_size", psu = "psu"),
     do_benchmark = FALSE, population_path = missing_file, benchmark_target_path = missing_file)
   cfg <- list(years_keep = years, run = list(steps = "MFH"), mfh = mc)

@@ -14,6 +14,32 @@ local({
   eligibility <- Filter(function(x) is.call(x) && identical(x[[1]], as.name("<-")) &&
     identical(x[[2]], as.name("ai_eligible")), driver)[[1L]]
   root <- getwd()
+  source("R/brief_generator.R", local = TRUE)
+  make_summary <- function(cv, mse) list(`2022` = list(cv_median = cv,
+    cv_max = cv, mse_median = mse, n_cv_above_25pct = 0))
+  for (pair in list(c(10, 5), c(5, 10), c(5, 5), c(NA, NA), c(Inf, 5))) {
+    text <- paste(format_comparison_section(4, make_summary(.2, pair[1]),
+      make_summary(.1, pair[2])), collapse = "\n")
+    verify(!grepl("indicating more accurate|generally preferred|improved precision from", text) &&
+      grepl("do not establish model accuracy", text, fixed = TRUE) &&
+      grepl("matched domains", text, fixed = TRUE) &&
+      grepl("covariance-boundary", text, fixed = TRUE),
+      paste("legacy comparison qualifies lower, equal or unavailable estimated MSE:", paste(pair, collapse = "/")))
+  }
+  captured_prompt <- NULL
+  # Exercise the actual brief/AI entry without making a provider request.
+  brief_env <- new.env(parent = environment())
+  source("R/brief_generator.R", local = brief_env)
+  brief_env$format_model_section <- function(...) "Synthetic model diagnostics"
+  brief <- brief_env$generate_analysis_brief(list(), list(), NULL,
+    llm = list(enabled = TRUE, query = function(prompt) {
+      captured_prompt <<- prompt; "Review requires comparable evidence."
+    }), ufh_diagnostics = list(), mfh_diagnostics = list(),
+    ufh_bench = make_summary(.2, 10), mfh_bench = make_summary(.1, 5))
+  verify(grepl("lower median estimated MSE", brief$template_brief, fixed = TRUE) &&
+    grepl("insufficient evidence", captured_prompt, fixed = TRUE) &&
+    !grepl("State which approach is better|accuracy \\(MSE\\)", captured_prompt),
+    "legacy AI brief preserves conditional precision language without forcing a winner")
   fixture <- tempfile("ai_recommendation_")
   dir.create(file.path(fixture, "outputs/data"), recursive = TRUE)
   dir.create(file.path(fixture, "outputs/tables"), recursive = TRUE)

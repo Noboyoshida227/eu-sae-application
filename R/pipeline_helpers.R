@@ -1420,6 +1420,80 @@ sae_percent_change <- function(m1, m2, mse1, mse2, mse_diff, alpha = 0.05,
 # each person as many times as there are members in the household. With
 # survey_unit = "person" the household size is set to 1, so population_weight
 # equals the survey weight.
+# Cross-year sampling design is an explicit analyst declaration. An unchecked
+# legacy checkbox never established independent sampling.
+sae_psu_design <- function(x = NULL, legacy_consistent = NULL) {
+  if (is.null(x) || !length(x) || (length(x) == 1L &&
+      (is.na(x) || !nzchar(trimws(as.character(x)))))) {
+    return(if (isTRUE(legacy_consistent)) "linked" else "not_specified")
+  }
+  x <- as.character(x)
+  if (length(x) != 1L || !x %in% c("linked", "independent", "not_specified")) {
+    stop("PSU design must be linked, independent or not_specified.", call. = FALSE)
+  }
+  x
+}
+
+sae_config_psu_design <- function(cfg) {
+  sae_psu_design(cfg$mfh$psu_design %||% cfg$psu_design,
+                 cfg$mfh$psu_consistent %||% cfg$psu_consistent)
+}
+
+sae_require_psu_design <- function(choice) {
+  choice <- sae_psu_design(choice)
+  if (identical(choice, "not_specified")) {
+    stop(paste0("MFH requires a specified cross-year PSU design. Confirm linked PSU identifiers ",
+      "or independently sampled surveys. If overlap is unknown or cannot be linked, ",
+      "obtain survey-design advice before estimating cross-year sampling covariance. ",
+      "An unchecked legacy setting does not mean independent sampling."), call. = FALSE)
+  }
+  choice
+}
+
+sae_psu_design_choices <- function() c(
+  "Not specified: overlap exists but cannot be linked, or I am unsure" = "not_specified",
+  "Same identifiers represent the same PSUs across years" = "linked",
+  "The two surveys are independently sampled" = "independent")
+
+sae_psu_design_label <- function(choice) {
+  choices <- sae_psu_design_choices()
+  names(choices)[match(sae_psu_design(choice), unname(choices))]
+}
+
+sae_psu_readiness_messages <- function(choice, steps) {
+  choice <- sae_psu_design(choice)
+  if (!"MFH" %in% (steps %||% c("UFH", "MFH", "Comparison"))) {
+    return("PSU design: UFH change inference assumes independent years; overlap may require expert assessment.")
+  }
+  problem <- tryCatch({ sae_require_psu_design(choice); NULL },
+                      error = function(e) conditionMessage(e))
+  if (!is.null(problem)) return(paste("PSU design: ERROR --", problem))
+  if (choice == "independent") return(paste(
+    "PSU design: independent surveys; year-specific designs and zero cross-year sampling covariance.",
+    "This does not constrain the MFH random-effect covariance."))
+  "PSU design: linked identifiers; confirm that PSU and stratum codes retain the same meaning across years."
+}
+
+sae_mfh_survey_design <- function(data, psu_design, use_strata = FALSE) {
+  psu_design <- sae_require_psu_design(psu_design)
+  if (anyNA(data$psu) || anyNA(data$year)) stop("PSU and year identifiers must be nonmissing.")
+  stratified <- isTRUE(use_strata) && "strata" %in% names(data)
+  if (stratified && anyNA(data$strata)) stop("Mapped strata must be nonmissing.")
+  if (psu_design == "independent") {
+    # Year-specific strata keep each year's PSU count and variance correction;
+    # merely renaming PSUs in a pooled unstratified design would not do this.
+    data$.sae_psu <- interaction(data$year, if (stratified) data$strata else 1,
+                                  data$psu, drop = TRUE)
+    data$.sae_strata <- interaction(data$year, if (stratified) data$strata else 1,
+                                     drop = TRUE)
+    return(survey::svydesign(ids = ~.sae_psu, strata = ~.sae_strata,
+      weights = ~population_weight, data = data, nest = TRUE))
+  }
+  if (stratified) return(survey::svydesign(ids = ~psu, strata = ~strata,
+    weights = ~population_weight, data = data, nest = TRUE))
+  survey::svydesign(ids = ~psu, weights = ~population_weight, data = data)
+}
+
 sae_survey_unit <- function(x) {
   x <- tolower(trimws(as.character(x %||% "household")[1]))
   if (is.na(x) || !x %in% c("household", "person")) "household" else x

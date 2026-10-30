@@ -11,8 +11,8 @@
 #
 #   Change maps (later year minus earlier year, growth rates, anything
 #               with a meaningful zero):
-#               diverging blue - white - red centred on zero --
-#               blue = decrease, white = no change, red = increase.
+#               diverging blue - light grey - red centred on zero --
+#               blue = decrease, light grey = no change, red = increase.
 #
 #   Domains without a value are drawn in light grey in both cases.
 #
@@ -66,7 +66,7 @@ sae_fill_welfare <- function(name = "Mean welfare (EUR)", horizontal = TRUE, ...
 sae_fill_change <- function(name = "Change", ...) {
   ggplot2::scale_fill_gradient2(
     low      = "#2c7bb6",
-    mid      = "white",
+    mid      = "#D0D0D0",
     high     = "#d7191c",
     midpoint = 0,
     name     = name,
@@ -114,6 +114,6 @@ sae_map_legend_note <- function(kind = c("level", "change")) {
   kind <- match.arg(kind)
   switch(kind,
     level  = "Lighter colours indicate lower values and darker colours higher values; domains without an estimate are grey.",
-    change = "Blue indicates a decrease, white no change and red an increase; domains without an estimate are grey."
+    change = "Blue indicates a decrease, light grey no change and red an increase; domains without an estimate are a paler grey."
   )
 }

@@ -981,7 +981,7 @@ check(identical(sae_ic_criterion_label("BIC", FALSE, "a", NULL), "BIC (Year 2 on
 source("app_support.R")
 ic_cfg <- function(ufh) list(years_keep = c(2012L, 2013L), analysis_seed = 123L,
                              run = list(steps = c("UFH", "MFH")), ufh = ufh,
-                             mfh = list(ic_criterion = "AIC"))
+                             mfh = list(psu_design = "linked", ic_criterion = "AIC"))
 check(isTRUE(validate_app_config(ic_cfg(list(ic_criterion = "none", lasso_enabled = FALSE,
                                              candidate_vars_y1 = "a", candidate_vars_y2 = "b")))$valid) &&
       !isTRUE(validate_app_config(ic_cfg(list(ic_criterion = "none", lasso_enabled = TRUE,
@@ -1046,7 +1046,7 @@ check(grepl("lapply(file.path(figures_root, .figure_subdirs), list.files", cmp_t
       "Comparison clean-up is limited to its own figure subfolders")
 check(isTRUE(validate_app_config(list(years_keep = c(2012L, 2013L), analysis_seed = 123L,
                                       run = list(steps = "MFH"),
-                                      mfh = list(variance_lower_multiplier = 5)))$valid),
+                                      mfh = list(psu_design = "linked", variance_lower_multiplier = 5)))$valid),
       "the unused variance_lower_multiplier setting no longer blocks a run")
 
 # ---- Mean welfare: price deflation and percentage changes (w5k) ----
@@ -1231,7 +1231,7 @@ check(is.null(sae_price_factors(.pi_real, c(2012L, 2013L))) &&
         identical(sae_price_basis_label(list(enabled = FALSE), c(2012L, 2013L)),
                   "current prices (not deflated)") &&
         isTRUE(validate_app_config(list(years_keep = c(2012L, 2013L), analysis_seed = 123L,
-                                        indicator_type = "mean_welfare", price_index = .pi_real))$valid),
+                                        indicator_type = "mean_welfare", run = list(steps = "UFH"), price_index = .pi_real))$valid),
       "welfare already in constant prices: no price index, no conversion, labelled as such")
 # GPT-6 Astra review (5 Oct 2026): an old setup with the constant-prices box
 # ticked must restore as "convert" (read before defaults are merged), and the
@@ -1656,7 +1656,7 @@ local({
 for (.method_test in c("test_ufh_methodology.R", "test_mfh_bootstrap_methodology.R",
                        "test_mfh_convergence.R", "test_methodology_simulation.R",
                        "test_ufh_reporting.R", "test_w5p_mfh_plots.R",
-                       "test_input_preflight.R", "test_variance_defaults.R", "test_ai_recommendation.R", "test_navigation.R")) {
+                       "test_input_preflight.R", "test_psu_design.R", "test_variance_defaults.R", "test_ai_recommendation.R", "test_navigation.R")) {
   source(file.path("tests", .method_test), local = new.env(parent = globalenv()))
 }
 

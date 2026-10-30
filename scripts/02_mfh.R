@@ -131,6 +131,7 @@ if (nzchar(cfg_path) && file.exists(cfg_path)) {
 }
 mfh_cfg <- sae_resolve_method_input_config(cfg, "mfh")
 cfg$mfh <- mfh_cfg
+psu_design <- sae_require_psu_design(sae_config_psu_design(cfg))
 
 if (!exists("%||%", mode = "function")) {
   `%||%` <- function(x, y) {
@@ -741,22 +742,10 @@ survey_step1 <- survey_dt %>%
 # ---- Define Survey Design ----
 # Direct poverty/indicator estimates are person-weighted by expanding each
 # sampled household by household size: population_weight = weight * hh_size.
-if (isTRUE(use_strata) && "strata" %in% names(survey_step1) && any(!is.na(survey_step1$strata))) {
+if (isTRUE(use_strata) && "strata" %in% names(survey_step1)) {
   survey_step1$strata <- sae_strata_codes(survey_step1$strata, context = "MFH survey design")
-  des <- svydesign(
-    ids     = ~psu,
-    strata  = ~strata,
-    weights = ~population_weight,
-    data    = survey_step1,
-    nest    = TRUE
-  )
-} else {
-  des <- svydesign(
-    ids     = ~psu,
-    weights = ~population_weight,
-    data    = survey_step1
-  )
 }
+des <- sae_mfh_survey_design(survey_step1, psu_design, use_strata)
 
 # ---- Direct estimates: Domain x Year ----
 dir_est_domain_long <- svyby(
@@ -999,6 +988,8 @@ rho_12 <- if (!is.null(rn) && !is.null(cn) && y1_chr %in% rn && y2_chr %in% cn) 
 } else {
   R_nat_nolink[1, 2]
 }
+
+if (psu_design == "independent") rho_12 <- 0
 
 # Keep objects if you want diagnostics
 nat_cov_no_link <- V_nat_nolink
@@ -1454,7 +1445,8 @@ cov_menu <- list(
 
 # 3) Choose which variance and covariance definitions to use
 var_choice <- sae_variance_choice(mfh_cfg$var_choice)
-cov_choice <- sae_covariance_choice(mfh_cfg$cov_choice, var_choice)
+cov_choice <- if (psu_design == "independent") "zero" else
+  sae_covariance_choice(mfh_cfg$cov_choice, var_choice)
 
 # 4) Build the chosen column-name vector (to pass downstream)
 vardir_cols <- c(var_menu[[var_choice]], cov_menu[[cov_choice]])
@@ -1762,6 +1754,7 @@ saveRDS(
     fit_skipped      = .fit_skipped,
     var_choice       = var_choice,
     cov_choice       = cov_choice,
+    psu_design       = psu_design,
     vardir_cols       = vardir_cols,
     bad_vardir_rows   = .n_bad_rows,
     excluded_domains  = .excluded_domains,
@@ -1780,6 +1773,9 @@ saveRDS(
 if (file.exists(.run_metadata_path)) {
   .run_metadata <- tryCatch(readRDS(.run_metadata_path), error = function(e) NULL)
   if (is.list(.run_metadata)) {
+    .run_metadata$psu_design <- psu_design
+    .run_metadata$psu_design_label <- sae_psu_design_label(psu_design)
+    .run_metadata$mfh_cov_choice <- cov_choice
     .run_metadata$mfh_requested_model <- diag_model_requested
     .run_metadata$mfh_selected_model <- diag_model
     .run_metadata$mfh_inference_status <- .inference_status

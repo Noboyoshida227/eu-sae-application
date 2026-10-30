@@ -786,11 +786,6 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
         paste(candidate_vars, collapse = ", "), "\n", sep = "")
   }
 
-  # ---- Sample sizes ----
-  sampsize_dt <- survey_dt |>
-    group_by(domain) |>
-    summarize(N = n())
-
   # ---- Build the LHS the model is fitted on ----
   # For "poverty"      -- pov_indicator is FGT(Î±) computed from welfare+povline
   # For "mean_welfare" -- estimate arithmetic mean welfare before any transformation
@@ -803,6 +798,12 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
     survey_dt <- survey_dt |>
       mutate(pov_indicator = as.numeric(welfare))
   }
+
+  # Count the outcomes used by svymean(na.rm = TRUE), not missing survey
+  # records. This N feeds the GVF and the boundary effective-size fallback.
+  sampsize_dt <- survey_dt |>
+    group_by(domain) |>
+    summarize(N = sum(!is.na(pov_indicator)), .groups = "drop")
 
   # ---- Direct estimation ----
   # Direct poverty/indicator estimates are person-weighted by expanding each
@@ -842,7 +843,8 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
   } else {
     domain_svar <- survey_dt |>
       group_by(domain) |>
-      summarize(var_SRS = var(pov_indicator, na.rm = TRUE) / n(), .groups = "drop")
+      summarize(var_SRS = var(pov_indicator, na.rm = TRUE) /
+                  sum(!is.na(pov_indicator)), .groups = "drop")
     direct_dt <- direct_dt |>
       left_join(domain_svar, by = "domain") |>
       dplyr::mutate(var_SRS = as.numeric(var_SRS))

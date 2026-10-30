@@ -52,7 +52,9 @@ local({
   groups <- data.frame(domain = rhs$domain, region = rep(c("north", "south"), each = 12))
   original_fit <- sae_ufh_fit
   fitted_input <- NULL
+  fitted_data <- NULL
   sae_ufh_fit <- function(...) {
+    fitted_data <<- list(...)$combined_data
     fitted_input <<- original_fit(...)
     fitted_input
   }
@@ -115,11 +117,51 @@ local({
     zero_direct$variance_audit$working_variance[zero_row] > 0 &&
     is.na(zero_direct$pov_fh$Direct_CV[match("D01", zero_direct$pov_fh$domain)]),
     "production direct-mode backfills zero model variance without changing zero raw variance or unavailable CV")
+  # Missing outcomes must not enter the GVF sample count or the boundary
+  # effective-size fallback. Exercise the actual annual pipeline.
+  missing_data <- survey_input
+  first_rows <- which(missing_data$domain == "D01")
+  missing_data$welfare[first_rows] <- NA_real_
+  missing_data$welfare[first_rows[1:10]] <- 2
+  missing_data$povline[which(missing_data$domain == "D02")[1:7]] <- NA_real_
+  run_case(data = missing_data, transform = "arcsin")
+  d1 <- match("D01", fitted_data$Domain)
+  d2 <- match("D02", fitted_data$Domain)
+  verify(fitted_data$N[d1] == 10 && fitted_data$n_eff[d1] == 10 &&
+           abs(1 / (4 * fitted_data$n_eff[d1]) - .025) < 1e-12 &&
+           fitted_data$N[d2] == sum(missing_data$domain == "D02") - 7,
+         "arcsine fallback counts observed welfare and poverty-line outcomes only")
+  run_case(data = missing_data, choice = "sm_all")
+  observed_n <- vapply(fitted_data$Domain, function(id) {
+    rows <- missing_data$domain == id
+    sum(!is.na(compute_fgt(missing_data$welfare[rows], missing_data$povline[rows], 0L)))
+  }, numeric(1))
+  missing_direct <- survey::svyby(~outcome, ~domain,
+    make_sae_design(transform(missing_data,
+      outcome = compute_fgt(welfare, povline, 0L))), survey::svymean, na.rm = TRUE)
+  expected_gvf <- varsmoothie_king(fitted_data$Domain,
+    (as.numeric(survey::SE(missing_direct))^2)[
+      match(fitted_data$Domain, missing_direct$domain)], observed_n)
+  verify(all(fitted_data$N == observed_n) &&
+           isTRUE(all.equal(fitted_data$vardir,
+             expected_gvf$var_smooth[match(fitted_data$Domain, expected_gvf$Domain)],
+             tolerance = 1e-12)),
+         "GVF uses observed indicator counts despite missing welfare or poverty lines")
+
   indicator_type <- "mean_welfare"
   welfare_data <- survey_input
   welfare_data$welfare <- 30 + 2 * as.numeric(sub("D", "", welfare_data$domain)) +
     welfare_data$welfare * 3
   run_case(data = welfare_data, choice = "direct")
+  welfare_missing <- welfare_data
+  welfare_missing$welfare[which(welfare_missing$domain == "D01")[1:5]] <- NA_real_
+  run_case(data = welfare_missing, choice = "direct")
+  row <- match("D01", fitted_data$Domain)
+  values <- welfare_missing$welfare[welfare_missing$domain == "D01"]
+  verify(fitted_data$N[row] == sum(!is.na(values)) &&
+           isTRUE(all.equal(fitted_data$var_SRS[row],
+             stats::var(values, na.rm = TRUE) / sum(!is.na(values)))),
+         "mean-welfare SRS variance and sample size share the observed denominator")
   log_transform <- TRUE
   log_case <- run_case(data = welfare_data, choice = "sm_all", benchmark = TRUE)
   log_diagnostic <- build_mse_decomposition(log_case)

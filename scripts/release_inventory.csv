@@ -241,6 +241,7 @@ docs/validation/QER/evidence/integration/spanish_b500_summary.csv
 docs/validation/QER/VALIDATION_RECEIPT.md
 R/workbench_ui.R
 tests/test_survey_unit_groups.R
+tests/test_psu_design.R
 tests/test_variance_defaults.R
 tests/test_ai_recommendation.R
 docs/guidance/MOLINA_ROMERO_DEVIATIONS_w5p.md

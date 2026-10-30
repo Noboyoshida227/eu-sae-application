@@ -11,6 +11,7 @@ supported_languages <- function() c(English = "en", French = "fr")
 root <- if (basename(getwd()) == "tools") ".." else "."
 core <- file.path(root, "app.R")
 .app_dir <- .wiz_app_dir <- normalizePath(root, winslash = "/")
+source(file.path(root, "R", "pipeline_helpers.R"))
 source(file.path(root, "R", "workbench_ui.R"))
 source(file.path(root, "R", "landing_page.R"))
 

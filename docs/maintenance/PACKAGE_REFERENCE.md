@@ -47,7 +47,7 @@ The original `Data/Spain/` is retained in the repository working copy for proven
   finishes as *Stopped by user*.
 - **Maps** use one colour scheme. Level maps (poverty rates, RMSE, mean
   welfare) run from light (lower) to dark (higher); change maps use
-  blue–white–red with white at zero. In the final report, all poverty maps
+  blue–light grey–red with light grey at zero. In the final report, all poverty maps
   (every method, both years) share one legend range, all RMSE maps share
   another, and the poverty-change maps share one range centred on zero, so the
   same colour means the same value on every map of that kind. The UFH and MFH
