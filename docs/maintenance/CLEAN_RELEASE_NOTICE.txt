@@ -1,4 +1,4 @@
-EU SAE candidate 5.2.0-rc.6-wizard.5.18 - reorganized layout
+EU SAE candidate 5.2.0-rc.6-wizard.5.19 - reorganized layout
 Prepared locally for QER review and testing; this build does not publish or upload the package. Whether to publish estimates as official statistics is for each national statistical office to decide.
 Includes only the explicit scripts/release_inventory.csv file list.
 Windows: open Start_Here and run Start_Wizard.bat or Start_Dashboard.bat. Keep Start_Here inside the package.

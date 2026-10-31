@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 5.2.0-rc.6-wizard.5.19 - 2026-10-30
+
+QER-RC3 (`EU_SAE_520_w5s`): a pre-release for quality enhancement review, not for official statistics. It replaces QER-RC2.
+
+- Report how many MFH direct variances were replaced by smoothing, for example `44 of 80`, in the run information table. Estimates are unchanged.
+
 ## 5.2.0-rc.6-wizard.5.18 - 2026-10-30
 
 QER-RC2 (`EU_SAE_520_w5r`): a pre-release for quality enhancement review, not for official statistics. It replaces QER-RC1 after step 4 findings.

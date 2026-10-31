@@ -69,3 +69,12 @@ sae_sm_out_variance <- function(direct_variance,
   direct_variance
 }
 
+# Domain-year cells whose modeled variance is not the direct variance.
+sae_replaced_variance_label <- function(direct_variance, used_variance) {
+  direct_variance <- as.numeric(direct_variance)
+  used_variance <- as.numeric(used_variance)
+  replaced <- !is.finite(direct_variance) | !is.finite(used_variance) |
+    direct_variance != used_variance
+  sprintf("%d of %d", sum(replaced), length(replaced))
+}
+

@@ -1780,6 +1780,9 @@ if (file.exists(.run_metadata_path)) {
     .run_metadata$psu_design <- psu_design
     .run_metadata$psu_design_label <- sae_psu_design_label(psu_design)
     .run_metadata$psu_design_warning <- .psu_overlap_warning
+    .run_metadata$mfh_variances_replaced <- sae_replaced_variance_label(
+      c(all_var_hat_domain_dt$v1, all_var_hat_domain_dt$v2),
+      c(all_var_hat_domain_dt[[vardir_cols[1]]], all_var_hat_domain_dt[[vardir_cols[2]]]))
     .run_metadata$mfh_cov_choice <- cov_choice
     .run_metadata$mfh_requested_model <- diag_model_requested
     .run_metadata$mfh_selected_model <- diag_model

@@ -17,7 +17,7 @@ parse_ok <- vapply(r_files, function(path) {
 check(all(parse_ok), "all R sources parse")
 check(identical(trimws(readLines("VERSION", warn = FALSE)[1]), "5.2.0-rc.6"), "VERSION is the candidate version")
 check(identical(trimws(readLines("WIZARD_VERSION", warn = FALSE)[1]),
-                "5.2.0-rc.6-wizard.5.18"),
+                "5.2.0-rc.6-wizard.5.19"),
       "WIZARD_VERSION identifies the rc.6 wizard overlay")
 wizard_version <- trimws(readLines("WIZARD_VERSION", warn = FALSE)[1])
 changelog_text <- read_all("docs/maintenance/CHANGELOG.md")
@@ -138,7 +138,7 @@ source("R/workbench_ui.R", local = TRUE)
 .res_links <- vapply(sae_resource_links("."), function(l) l$href, character(1))
 wizard_resources <- c(
   "docs/guidance/guidelines_v5_2_0_rc6_wizard.pdf",
-  "docs/instructions/English/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_18.pdf",
+  "docs/instructions/English/EU_SAE_Download_Instructions_5_2_0_rc_6_wizard_5_19.pdf",
   "docs/instructions/English/EU_SAE_Workbench_Guide_1_Install_and_Start.pdf",
   "docs/instructions/English/EU_SAE_Workbench_Guide_2_Running_the_Workbench.pdf",
   "docs/instructions/English/EU_SAE_Workbench_Guide_3_Estimating_Poverty_and_Welfare.pdf",

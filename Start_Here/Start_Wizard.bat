@@ -1,7 +1,7 @@
 @echo off
 setlocal DisableDelayedExpansion
 REM ============================================================
-REM  EU SAE Workbench 5.2.0-rc.6-wizard.5.18 - One-click launcher (Windows)
+REM  EU SAE Workbench 5.2.0-rc.6-wizard.5.19 - One-click launcher (Windows)
 REM
 REM  Double-click this file to start the guided version of the Workbench.
 REM  Your default web browser will open with the Workbench.

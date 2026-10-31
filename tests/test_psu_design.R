@@ -141,7 +141,15 @@ local({
   stable <- varsmoothie_king(1:5, c(.02, .018, .015, .004, .002), c(10, 12, 14, 80, 150))
   verify(all(is.finite(stable$var_smooth)) && max(stable$var_smooth) < 1, "ordinary smoothing is unchanged")
   }
+  source("R/variance_policy.R", local = TRUE)
+  verify(identical(sae_replaced_variance_label(c(.01, 0, NA, .02), c(.01, .004, .005, .02)), "2 of 4"),
+         "replaced variances are counted, including zero and missing direct values")
+  verify(identical(sae_replaced_variance_label(c(.01, .02), c(.01, .02)), "0 of 2"),
+         "unchanged variances are not counted")
   mfh_lines <- readLines("scripts/02_mfh.R", encoding = "UTF-8")
+  verify(any(grepl("mfh_variances_replaced", readLines("report.Rmd", encoding = "UTF-8"), fixed = TRUE)) &&
+           any(grepl("mfh_variances_replaced", mfh_lines, fixed = TRUE)),
+         "MFH records and the report shows the replaced-variance count")
   verify(which(grepl("sae_psu_overlap_warning", mfh_lines, fixed = TRUE)) <
            which(grepl("des <- sae_mfh_survey_design", mfh_lines, fixed = TRUE)) &&
            any(grepl("psu_design_warning", readLines("report.Rmd", encoding = "UTF-8"), fixed = TRUE)),
