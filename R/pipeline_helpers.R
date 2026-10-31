@@ -1446,9 +1446,15 @@ sae_require_psu_design <- function(choice) {
       "or independently sampled surveys. If overlap is unknown or cannot be linked, ",
       "obtain survey-design advice before estimating cross-year sampling covariance. ",
       "An unchecked legacy setting does not mean independent sampling. ",
-      "To run UFH alone, deselect MFH."), call. = FALSE)
+      "To run UFH alone, select only UFH."), call. = FALSE)
   }
   choice
+}
+
+# Comparison reads the UFH and MFH outputs of the same run.
+sae_comparison_steps_error <- function(steps) {
+  if (!"Comparison" %in% steps || all(c("UFH", "MFH") %in% steps)) return(character())
+  "Comparison requires both UFH and MFH in the same run. Select both, or remove Comparison."
 }
 
 sae_psu_design_choices <- function() c(

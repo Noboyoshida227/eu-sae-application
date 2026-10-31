@@ -64,6 +64,12 @@ varsmoothie_king <- function(domain,
   dt$pred_var <- predict(lm_model, newdata = dt)
   residual_var <-  summary(lm_model)$sigma^2
   dt$var_smooth <- exp(dt$pred_var) * exp(residual_var/2)
+  if (any(!is.finite(dt$var_smooth)) || max(dt$var_smooth) > 1e6 * max(training$var)) {
+    stop("Variance smoothing failed: predicted variances are far above every direct variance. ",
+         "This usually means most domain estimates are exactly 0 or 1, so too few positive ",
+         "variances remain to fit the smoothing model. Review the indicator and the domains.",
+         call. = FALSE)
+  }
   
   return(dt[, c("Domain", "var_smooth"), with = F])
   

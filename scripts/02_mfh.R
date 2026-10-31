@@ -1739,7 +1739,8 @@ saveRDS(
     years_keep       = years_keep,
     selected_model   = selected_model,
     convergence_check = .mfh_conv_tbl,
-    formula          = mfh_formula,
+    # A formula keeps its creating environment; do not save survey rows with it.
+    formula          = lapply(mfh_formula, function(f) { environment(f) <- globalenv(); f }),
     diag_model_requested = diag_model_requested,
     diag_model       = diag_model,
     variance_structure_selection = .mfh_variance_selection,

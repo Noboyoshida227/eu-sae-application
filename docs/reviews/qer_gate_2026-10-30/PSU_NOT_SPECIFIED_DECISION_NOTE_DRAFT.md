@@ -169,3 +169,5 @@ Applied to the working tree on 30 October 2026, uncommitted.
 | 8. Documentation | Done, except that the Polish and Greek Guide 2 PDFs still show old text. PowerPoint here cannot open those decks, including the committed Polish version, so the PDFs were not regenerated. The new Polish and Greek slide text needs a native speaker's review and a render check |
 
 **Rerun check:** `run_config_sm_out.yml` matched its saved outputs in 22 of 22 CSV tables, and `run_config_mean_welfare_sm_out.yml` in 20 of 20. The other four configurations pass validation but were not rerun. Acceptance criterion 6 stays open until the frozen-candidate rerun.
+
+**Update for QER-RC2:** step 4 showed that "deselect MFH" left UFH plus Comparison, which cannot run. The message now says to select only UFH, and Comparison without both models is rejected. The Polish and Greek Guide 2 PDFs are regenerated. The translated slide text still needs a native speaker’s review.

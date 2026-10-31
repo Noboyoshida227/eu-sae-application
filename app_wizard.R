@@ -1437,6 +1437,7 @@ wizard_server <- function(input, output, session) {
     if (length(input$steps) == 0L) {
       msgs <- c(msgs, "Select at least one pipeline step (UFH, MFH or Comparison).")
     }
+    msgs <- c(msgs, sae_comparison_steps_error(input$steps))
     if (isTRUE(input$do_benchmark) &&
         identical(input$benchmark_level %||% "national", "custom")) {
       if (wiz_is_blank(input$var_benchmark_level)) {

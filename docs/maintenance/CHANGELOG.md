@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 5.2.0-rc.6-wizard.5.18 - 2026-10-30
+
+QER-RC2 (`EU_SAE_520_w5r`): a pre-release for quality enhancement review, not for official statistics. It replaces QER-RC1 after step 4 findings.
+
+- Stop saving survey rows in `outputs/data/mfh_artifacts.rds`. Saved MFH formulas kept their creating environment, which held row-level data and identifiers.
+- Reject Comparison unless UFH and MFH run together, in validation, readiness and the wizard, in place of a raw file error. The MFH block message now says to select only UFH.
+- Stop with a clear message when variance smoothing predicts values more than a million times above every direct variance, which can happen when most domain estimates are exactly 0 or 1. Ordinary runs are unaffected.
+- Repair all six Polish and Greek guide decks, which PowerPoint could not open because some paragraphs had duplicate properties, and regenerate their PDFs, including the Guide 2 PSU slide.
+
 ## 5.2.0-rc.6-wizard.5.17 - 2026-10-30
 
 QER-RC1 (`EU_SAE_520_w5q`): a pre-release for quality enhancement review, not for official statistics.

@@ -35,6 +35,12 @@
       "new": "Check PSU meanings across years and choose the cross-year PSU design and sampling-covariance option accordingly. MFH does not run while the design is not specified.",
       "locator": "Annex workflow, PSU design",
       "count": 1
+    },
+    {
+      "old": "With Not specified, MFH does not run; to run UFH alone, deselect MFH.",
+      "new": "With Not specified, MFH does not run; to run UFH alone, select only UFH, because Comparison needs both models.",
+      "locator": "Section 11, Step 4 cross-year PSU design, UFH-only route",
+      "count": 1
     }
   ]
 }

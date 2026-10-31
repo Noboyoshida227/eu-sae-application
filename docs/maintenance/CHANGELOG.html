@@ -18,6 +18,14 @@ details{margin:22px 0;padding:15px 20px;background:var(--wash)}summary{cursor:po
 @media print{header{padding:10px 0;background:white;color:black}nav{display:none}main{padding:0}a{color:black}h2,h3{break-after:avoid}.catalogue-item,tr{break-inside:avoid}.steps{display:block}}
 </style></head><body><main><nav><a href="../INDEX.html">Documentation catalogue</a></nav><h1 id="changelog">Changelog</h1>
 <h2 id="unreleased">Unreleased</h2>
+<h2 id="520-rc6-wizard518---2026-10-30">5.2.0-rc.6-wizard.5.18 - 2026-10-30</h2>
+<p>QER-RC2 (<code>EU_SAE_520_w5r</code>): a pre-release for quality enhancement review, not for official statistics. It replaces QER-RC1 after step 4 findings.</p>
+<ul>
+<li>Stop saving survey rows in <code>outputs/data/mfh_artifacts.rds</code>. Saved MFH formulas kept their creating environment, which held row-level data and identifiers.</li>
+<li>Reject Comparison unless UFH and MFH run together, in validation, readiness and the wizard, in place of a raw file error. The MFH block message now says to select only UFH.</li>
+<li>Stop with a clear message when variance smoothing predicts values more than a million times above every direct variance, which can happen when most domain estimates are exactly 0 or 1. Ordinary runs are unaffected.</li>
+<li>Repair all six Polish and Greek guide decks, which PowerPoint could not open because some paragraphs had duplicate properties, and regenerate their PDFs, including the Guide 2 PSU slide.</li>
+</ul>
 <h2 id="520-rc6-wizard517---2026-10-30">5.2.0-rc.6-wizard.5.17 - 2026-10-30</h2>
 <p>QER-RC1 (<code>EU_SAE_520_w5q</code>): a pre-release for quality enhancement review, not for official statistics.</p>
 <ul>

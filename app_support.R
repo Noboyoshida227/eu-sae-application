@@ -67,6 +67,7 @@ validate_app_config <- function(cfg) {
                           error = function(e) conditionMessage(e))
     if (!is.null(psu_error)) errs <- c(errs, psu_error)
   }
+  errs <- c(errs, sae_comparison_steps_error(steps))
   bad_steps <- setdiff(steps, c("UFH", "MFH", "Comparison"))
   if (length(bad_steps) > 0) {
     errs <- c(errs, paste0("Invalid run steps: ", paste(bad_steps, collapse = ", ")))

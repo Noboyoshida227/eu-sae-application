@@ -28,8 +28,17 @@ local({
     verify(identical(sae_config_psu_design(yaml::read_yaml(path)), "linked"),
            paste("bundled config declares linked PSUs:", basename(path)))
   }
-  verify(grepl("deselect MFH", sae_psu_readiness_messages("not_specified", "MFH"), fixed = TRUE),
+  verify(grepl("select only UFH", sae_psu_readiness_messages("not_specified", "MFH"), fixed = TRUE),
          "blocked MFH message explains how to run UFH alone")
+  for (steps in list("UFH", "MFH", c("UFH", "MFH"), c("UFH", "MFH", "Comparison"))) {
+    verify(!length(sae_comparison_steps_error(steps)), paste("steps allowed:", toString(steps)))
+  }
+  for (steps in list("Comparison", c("UFH", "Comparison"), c("MFH", "Comparison"))) {
+    cfg$mfh <- list(psu_design = "linked"); cfg$run$steps <- steps
+    verify(!validate_app_config(cfg)$valid &&
+             grepl("both UFH and MFH", paste(validate_app_config(cfg)$errors, collapse = " ")),
+           paste("incomplete comparison is rejected:", toString(steps)))
+  }
   verify(grepl("ERROR", sae_psu_readiness_messages("not_specified", "MFH")) &&
            !grepl("ERROR", sae_psu_readiness_messages("not_specified", "UFH")),
          "readiness blocks only MFH when design is unspecified")
@@ -114,6 +123,24 @@ local({
     mfh_options = list(cov_choice = "direct"), psu_design = "independent")
   verify(grepl("**Covariance option:** zero", note, fixed = TRUE),
          "data note reports effective rather than overridden covariance")
+  # A saved formula must not carry the survey rows through its environment.
+  saved_formula <- local({
+    rows <- data.frame(secret = seq_len(50000))
+    y ~ x
+  })
+  environment(saved_formula) <- globalenv()
+  verify(length(serialize(saved_formula, NULL)) < 2000, "cleared formula environment is small")
+  verify(any(grepl("environment(f) <- globalenv()", readLines("scripts/02_mfh.R", encoding = "UTF-8"), fixed = TRUE)),
+         "MFH artifacts clear formula environments")
+  if (requireNamespace("data.table", quietly = TRUE)) {
+  suppressPackageStartupMessages(library(data.table))
+  source("scripts/ufh_functions.R", local = TRUE)
+  explode <- data.frame(n = c(800, 900, 1000, 10, 12), v = c(1e-2, 1e-4, 1e-7, 0, 0))
+  verify(inherits(try(varsmoothie_king(1:5, explode$v, explode$n), silent = TRUE), "try-error"),
+         "variance smoothing stops when predictions explode")
+  stable <- varsmoothie_king(1:5, c(.02, .018, .015, .004, .002), c(10, 12, 14, 80, 150))
+  verify(all(is.finite(stable$var_smooth)) && max(stable$var_smooth) < 1, "ordinary smoothing is unchanged")
+  }
   mfh_lines <- readLines("scripts/02_mfh.R", encoding = "UTF-8")
   verify(which(grepl("sae_psu_overlap_warning", mfh_lines, fixed = TRUE)) <
            which(grepl("des <- sae_mfh_survey_design", mfh_lines, fixed = TRUE)) &&

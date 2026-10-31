@@ -1,6 +1,6 @@
 # EU SAE Workbench — guided version (wizard)
 
-Wizard version: **5.2.0-rc.6-wizard.5.17**
+Wizard version: **5.2.0-rc.6-wizard.5.18**
 Underlying EU SAE package: **5.2.0-rc.6**
 
 w5p validates consumed population/target keys and MFH panel completeness before output cleanup. Named matrix years are matched by label; duplicate required keys are rejected. UFH exports raw Direct uncertainty and separately records its working variances in `outputs/tables/ufh_variance_audit.csv`. Standalone MFH figures retain pointwise and inference-status qualifications. See [methodological departures and their justification](../../guidance/MOLINA_ROMERO_DEVIATIONS_w5p.md) and the [fresh validation receipt](../../validation/W5P_VALIDATION_RECEIPT.md).
@@ -153,7 +153,7 @@ Required fields carry a red asterisk.
    strata and forces cross-year sampling-error covariance to zero. This does
    not force the MFH random-effect covariance to zero. Choose **Not specified**
    when overlap is unknown or cannot be linked; MFH is blocked pending design
-   advice. To run UFH alone, deselect MFH; its change inference assumes independent
+   advice. To run UFH alone, select only UFH, because Comparison needs both models; its change inference assumes independent
    years. If linked PSUs are chosen but none is shared across years, readiness and
    the report give a warning. Identical code values alone do not establish linkage or independence.
    Old unchecked settings load as **Not specified**; old checked settings load

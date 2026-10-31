@@ -1,6 +1,6 @@
 EU SAE WORKBENCH - APPLICATION PACKAGE RELEASE NOTICE
 
-Wizard overlay version: 5.2.0-rc.6-wizard.5.17
+Wizard overlay version: 5.2.0-rc.6-wizard.5.18
 Underlying package version: 5.2.0-rc.6
 
 This w5p local review candidate repairs matrix-year/key validation, pre-run
