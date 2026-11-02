@@ -33,7 +33,7 @@ This register lists the method choices where reviewers' judgment matters most. T
 - **Evidence:** the correlation now averages .464 against .467. Linked change coverage rose from 84.0% to 90.9%, and actual change MSE fell 8%.
 - **Sensitivity on cases:** Spain poverty .561 to .555, no flips. Spain mean welfare .677 to .763, change MSE ratio .81, 1 flip of 52. R5a .748 to .307, change MSE ratio 2.13, 4 flips of 40.
 - **Limits:** tested in a scenario with no strata. Surveys whose strata cross domains were not simulated. A single pooled correlation assumes domains are alike. Correlation-limit fits rose from 1 to 4 of the cases.
-- **Note status:** `03_Technical_references` holds a revised draft of the note, with tracked changes against the earlier version. It is submitted for the sampling experts' review and has not been agreed. The application ZIP keeps the earlier note.
+- **Note status:** The emailed ZIP holds a revised draft of the note, with tracked changes against the earlier version. It is submitted for the sampling experts' review and has not been agreed. The application ZIP keeps the earlier note.
 
 **Questions for experts:** Is the residual correlation the right quantity for stratified designs? Where domains are similar to strata, does it remain close to the true correlation? Should a domain-varying correlation be considered?
 

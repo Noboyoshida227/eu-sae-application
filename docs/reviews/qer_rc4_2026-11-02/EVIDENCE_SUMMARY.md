@@ -128,7 +128,7 @@ The within-domain correlation estimator tracked the truth with and without house
 
 ## D. Historical evidence
 
-These dated studies keep their original scope. See `MCPE_VALIDATION_STATUS.md`, `Historical_QER_VALIDATION_RECEIPT.md` and `W5P_VALIDATION_RECEIPT.md` in `04_Validation_evidence`.
+These dated studies keep their original scope. In the application ZIP, see `docs/validation/MCPE_VALIDATION_STATUS.md`, `docs/validation/QER/VALIDATION_RECEIPT.md` and `docs/validation/W5P_VALIDATION_RECEIPT.md`.
 
 - The 2,100-outer-simulation MFH2 study used fixed covariates and known sampling covariances. Nominal 95% absolute-change coverage was about 94.3-94.9% in ordinary scenarios, 87.4% in a low-signal scenario and 65.2% among correlation-limit fits. Its known-input design is why it looks better than section A.
 - The October 28 and 29 receipts describe earlier code, and they are not results for RC4.

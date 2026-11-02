@@ -13,27 +13,25 @@ Reviewers should assess fidelity to the reference, the justification and evidenc
 ## What to know first
 
 - **Coverage is below target in simulation.** In the known-truth simulation on this candidate, nominal 95% intervals covered 88.3-88.7% for levels and 90.9-91.5% for change. Bias was negligible. Stated uncertainty is too small, mainly because estimated direct variances are noisy and treated as known.
-- **The sampling correlation changed in this candidate.** It is now estimated from within-domain residuals. The package includes a revised draft of the sampling-covariance note for expert review, with Section 8 rewritten to match. See decision D1.
+- **The sampling correlation changed in this candidate.** It is now estimated from within-domain residuals. The emailed ZIP includes a revised draft of the sampling-covariance note for expert review, with Section 8 rewritten to match. See decision D1.
 - **Coverage for the full workflow is not established.** Model selection and benchmarking were not simulated.
 
 ## Package and release status
 
-Application: `EU_SAE_520_w5t`, version `5.2.0-rc.6-wizard.5.20`, commit `b8eaac3`, ZIP SHA-256 `4a680028d2ba53ada01a6c4eb3633719ae8b62530621002a985df1420ae4630e`. This package holds review materials only: no runnable application code and no example data. The application ZIP is distributed separately. In that distribution, open `Start_Here/START_HERE.html`.
+Application: `EU_SAE_520_w5t`, version `5.2.0-rc.6-wizard.5.20`, commit `b8eaac3`, ZIP SHA-256 `4a680028d2ba53ada01a6c4eb3633719ae8b62530621002a985df1420ae4630e`. The emailed ZIP holds review materials only: no runnable application code and no example data. The application ZIP is distributed separately on the [GitHub release page](https://github.com/Noboyoshida227/eu-sae-application/releases/tag/v5.2.0-rc.6-wizard.5.20). In that distribution, open `Start_Here/START_HERE.html`.
 
 The reference is the privately supplied January 29, 2025 manuscript, not a 2015 publication. The manuscript and the authors' code are not included. The additional-code inventory is a functional account of Workbench additions, not a verified file-by-file difference from the authors' code.
 
-Copied documents come from the frozen RC4 archive, so a few statements in them are out of date. The review ledger lists these under "Known document issues". The sampling-covariance note is the exception: the package holds the revised draft, while the application ZIP keeps the earlier version until the note is agreed. See `PACKAGE_PROVENANCE.json` for sources and `PACKAGE_MANIFEST.csv` for file hashes.
+Copied documents come from the frozen RC4 archive, so a few statements in them are out of date. The review ledger lists these under "Known document issues". The sampling-covariance note is the exception: the emailed ZIP holds the revised draft, while the application ZIP keeps the earlier version until the note is agreed.
 
-## Folder structure
+## Where to find the materials
 
 | Location | Contents and use |
 |---|---|
-| README.html and README.pdf | This guide |
-| 01_Email_attachments | Guidelines, deviations note, additional-code inventory, validation summary, decision register, review ledger, quick start, installation instructions and reviewer form |
-| 02_User_guides | Guides 1, 2 and 3 in English, Polish and Greek. Native review of the Polish and Greek slide text is pending |
-| 03_Technical_references | Revised draft of the sampling-covariance note, as tracked changes and as a clean PDF; MSE note, robust MFH2 note and companion covariance derivations |
-| 04_Validation_evidence | Dated validation records, which keep their original scope |
-| 05_Editable_sources | Markdown sources. Relative links in them are for provenance |
+| Emailed ZIP | This guide, guidelines, deviations note, additional-code inventory, validation summary, decision register, review ledger, quick start, installation instructions, reviewer form, and the revised draft of the sampling-covariance note as tracked changes and as a clean PDF |
+| Application ZIP, `docs/instructions/English`, `Polish` and `Greek` | Guides 1, 2 and 3. Native review of the Polish and Greek slide text is pending |
+| Application ZIP, `docs/guidance/Technical notes` | MSE note, robust MFH2 note and companion covariance derivations. It also holds the earlier sampling-covariance note: use the draft in the emailed ZIP instead |
+| Application ZIP, `docs/validation` | Dated validation records, which keep their original scope |
 
 ## Review responsibilities
 
@@ -44,7 +42,7 @@ Copied documents come from the frozen RC4 archive, so a few statements in them a
 | Ifeanyi Nzegwu Edochie | MFH code and general comments on the user interface |
 | Sylvia Harmening | UFH code, including transformations and uncertainty; additional MFH comments |
 | Ervin Dervisevic | Application code, reliability, maintainability and workflow integration |
-| Giulio Barcaroli | Sampling design and estimation of the sampling-error covariance matrix |
+| Giulio Barcaroli | Sampling design and estimation of the sampling-error covariance matrix, including the revised method for the covariance of sampling errors in the draft note |
 | Maarten Lambrechts | Interface design, navigation, clarity of settings and presentation of results |
 
 ## Suggested reading routes
