@@ -1,6 +1,6 @@
 # EU SAE Workbench — guided version (wizard)
 
-Wizard version: **5.2.0-rc.6-wizard.5.19**
+Wizard version: **5.2.0-rc.6-wizard.5.20**
 Underlying EU SAE package: **5.2.0-rc.6**
 
 w5p validates consumed population/target keys and MFH panel completeness before output cleanup. Named matrix years are matched by label; duplicate required keys are rejected. UFH exports raw Direct uncertainty and separately records its working variances in `outputs/tables/ufh_variance_audit.csv`. Standalone MFH figures retain pointwise and inference-status qualifications. See [methodological departures and their justification](../../guidance/MOLINA_ROMERO_DEVIATIONS_w5p.md) and the [fresh validation receipt](../../validation/W5P_VALIDATION_RECEIPT.md).
@@ -170,7 +170,8 @@ Required fields carry a red asterisk.
 The default variance option is **`sm_out`** for identity/log UFH and MFH: each
 direct variance is kept unless it is missing/non-finite or strictly below 0.001.
 MFH defaults to **`rho_sm_out`** for the corresponding pooled-correlation
-covariance. **`sm_all`** replaces all working variances with GVF predictions.
+covariance; the correlation is estimated at PSU level after removing each
+domain-year mean, and the report shows it. **`sm_all`** replaces all working variances with GVF predictions.
 Because the GVF uses sample size only, it gives areas of similar size similar
 variances whatever their poverty rate, so it can overstate the variances of
 low-poverty areas; use it when direct variances are broadly unstable and the GVF

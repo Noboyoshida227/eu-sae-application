@@ -69,6 +69,26 @@ sae_sm_out_variance <- function(direct_variance,
   direct_variance
 }
 
+# Outcome minus its weighted domain-year mean, for the pooled sampling correlation.
+# With PSU-clustered designs the cross-year covariance of these residuals keeps
+# household overlap and PSU persistence, and drops lasting differences between
+# domains, which belong to the model and are not sampling error of a domain.
+sae_within_domain_residual <- function(y, domain, year, weights) {
+  y <- as.numeric(y)
+  weights <- as.numeric(weights)
+  used <- is.finite(y) & is.finite(weights)
+  group <- interaction(domain, year, drop = TRUE)
+  total <- rowsum(ifelse(used, y * weights, 0), group, reorder = FALSE)
+  weight <- rowsum(ifelse(used, weights, 0), group, reorder = FALSE)
+  index <- match(as.character(group), rownames(total))
+  y - as.numeric(total[index, 1]) / as.numeric(weight[index, 1])
+}
+
+sae_sampling_correlation_label <- function(correlation, unadjusted, psu_design) {
+  if (identical(psu_design, "independent")) return("0, independently sampled surveys")
+  sprintf("%.3f within domains (%.3f before removing domain means)", correlation, unadjusted)
+}
+
 # Domain-year cells whose modeled variance is not the direct variance.
 sae_replaced_variance_label <- function(direct_variance, used_variance) {
   direct_variance <- as.numeric(direct_variance)

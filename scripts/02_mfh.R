@@ -802,8 +802,8 @@ dir_est_domain_all_years <- dir_est_domain_all_years %>%
 all_var_hat_domain_dt <- dir_est_domain_all_years %>%
   transmute(
     domain      = as.character(domain),
-    v1          = .data[[mse_cols[1]]],
-    v2          = .data[[mse_cols[2]]],
+    v1          = sae_zero_rounding_variance(.data[[mse_cols[1]]]),
+    v2          = sae_zero_rounding_variance(.data[[mse_cols[2]]]),
     !!N_cols[1] := .data[[N_cols[1]]],
     !!N_cols[2] := .data[[N_cols[2]]]
   ) %>%
@@ -965,12 +965,22 @@ print(covariances)
 all_var_hat_domain_dt <- all_var_hat_domain_dt %>%
   left_join(covariances, by = "domain")
 
-###### Option 2: Using national correlation coefficient
+###### Option 2: Using a pooled sampling correlation coefficient
+
+# After Boonstra and van den Brakel (2019), the correlation is pooled over
+# domains from residuals. Unlike their overlap formula, it stays at PSU level,
+# so it combines household overlap and PSU persistence.
+.rho_unadjusted <- cov2cor(attr(
+  svyby(~poor, ~year, des, svymean, covmat = TRUE, na.rm = TRUE, vartype = NULL),
+  "var"))[1, 2]
+des_residual <- des
+des_residual$variables$.sae_residual <- sae_within_domain_residual(
+  des$variables$poor, des$variables$domain, des$variables$year, weights(des))
 
 fit_nat_nolink_psu <- svyby(
-  ~poor,
+  ~.sae_residual,
   ~year,
-  des,
+  des_residual,
   svymean,
   covmat  = TRUE,
   na.rm   = TRUE,
@@ -998,7 +1008,7 @@ if (psu_design == "independent") rho_12 <- 0
 nat_cov_no_link <- V_nat_nolink
 nat_cor_no_link <- R_nat_nolink
 
-# Opt 2_1: National correlation coefficient x direct variance estimate.
+# Opt 2_1: Pooled correlation coefficient x direct variance estimate.
 # Use v1_direct / v2_direct (the NA/zero-backfilled safety variants)
 # rather than the raw v1 / v2. This is the covariance paired with
 # `var_choice = "direct"` (whose diagonal uses v1_direct / v2_direct),
@@ -1013,12 +1023,12 @@ all_var_hat_domain_dt$v12_d_nc <-
   rho_12 * sqrt(all_var_hat_domain_dt$v1_direct) *
            sqrt(all_var_hat_domain_dt$v2_direct)
 
-# Option 2_2: National correlation coefficient x variance (outlier-smoothed)
+# Option 2_2: Pooled correlation coefficient x variance (outlier-smoothed)
 all_var_hat_domain_dt$v12_d_ncsm <-
   rho_12 * sqrt(all_var_hat_domain_dt$v1_sm_out) *
            sqrt(all_var_hat_domain_dt$v2_sm_out)
 
-# Option 2_3: National correlation coefficient x fully smoothed variances
+# Option 2_3: Pooled correlation coefficient x fully smoothed variances
 all_var_hat_domain_dt$v12_d_ncsm_all <-
   rho_12 * sqrt(all_var_hat_domain_dt$v1_sm_all) *
            sqrt(all_var_hat_domain_dt$v2_sm_all)
@@ -1034,7 +1044,8 @@ all_var_hat_domain_dt$v12_zero <- 0
 rm(
   svyby_out,          # per-domain svyby() results (already merged)
   covariances,        # merged already
-  fit_nat_nolink_psu  # national svyby() object (used to extract V/R)
+  fit_nat_nolink_psu, # pooled svyby() object (used to extract V/R)
+  des_residual
 )
 
 
@@ -1440,9 +1451,9 @@ var_menu <- list(
 
 cov_menu <- list(
   direct     = "v12_d",           # domain direct covariance (if available)
-  rho_dir    = "v12_d_nc",        # national rho * sqrt(v1*v2)
-  rho_sm_out     = "v12_d_ncsm",      # national rho * sqrt(v1_sm_out*v2_sm_out)
-  rho_sm_all = "v12_d_ncsm_all",  # national rho * sqrt(v1_sm_all*v2_sm_all)
+  rho_dir    = "v12_d_nc",        # pooled rho * sqrt(v1*v2)
+  rho_sm_out     = "v12_d_ncsm",      # pooled rho * sqrt(v1_sm_out*v2_sm_out)
+  rho_sm_all = "v12_d_ncsm_all",  # pooled rho * sqrt(v1_sm_all*v2_sm_all)
   zero       = "v12_zero"         # covariance set to zero
 )
 
@@ -1780,6 +1791,8 @@ if (file.exists(.run_metadata_path)) {
     .run_metadata$psu_design <- psu_design
     .run_metadata$psu_design_label <- sae_psu_design_label(psu_design)
     .run_metadata$psu_design_warning <- .psu_overlap_warning
+    .run_metadata$mfh_sampling_correlation <- sae_sampling_correlation_label(
+      rho_12, .rho_unadjusted, psu_design)
     .run_metadata$mfh_variances_replaced <- sae_replaced_variance_label(
       c(all_var_hat_domain_dt$v1, all_var_hat_domain_dt$v2),
       c(all_var_hat_domain_dt[[vardir_cols[1]]], all_var_hat_domain_dt[[vardir_cols[2]]]))

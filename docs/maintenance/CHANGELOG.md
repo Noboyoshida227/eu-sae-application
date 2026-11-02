@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 5.2.0-rc.6-wizard.5.20 - 2026-11-01
+
+QER-RC4 (`EU_SAE_520_w5t`): a pre-release for quality enhancement review, not for official statistics. It replaces QER-RC3.
+
+- MFH: estimate the pooled sampling correlation after removing each domain-year mean, for `rho_dir`, `rho_sm_out` and `rho_sm_all`. The calculation stays at PSU level, so it keeps household overlap and PSU persistence and no longer counts lasting differences between domains as sampling correlation. **MFH results on same-PSU surveys change.** Independent-design results and UFH models do not use this correlation.
+- Report the correlation, with its unadjusted value, in the run information table.
+- UFH and MFH: treat direct variances that are only rounding residue as zero. Before this, one such domain could stop the run during smoothing, or give an arcsine UFH domain a very large effective sample size.
+- Document known-truth findings in `MCPE_VALIDATION_STATUS.md`, including limits for high-poverty domains and domains with few PSUs.
+
 ## 5.2.0-rc.6-wizard.5.19 - 2026-10-30
 
 QER-RC3 (`EU_SAE_520_w5s`): a pre-release for quality enhancement review, not for official statistics. It replaces QER-RC2.

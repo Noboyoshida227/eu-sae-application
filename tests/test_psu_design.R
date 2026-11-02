@@ -140,10 +140,44 @@ local({
          "variance smoothing stops when predictions explode")
   stable <- varsmoothie_king(1:5, c(.02, .018, .015, .004, .002), c(10, 12, 14, 80, 150))
   verify(all(is.finite(stable$var_smooth)) && max(stable$var_smooth) < 1, "ordinary smoothing is unchanged")
+  rounded <- c(.02, 7.5e-35, .015, .004, .002, .01); sizes <- c(10, 12, 14, 80, 150, 40)
+  verify(identical(sae_zero_rounding_variance(rounded)[2], 0), "rounding residue becomes zero")
+  verify(identical(sae_zero_rounding_variance(c(1e6, 1e-3))[2], 1e-3), "small real variances are kept")
+  verify(near(varsmoothie_king(1:6, rounded, sizes)$var_smooth,
+              varsmoothie_king(1:6, replace(rounded, 2, 0), sizes)$var_smooth),
+         "rounding residue does not enter the smoothing fit")
   }
   source("R/variance_policy.R", local = TRUE)
   verify(identical(sae_replaced_variance_label(c(.01, 0, NA, .02), c(.01, .004, .005, .02)), "2 of 4"),
          "replaced variances are counted, including zero and missing direct values")
+  verify(near(sae_within_domain_residual(c(1, 3, 10, NA), c("a", "a", "b", "b"), 1, c(1, 1, 2, 2)), c(-1, 1, 0, NA)),
+         "within-domain residuals remove the weighted domain-year mean and keep missing values")
+  if (requireNamespace("survey", quietly = TRUE)) {
+    set.seed(20261101)
+    domains <- 40L; psus <- 8L; households <- 6L
+    domain_level <- rep(rnorm(domains, 0, 1), each = psus)
+    psu_effect <- rnorm(domains * psus, 0, .3)
+    make_year <- function(year) data.frame(year = year, domain = rep(rep(seq_len(domains), each = psus), each = households),
+      psu = rep(seq_len(domains * psus), each = households), population_weight = 1,
+      poor = rep(domain_level + sqrt(.7) * psu_effect + rnorm(domains * psus, 0, .3 * sqrt(.3)), each = households) +
+        rnorm(domains * psus * households, 0, .4))
+    panel <- rbind(make_year(1L), make_year(2L))
+    design <- survey::svydesign(ids = ~psu, weights = ~population_weight, data = panel)
+    correlation_of <- function(d, f) stats::cov2cor(attr(survey::svyby(f, ~year, d, survey::svymean,
+      covmat = TRUE, vartype = NULL), "var"))[1, 2]
+    design$variables$.sae_residual <- sae_within_domain_residual(
+      design$variables$poor, design$variables$domain, design$variables$year, weights(design))
+    truth <- .7 * .09 / (.09 + .16 / households)
+    pooled <- correlation_of(design, ~.sae_residual)
+    verify(abs(pooled - truth) < .1, "pooled correlation recovers the within-domain sampling correlation")
+    verify(correlation_of(design, ~poor) > .9, "unadjusted correlation absorbs lasting domain differences")
+  }
+  verify(identical(sae_sampling_correlation_label(.1234, .5, "linked"), "0.123 within domains (0.500 before removing domain means)"),
+         "report shows the sampling correlation and its unadjusted value")
+  mfh_source <- readLines("scripts/02_mfh.R", encoding = "UTF-8")
+  verify(any(grepl("~.sae_residual", mfh_source, fixed = TRUE)) && any(grepl("mfh_sampling_correlation", mfh_source, fixed = TRUE)) &&
+           any(grepl("mfh_sampling_correlation", readLines("report.Rmd", encoding = "UTF-8"), fixed = TRUE)),
+         "MFH uses the residual correlation and the report shows it")
   verify(identical(sae_replaced_variance_label(c(.01, .02), c(.01, .02)), "0 of 2"),
          "unchanged variances are not counted")
   mfh_lines <- readLines("scripts/02_mfh.R", encoding = "UTF-8")

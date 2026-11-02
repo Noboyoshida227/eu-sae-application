@@ -41,12 +41,22 @@ fgt_label <- function(alpha = 0L) {
 #' 
 #' @export
 
+# A domain whose PSUs give identical values has zero variance, which survey
+# arithmetic can leave as rounding residue such as 7.5e-35. Keep it at zero.
+sae_zero_rounding_variance <- function(variance) {
+  variance <- as.numeric(variance)
+  finite <- is.finite(variance)
+  if (!any(finite)) return(variance)
+  variance[finite & abs(variance) <= 1e-20 * max(abs(variance[finite]))] <- 0
+  variance
+}
+
 varsmoothie_king <- function(domain,
                              direct_var,
                              sampsize){
   
   dt <- data.table(Domain = domain,
-                   var = direct_var,
+                   var = sae_zero_rounding_variance(direct_var),
                    n = sampsize)
   
   if (any(!is.finite(dt$n) | dt$n <= 0)) stop("GVF requires positive finite sample sizes.")
@@ -66,8 +76,9 @@ varsmoothie_king <- function(domain,
   dt$var_smooth <- exp(dt$pred_var) * exp(residual_var/2)
   if (any(!is.finite(dt$var_smooth)) || max(dt$var_smooth) > 1e6 * max(training$var)) {
     stop("Variance smoothing failed: predicted variances are far above every direct variance. ",
-         "This usually means most domain estimates are exactly 0 or 1, so too few positive ",
-         "variances remain to fit the smoothing model. Review the indicator and the domains.",
+         "This usually means too few positive direct variances remain to fit the smoothing ",
+         "model, for example when most domain estimates are exactly 0 or 1. Review the ",
+         "indicator and the domains.",
          call. = FALSE)
   }
   

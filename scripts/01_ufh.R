@@ -814,7 +814,7 @@ run_fh_year <- function(yr, survey_all, rhs_dt_raw, shp_dt,
 
   direct_dt <- var_dt |>
     rename(direct_povrate = "pov_indicator", SD = "se") |>
-    mutate(vardir = SD^2,
+    mutate(vardir = sae_zero_rounding_variance(SD^2),
            CV = .safe_cv(SD, direct_povrate)) |>
     merge(sampsize_dt, by = "domain")
   # Preserve survey-design uncertainty on the reported indicator scale before

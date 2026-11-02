@@ -259,3 +259,19 @@ and alternative admissible models before external conclusions, and report
 sensitivity when results are near a decision threshold. Increasing draw
 counts is not a remedy for this limitation. Do not describe the process as
 uniformly validated or certified, and do not inflate MSEs to fit this study.
+
+## Survey-based known-truth studies, QER-RC3 and QER-RC4, November 2026
+
+These studies simulate survey rows, then use production direct estimates, variances, sampling correlation, `sm_out` smoothing, REML and the joint bootstrap, with 60 domains of 4 to 18 PSUs and 500 draws. They exclude model selection and benchmarking. They describe one synthetic scenario, not real surveys. Intervals target 95%.
+
+On QER-RC3, with a continuous outcome and 2,000 samples per design, MFH2 level coverage was 88.1% (linked) and 88.7% (independent), and change coverage was 84.2% and 91.4%. Bias was negligible.
+
+Paired 100-sample diagnostics, not gate evidence, found three causes:
+
+- The unadjusted national correlation counted lasting differences between domains as sampling correlation: .67 against a true .47. QER-RC4 removes domain-year means first.
+- Direct variances are noisy and, without strata that separate domains, about (n-1)/n of their true value, for n PSUs in a domain. This is not changed and is the main shortfall for levels.
+- With a 0/1 poverty outcome, coverage in domains at or above 30% poverty stayed near 85-88% even with true sampling inputs, and low-poverty domains were over-covered. UFH showed the same pattern. The likely cause, not tested, is a common random-effect variance on the rate scale.
+
+With the poverty outcome and residual correlation, linked MFH2 level and change coverage were 92.8% and 92.5%. UFH with no transformation gave 92.7% and 96.5%, and arcsine UFH gave 90.1% and 94.0%. MFH2 had 5% lower level MSE and 14-26% lower change MSE than UFH. UFH change intervals are conservative when years are correlated, because they assume period independence. Arcsine change coverage partly reflects offsetting errors.
+
+`sm_all` raised average coverage, but moved variances further from the truth at every poverty level, so it is not recommended as a remedy.

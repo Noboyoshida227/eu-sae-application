@@ -1,0 +1,76 @@
+{
+  "docs/guidance/guidelines_v5_2_0_rc6_wizard.docx": [
+    {
+      "insert_after": "Cross-year PSU design update (after w5p, October 2026).",
+      "new": "Sampling correlation update (QER-RC4, November 2026). The rho_dir, rho_sm_out and rho_sm_all options now estimate the sampling-error correlation after removing each domain-year mean. The calculation stays at PSU level, so it keeps household overlap and PSU persistence, but lasting differences between domains no longer inflate it. Direct variances that are only rounding residue are treated as zero. MFH results on same-PSU surveys therefore differ from earlier releases. In known-truth simulations of one synthetic scenario, intervals stayed too narrow in high-poverty domains and in domains with few PSUs, and UFH change intervals were conservative when the years were correlated. See the MCPE validation status note.",
+      "locator": "Release-candidate update, pooled sampling correlation",
+      "count": 1
+    },
+    {
+      "old": "a single national average autocorrelation of the sampling errors and multiply",
+      "new": "a single autocorrelation of the sampling errors, pooled over domains, and multiply",
+      "locator": "Section 6, covariance estimation",
+      "count": 1
+    },
+    {
+      "old": "The national-correlation options adapt",
+      "new": "The pooled-correlation options adapt",
+      "locator": "Section 6, pooled-correlation options",
+      "count": 1
+    },
+    {
+      "old": "the national sampling-error correlation is estimated from the full sample and combined with domain variances on the selected basis.",
+      "new": "the sampling-error correlation is estimated from the full sample at PSU level after removing each domain-year mean, and combined with domain variances on the selected basis. This keeps household overlap and PSU persistence, and excludes lasting differences between domains, which the model should capture.",
+      "locator": "Section 6, pooled-correlation calculation",
+      "count": 1
+    },
+    {
+      "old": "the nationally pooled sampling-correlation strategy of",
+      "new": "the pooled sampling-correlation strategy of",
+      "locator": "Pooled strategy wording, all sections",
+      "count": 5
+    },
+    {
+      "old": "Use one national sampling-error correlation with",
+      "new": "Use one pooled sampling-error correlation with",
+      "locator": "Covariance option table",
+      "count": 3
+    },
+    {
+      "old": "combining a national sampling-error correlation with selectively",
+      "new": "combining a pooled sampling-error correlation with selectively",
+      "locator": "Section 6, MFH covariance default",
+      "count": 1
+    },
+    {
+      "old": "combines a national sampling-error correlation with selectively",
+      "new": "combines a pooled sampling-error correlation with selectively",
+      "locator": "Annex H, covariance options",
+      "count": 1
+    },
+    {
+      "old": "as a single national correlation applied to each domain",
+      "new": "as a single correlation pooled over domains and applied to each domain",
+      "locator": "Annex G.8, covariance options",
+      "count": 1
+    },
+    {
+      "old": "The national-correlation approach adapts",
+      "new": "The pooled-correlation approach adapts",
+      "locator": "Pooled approach wording",
+      "count": 2
+    },
+    {
+      "old": "the national-correlation options, including",
+      "new": "the pooled-correlation options, including",
+      "locator": "Annex H, responsibility",
+      "count": 1
+    },
+    {
+      "old": "zero covariance, and national-correlation options.",
+      "new": "zero covariance, and pooled-correlation options.",
+      "locator": "Annex H, covariance options list",
+      "count": 1
+    }
+  ]
+}
