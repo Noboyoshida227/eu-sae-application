@@ -10,7 +10,7 @@ This register lists the method choices where reviewers' judgment matters most. T
 
 | # | Decision | Status | Main expert |
 |---|---|---|---|
-| D1 | Sampling correlation from within-domain residuals | Owner decided November 1, 2026; departs from Section 8 of the owner's note | Barcaroli |
+| D1 | Sampling correlation from within-domain residuals | Owner decided November 1, 2026; revised note drafted for expert review | Barcaroli |
 | D2 | Direct variances treated as known | Standing; shortfall measured | Barcaroli, Tzavidis |
 | D3 | Selective smoothing, `sm_out`, by default | Owner decided October 29, 2026 | Molina, Tzavidis |
 | D4 | Common random-effect variance on the rate scale | Open | Molina, Tzavidis |
@@ -26,14 +26,14 @@ This register lists the method choices where reviewers' judgment matters most. T
 ## D1. Sampling correlation from within-domain residuals
 
 - **Molina and Romero:** treat estimated domain sampling covariance matrices as known inputs (p20).
-- **Owner's note, Section 8:** multiply the correlation of the national direct estimator by the domain standard errors.
-- **Implementation in QER-RC4:** subtract each domain-year weighted mean, then run the same PSU-level national survey calculation on the residuals. The result, the pooled correlation, is multiplied by each domain's two standard errors. RC3 and earlier used Section 8 as written.
+- **Earlier version of the owner's note, Section 8:** multiply the correlation of the national direct estimator by the domain standard errors.
+- **Implementation in QER-RC4:** subtract each domain-year weighted mean, then run the same PSU-level national survey calculation on the residuals. The result, the pooled correlation, is multiplied by each domain's two standard errors. RC3 and earlier used the earlier Section 8 as written.
 - **Relationship to the literature:** this adapts the pooled residual approach of Boonstra and van den Brakel (2019), sections 3.2 and 3.3. Their domain-specific overlap factor is deliberately left out, because an overlap-only correlation misses PSU persistence. The owner's sampling experts confirmed that the PSU-level survey calculation captures both household overlap and PSU persistence.
 - **Why it changed:** without strata that separate domains, the national correlation counts lasting differences between domains as sampling correlation. In simulation it gave .67 against a true .47 for the continuous outcome, .49 against .20 for poverty, and about .42 when nothing at all carried across years.
 - **Evidence:** the correlation now averages .464 against .467. Linked change coverage rose from 84.0% to 90.9%, and actual change MSE fell 8%.
 - **Sensitivity on cases:** Spain poverty .561 to .555, no flips. Spain mean welfare .677 to .763, change MSE ratio .81, 1 flip of 52. R5a .748 to .307, change MSE ratio 2.13, 4 flips of 40.
 - **Limits:** tested in a scenario with no strata. Surveys whose strata cross domains were not simulated. A single pooled correlation assumes domains are alike. Correlation-limit fits rose from 1 to 4 of the cases.
-- **Note status:** the note in `03_Technical_references` still describes the national correlation. It needs revising with the sampling experts.
+- **Note status:** `03_Technical_references` holds a revised draft of the note, with tracked changes against the earlier version. It is submitted for the sampling experts' review and has not been agreed. The application ZIP keeps the earlier note.
 
 **Questions for experts:** Is the residual correlation the right quantity for stratified designs? Where domains are similar to strata, does it remain close to the true correlation? Should a domain-varying correlation be considered?
 

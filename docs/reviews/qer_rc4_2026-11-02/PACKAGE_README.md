@@ -13,7 +13,7 @@ Reviewers should assess fidelity to the reference, the justification and evidenc
 ## What to know first
 
 - **Coverage is below target in simulation.** In the known-truth simulation on this candidate, nominal 95% intervals covered 88.3-88.7% for levels and 90.9-91.5% for change. Bias was negligible. Stated uncertainty is too small, mainly because estimated direct variances are noisy and treated as known.
-- **The sampling correlation changed in this candidate.** It is now estimated from within-domain residuals. This departs from Section 8 of the sampling-covariance note in `03_Technical_references`, which still describes the national correlation. See decision D1.
+- **The sampling correlation changed in this candidate.** It is now estimated from within-domain residuals. The package includes a revised draft of the sampling-covariance note for expert review, with Section 8 rewritten to match. See decision D1.
 - **Coverage for the full workflow is not established.** Model selection and benchmarking were not simulated.
 
 ## Package and release status
@@ -22,7 +22,7 @@ Application: `EU_SAE_520_w5t`, version `5.2.0-rc.6-wizard.5.20`, commit `b8eaac3
 
 The reference is the privately supplied January 29, 2025 manuscript, not a 2015 publication. The manuscript and the authors' code are not included. The additional-code inventory is a functional account of Workbench additions, not a verified file-by-file difference from the authors' code.
 
-Copied documents come from the frozen RC4 archive, so a few statements in them are out of date. The review ledger lists these under "Known document issues". See `PACKAGE_PROVENANCE.json` for sources and `PACKAGE_MANIFEST.csv` for file hashes.
+Copied documents come from the frozen RC4 archive, so a few statements in them are out of date. The review ledger lists these under "Known document issues". The sampling-covariance note is the exception: the package holds the revised draft, while the application ZIP keeps the earlier version until the note is agreed. See `PACKAGE_PROVENANCE.json` for sources and `PACKAGE_MANIFEST.csv` for file hashes.
 
 ## Folder structure
 
@@ -31,7 +31,7 @@ Copied documents come from the frozen RC4 archive, so a few statements in them a
 | README.html and README.pdf | This guide |
 | 01_Email_attachments | Guidelines, deviations note, additional-code inventory, validation summary, decision register, review ledger, quick start, installation instructions and reviewer form |
 | 02_User_guides | Guides 1, 2 and 3 in English, Polish and Greek. Native review of the Polish and Greek slide text is pending |
-| 03_Technical_references | Sampling-covariance and MSE notes, robust MFH2 note and companion covariance derivations |
+| 03_Technical_references | Revised draft of the sampling-covariance note, as tracked changes and as a clean PDF; MSE note, robust MFH2 note and companion covariance derivations |
 | 04_Validation_evidence | Dated validation records, which keep their original scope |
 | 05_Editable_sources | Markdown sources. Relative links in them are for provenance |
 
@@ -55,7 +55,7 @@ All reviewers: this guide, `Validation_summary.pdf`, `Decision_register.pdf` and
 - **Ifeanyi:** additional-code inventory, MFH bootstrap and robust fitting sections, MSE and robust MFH2 notes, and the matching code.
 - **Sylvia:** additional-code inventory, guidelines on UFH transformations, benchmarking and uncertainty, MSE note, decision D9 and D11, and the matching code.
 - **Ervin:** additional-code inventory, review ledger, installation and user guides, validation evidence, and the frozen source release.
-- **Giulio:** sampling-error covariance note, decisions D1, D2 and D6, and the variance policy discussion.
+- **Giulio:** revised sampling-error covariance note, including the questions at the end of its Section 8 evidence subsection, decisions D1, D2 and D6, and the variance policy discussion.
 - **Maarten:** quick start and Guides 1 to 3, then the public or synthetic example in the application.
 
 ## Questions and feedback
