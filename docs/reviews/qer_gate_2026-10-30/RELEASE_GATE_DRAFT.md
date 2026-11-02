@@ -159,6 +159,8 @@ Passing a comparison shows agreement with that reference, not validity of the me
 | Partly overlapping design | Same, under each available declaration | Reported as evidence for QER, no pass mark |
 | Full workflow with benchmarking | Same | **Scope and time need owner decision** |
 
+**Owner change, 1 November 2026:** for QER-RC4 the independent and linked targets ran 500 outer samples per design instead of 2,000, so that results reach the team by 3 November 2026. The achieved Monte Carlo SE was .13 to .17 points, inside the 0.5-point aim, and the band is unchanged.
+
 The band is a flagging rule based on simulation precision and was not tuned to earlier results. The published low-signal and boundary scenarios fall outside it, so the owner must decide how they are presented. The proposed approach is disclosure to QER, not a pass.
 
 ## 7. Data locality
