@@ -28,7 +28,7 @@ Copied documents come from the frozen RC4 archive, so a few statements in them a
 
 | Location | Contents and use |
 |---|---|
-| Emailed ZIP | This guide, guidelines, deviations note, additional-code inventory, validation summary, decision register, review ledger, quick start, installation instructions, reviewer form, and the revised draft of the sampling-covariance note as tracked changes and as a clean PDF |
+| Emailed ZIP | This guide, guidelines, deviations note, additional-code inventory, validation summary, decision register, review ledger, quick start, installation instructions, reviewer form, the revised draft of the sampling-covariance note as tracked changes and as a clean PDF, and a plain guide to the known-truth validation |
 | Application ZIP, `docs/instructions/English`, `Polish` and `Greek` | Guides 1, 2 and 3. Native review of the Polish and Greek slide text is pending |
 | Application ZIP, `docs/guidance/Technical notes` | MSE note, robust MFH2 note and companion covariance derivations. It also holds the earlier sampling-covariance note: use the draft in the emailed ZIP instead |
 | Application ZIP, `docs/validation` | Dated validation records, which keep their original scope |
@@ -47,7 +47,7 @@ Copied documents come from the frozen RC4 archive, so a few statements in them a
 
 ## Suggested reading routes
 
-All reviewers: this guide, `Validation_summary.pdf`, `Decision_register.pdf` and the short deviations note. Comments outside your primary area are welcome.
+All reviewers: this guide, `Validation_summary.pdf`, `Decision_register.pdf` and the short deviations note. If simulation studies are new to you, start with `Known_truth_validation_note.docx`. Comments outside your primary area are welcome.
 
 - **Isabel and Nikos:** guidelines, deviations note, decision register D1 to D5 and D7 to D10, then the relevant technical notes.
 - **Ifeanyi:** additional-code inventory, MFH bootstrap and robust fitting sections, MSE and robust MFH2 notes, and the matching code.
