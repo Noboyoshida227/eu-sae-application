@@ -20,6 +20,7 @@ Class follows the gate: blocker, non-blocking defect, or optional enhancement. M
 | F4 | UFH differs from `sae::eblupFH` beyond tolerance | RC1 | Non-blocking, proposed | Open: decision register D11 |
 | F5 | Reports did not say how many variances were replaced | RC1 | Non-blocking, proposed | Fixed in RC3 |
 | F6 | Polish and Greek Guide 2 PDFs showed old text | RC1 | Non-blocking, proposed | Fixed in RC2; native review of slide text pending |
+| F8 | UFH selection stops with a raw "computationally singular" error when candidates include very large columns such as population counts, with LASSO off. No estimates are produced. Reported by a country team on an older version; the selection code is unchanged in RC4, and synthetic data gave the same stop in 5 of 5 samples and none with counts logged | RC4 | Non-blocking, proposed | Open. It does not meet the gate's "clear stop" wording. Workaround: remove or log such columns, or use a fixed formula. MFH selection not checked. A fix changes estimation code, so it needs a new candidate |
 | C1 | National correlation overstated without strata that separate domains | RC3 simulation | Methodological | Changed in RC4: decision register D1 |
 | C2 | All four coverage results below 93-97% | RC3 and RC4 | Gate flag | Open: decision register D2, D4, D5 |
 | C3 | High-poverty coverage near 85-88% even with true inputs | RC3 exploratory | Methodological | Open: decision register D4 |

@@ -81,6 +81,10 @@ One synthetic continuous outcome with no strata. Not covered: model selection, b
 
 The correlation can rise as well as fall. Selected MFH2 fits at the correlation limit rose from 1 to 4 of the cases (S2g 25%, 50% and 75%, and S6b). All four carry the boundary-sensitive label and the report warns, but their intervals and significance labels are still shown. Change MSE falls in those fits, with a median ratio of .44 in S2g 25%.
 
+### Finding after the step 4 run
+
+A country team's UFH run on an older version stopped with a raw "computationally singular" error, with arcsine, BIC, LASSO off and 86 numeric candidates on 52 domains. The selection code is unchanged in RC4. On synthetic data of that shape on RC4, 5 of 5 samples stopped with the same error when population counts were left as they were, and 5 of 5 finished when the counts were logged. This is a strong match, not proof, because the team's data were not examined. It is finding F8 in the review ledger.
+
 ## B. Exploratory studies on QER-RC3, November 1, 2026
 
 These used 100 paired samples per version, with changes applied only inside test scripts. They explain the gate results but are not gate evidence.
