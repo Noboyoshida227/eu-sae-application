@@ -72,6 +72,7 @@ The gate's §8 final AI review on the frozen candidate has not been run.
 These are in the frozen candidate, so they stay until a later candidate.
 
 - The sampling-covariance note inside the application ZIP still describes the national correlation in Section 8. The emailed ZIP holds a revised draft for expert review, and the ZIP will take the agreed version in a later candidate.
+- The guidelines and Guide 2 inside the application ZIP do not explain the AI recommendation on UFH or MFH. The emailed ZIP holds updated versions: guidelines Section 13.5 and the Step 5 slide of Guide 2.
 - The deviations note still says that the release "remains an uncommitted local review candidate". RC4 is committed and tagged.
 - The deviations note and `MCPE_VALIDATION_STATUS.md` were frozen before the gate simulation, so they do not hold its results. See `Validation_summary.pdf`.
 - `QER_README.md` inside the application folder describes historical studies and adds no coverage evidence for RC4.

@@ -22,14 +22,14 @@ Application: `EU_SAE_520_w5t`, version `5.2.0-rc.6-wizard.5.20`, commit `b8eaac3
 
 The reference is the privately supplied January 29, 2025 manuscript, not a 2015 publication. The manuscript and the authors' code are not included. The additional-code inventory is a functional account of Workbench additions, not a verified file-by-file difference from the authors' code.
 
-Copied documents come from the frozen RC4 archive, so a few statements in them are out of date. The review ledger lists these under "Known document issues". The sampling-covariance note is the exception: the emailed ZIP holds the revised draft, while the application ZIP keeps the earlier version until the note is agreed.
+Copied documents come from the frozen RC4 archive, so a few statements in them are out of date. The review ledger lists these under "Known document issues". The sampling-covariance note is the exception: the emailed ZIP holds the revised draft, while the application ZIP keeps the earlier version until the note is agreed. The guidelines and Guide 2 are also updated after the freeze, to explain the AI recommendation; use the emailed versions.
 
 ## Where to find the materials
 
 | Location | Contents and use |
 |---|---|
-| Emailed ZIP | This guide, guidelines, deviations note, additional-code inventory, validation summary, decision register, review ledger, quick start, installation instructions, reviewer form, the revised draft of the sampling-covariance note as tracked changes and as a clean PDF, and a plain guide to the known-truth validation |
-| Application ZIP, `docs/instructions/English`, `Polish` and `Greek` | Guides 1, 2 and 3. Native review of the Polish and Greek slide text is pending |
+| Emailed ZIP | This guide, guidelines with the new Section 13.5 on AI assistance, Guide 2 in English with the updated Step 5 slide, deviations note, additional-code inventory, validation summary, decision register, review ledger, quick start, installation instructions, reviewer form, the revised draft of the sampling-covariance note as tracked changes and as a clean PDF, and a plain guide to the known-truth validation |
+| Application ZIP, `docs/instructions/English`, `Polish` and `Greek` | Guides 1, 2 and 3. Their Guide 2 predates the updated Step 5 slide. Native review of the Polish and Greek slide text is pending |
 | Application ZIP, `docs/guidance/Technical notes` | MSE note, robust MFH2 note and companion covariance derivations. It also holds the earlier sampling-covariance note: use the draft in the emailed ZIP instead |
 | Application ZIP, `docs/validation` | Dated validation records, which keep their original scope |
 
@@ -63,8 +63,9 @@ All reviewers: this guide, `Validation_summary.pdf`, `Decision_register.pdf` and
 3. Is the within-domain sampling correlation sound, and what should replace or extend it for stratified or partly overlapping designs?
 4. How should the coverage shortfall be addressed or disclosed, especially for domains with few PSUs and high poverty?
 5. Are transformations, benchmarking and conditional bootstrap limitations sufficiently explained and validated?
-6. Which numerical or statistical issues require resolution before broader use, especially low-signal and covariance-boundary inference?
-7. Can government analysts understand the settings, identify unsuitable results and retain a reproducible record?
+6. Are the optional AI interpretations and UFH-or-MFH recommendation useful to analysts, and are their safeguards and limits adequate (guidelines Section 13.5)?
+7. Which numerical or statistical issues require resolution before broader use, especially low-signal and covariance-boundary inference?
+8. Can government analysts understand the settings, identify unsuitable results and retain a reproducible record?
 
 Use `Reviewer_feedback_template.docx`, one finding page per issue. Cite the section or the code file and function, describe the consequence, and separate observed defects from requests for evidence and suggested enhancements. Return it to [COORDINATOR EMAIL] by [FEEDBACK DEADLINE]. Do not send confidential microdata; use a public or synthetic reproducer or a permitted aggregate description.
 
