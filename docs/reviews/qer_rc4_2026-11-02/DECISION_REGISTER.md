@@ -8,20 +8,20 @@ This register lists the method choices where reviewers' judgment matters most. T
 
 ## Summary
 
-Suggested reviewers are starting points; any reviewer may comment on any decision. Giulio Barcaroli is asked to review only D1, through the draft sampling-covariance note.
+Suggested reviewers are starting points; any reviewer may comment on any decision. Giulio Barcaroli is asked to review only D1, through the draft sampling-covariance note. Ifeanyi Nzegwu Edochie reviews code only. He is listed, marked (code), on every decision on how MFH is implemented, D1 to D4, D6 to D8 and D10, to check how each is coded.
 
 | # | Decision | Status | Suggested reviewer |
 |---|---|---|---|
-| D1 | Sampling correlation from within-domain residuals | Owner decided November 1, 2026; revised note drafted for expert review | Barcaroli |
-| D2 | Direct variances treated as known | Standing; shortfall measured | Tzavidis |
-| D3 | Selective smoothing, `sm_out`, by default | Owner decided October 29, 2026 | Molina, Tzavidis |
-| D4 | Common random-effect variance on the rate scale | Open | Molina, Tzavidis |
+| D1 | Sampling correlation from within-domain residuals | Owner decided November 1, 2026; revised note drafted for expert review | Barcaroli, Edochie (code) |
+| D2 | Direct variances treated as known | Standing; shortfall measured | Tzavidis, Edochie (code) |
+| D3 | Selective smoothing, `sm_out`, by default | Owner decided October 29, 2026 | Molina, Tzavidis, Edochie (code) |
+| D4 | Common random-effect variance on the rate scale | Open | Molina, Tzavidis, Edochie (code) |
 | D5 | How flagged coverage is presented | Open | All methodological reviewers |
-| D6 | Declared cross-year PSU design | Owner decided October 30, 2026; partial overlap open | Any reviewer |
-| D7 | MFH2 default and two-year window | Owner decided | Molina |
-| D8 | Joint bootstrap conditional on selected model and inputs | Standing | Tzavidis, Edochie |
+| D6 | Declared cross-year PSU design | Owner decided October 30, 2026; partial overlap open | Edochie (code) |
+| D7 | MFH2 default and two-year window | Owner decided | Molina, Edochie (code) |
+| D8 | Joint bootstrap conditional on selected model and inputs | Standing | Tzavidis, Edochie (code) |
 | D9 | UFH and Direct change assume period independence | Standing | Harmening |
-| D10 | Change inference near the covariance boundary | Open | Molina, Tzavidis |
+| D10 | Change inference near the covariance boundary | Open | Molina, Tzavidis, Edochie (code) |
 | D11 | Accepting the `emdi` optimizer difference | Open | Harmening |
 | D12 | Validation scope: platforms and full workflow | Open | Dervisevic |
 

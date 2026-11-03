@@ -41,7 +41,7 @@ The areas below are suggested starting points. Beyond them, each reviewer is fre
 |---|---|
 | Isabel Molina Peralta | Guidelines: fidelity to Molina and Romero (2025), justification and evidence for adaptations |
 | Nikos Tzavidis | Guidelines: methodological choices, assumptions, diagnostics and inference |
-| Ifeanyi Nzegwu Edochie | MFH code and general comments on the user interface |
+| Ifeanyi Nzegwu Edochie (code) | MFH code, including how decisions D1 to D4, D6 to D8 and D10 in the decision register are coded |
 | Sylvia Harmening | UFH code, including transformations and uncertainty; additional MFH comments |
 | Ervin Dervisevic | Application code, reliability, maintainability and workflow integration |
 | Giulio Barcaroli | The revised method for the covariance of sampling errors, in the draft sampling-covariance note only |
@@ -52,7 +52,7 @@ The areas below are suggested starting points. Beyond them, each reviewer is fre
 These routes are suggestions, not assignments. A useful general start is this guide, `Validation_summary.pdf`, `Decision_register.pdf` and the short deviations note. If simulation studies are new to you, start with `Known_truth_validation_note.docx`.
 
 - **Isabel and Nikos:** guidelines, deviations note, decision register D1 to D5 and D7 to D10, then the relevant technical notes.
-- **Ifeanyi:** additional-code inventory, MFH bootstrap and robust fitting sections, MSE and robust MFH2 notes, and the matching code.
+- **Ifeanyi (code):** additional-code inventory, the code behind decision register D1 to D4, D6 to D8 and D10, MFH bootstrap and robust fitting code, and the MSE and robust MFH2 notes where they explain that code.
 - **Sylvia:** additional-code inventory, guidelines on UFH transformations, benchmarking and uncertainty, MSE note, decision D9 and D11, and the matching code.
 - **Ervin:** additional-code inventory, review ledger, installation and user guides, validation evidence, and the frozen source release.
 - **Giulio:** the draft sampling-covariance note only, in particular the revised Section 8 and the questions at the end of its evidence subsection.
