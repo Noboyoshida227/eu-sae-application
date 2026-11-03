@@ -33,30 +33,34 @@ Copied documents come from the frozen RC4 archive, so a few statements in them a
 | Application ZIP, `docs/guidance/Technical notes` | MSE note, robust MFH2 note and companion covariance derivations. It also holds the earlier sampling-covariance note: use the draft in the emailed ZIP instead |
 | Application ZIP, `docs/validation` | Dated validation records, which keep their original scope |
 
-## Review responsibilities
+## Suggested review areas
 
-| Reviewer | Main focus |
+The areas below are suggested starting points. Beyond them, each reviewer is free to choose which materials and topics to review. Giulio Barcaroli is asked to review only the revised method for the covariance of sampling errors; no other material is requested from him.
+
+| Reviewer | Suggested starting point |
 |---|---|
 | Isabel Molina Peralta | Guidelines: fidelity to Molina and Romero (2025), justification and evidence for adaptations |
 | Nikos Tzavidis | Guidelines: methodological choices, assumptions, diagnostics and inference |
 | Ifeanyi Nzegwu Edochie | MFH code and general comments on the user interface |
 | Sylvia Harmening | UFH code, including transformations and uncertainty; additional MFH comments |
 | Ervin Dervisevic | Application code, reliability, maintainability and workflow integration |
-| Giulio Barcaroli | Sampling design and estimation of the sampling-error covariance matrix, including the revised method for the covariance of sampling errors in the draft note |
+| Giulio Barcaroli | The revised method for the covariance of sampling errors, in the draft sampling-covariance note only |
 | Maarten Lambrechts | Interface design, navigation, clarity of settings and presentation of results |
 
 ## Suggested reading routes
 
-All reviewers: this guide, `Validation_summary.pdf`, `Decision_register.pdf` and the short deviations note. If simulation studies are new to you, start with `Known_truth_validation_note.docx`. Comments outside your primary area are welcome.
+These routes are suggestions, not assignments. A useful general start is this guide, `Validation_summary.pdf`, `Decision_register.pdf` and the short deviations note. If simulation studies are new to you, start with `Known_truth_validation_note.docx`.
 
 - **Isabel and Nikos:** guidelines, deviations note, decision register D1 to D5 and D7 to D10, then the relevant technical notes.
 - **Ifeanyi:** additional-code inventory, MFH bootstrap and robust fitting sections, MSE and robust MFH2 notes, and the matching code.
 - **Sylvia:** additional-code inventory, guidelines on UFH transformations, benchmarking and uncertainty, MSE note, decision D9 and D11, and the matching code.
 - **Ervin:** additional-code inventory, review ledger, installation and user guides, validation evidence, and the frozen source release.
-- **Giulio:** revised sampling-error covariance note, including the questions at the end of its Section 8 evidence subsection, decisions D1, D2 and D6, and the variance policy discussion.
+- **Giulio:** the draft sampling-covariance note only, in particular the revised Section 8 and the questions at the end of its evidence subsection.
 - **Maarten:** quick start and Guides 1 to 3, then the public or synthetic example in the application.
 
 ## Questions and feedback
+
+Reviewers may address any of these questions, or none, and raise other topics of their choice. For Giulio Barcaroli, only question 3 applies.
 
 1. Does the implementation faithfully represent the intended UFH and MFH models and change uncertainty?
 2. Are the MFH2 default, two-year window, variance smoothing and covariance assumptions justified for the intended applications?

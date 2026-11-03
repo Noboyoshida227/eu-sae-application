@@ -8,14 +8,16 @@ This register lists the method choices where reviewers' judgment matters most. T
 
 ## Summary
 
-| # | Decision | Status | Main expert |
+Suggested reviewers are starting points; any reviewer may comment on any decision. Giulio Barcaroli is asked to review only D1, through the draft sampling-covariance note.
+
+| # | Decision | Status | Suggested reviewer |
 |---|---|---|---|
 | D1 | Sampling correlation from within-domain residuals | Owner decided November 1, 2026; revised note drafted for expert review | Barcaroli |
-| D2 | Direct variances treated as known | Standing; shortfall measured | Barcaroli, Tzavidis |
+| D2 | Direct variances treated as known | Standing; shortfall measured | Tzavidis |
 | D3 | Selective smoothing, `sm_out`, by default | Owner decided October 29, 2026 | Molina, Tzavidis |
 | D4 | Common random-effect variance on the rate scale | Open | Molina, Tzavidis |
 | D5 | How flagged coverage is presented | Open | All methodological reviewers |
-| D6 | Declared cross-year PSU design | Owner decided October 30, 2026; partial overlap open | Barcaroli |
+| D6 | Declared cross-year PSU design | Owner decided October 30, 2026; partial overlap open | Any reviewer |
 | D7 | MFH2 default and two-year window | Owner decided | Molina |
 | D8 | Joint bootstrap conditional on selected model and inputs | Standing | Tzavidis, Edochie |
 | D9 | UFH and Direct change assume period independence | Standing | Harmening |
@@ -33,7 +35,7 @@ This register lists the method choices where reviewers' judgment matters most. T
 - **Evidence:** the correlation now averages .464 against .467. Linked change coverage rose from 84.0% to 90.9%, and actual change MSE fell 8%.
 - **Sensitivity on cases:** Spain poverty .561 to .555, no flips. Spain mean welfare .677 to .763, change MSE ratio .81, 1 flip of 52. R5a .748 to .307, change MSE ratio 2.13, 4 flips of 40.
 - **Limits:** tested in a scenario with no strata. Surveys whose strata cross domains were not simulated. A single pooled correlation assumes domains are alike. Correlation-limit fits rose from 1 to 4 of the cases.
-- **Note status:** The emailed ZIP holds a revised draft of the note, with tracked changes against the earlier version. It is submitted for the sampling experts' review and has not been agreed. The application ZIP keeps the earlier note.
+- **Note status:** The emailed ZIP holds a revised draft of the note, with tracked changes against the earlier version. It is submitted for the sampling expert's review and has not been agreed. The application ZIP keeps the earlier note.
 
 **Questions for experts:** Is the residual correlation the right quantity for stratified designs? Where domains are similar to strata, does it remain close to the true correlation? Should a domain-varying correlation be considered?
 
